@@ -81,6 +81,15 @@ class TransactionTile extends StatelessWidget {
                       color: AppColors.muted,
                     ),
                   ),
+                  const SizedBox(height: 2),
+                  Text(
+                    transaction.paymentMethodDisplay,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.muted,
+                    ),
+                  ),
                   if (transaction.notes.isNotEmpty) ...[
                     const SizedBox(height: 2),
                     Text(

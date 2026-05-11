@@ -34,6 +34,12 @@ class IconMapper {
     'emergency': Icons.emergency,
     'diamond': Icons.diamond,
     'volunteer_activism': Icons.volunteer_activism,
+    // Payment Methods
+    'cash': Icons.payments,
+    'card': Icons.credit_card,
+    'bank': Icons.account_balance,
+    'upi': Icons.account_balance_wallet,
+    'other': Icons.more_horiz,
   };
 
   /// Returns the Flutter [IconData] for a Django icon name.

@@ -304,6 +304,27 @@ class ApiService {
     }
   }
 
+  /// Update an existing user category
+  static Future<ApiResult<CategoryModel>> updateCategory(
+      int id, Map<String, dynamic> catData) async {
+    try {
+      final url = await _url('/api/categories/$id/');
+      final response = await http.put(
+        Uri.parse(url),
+        headers: await _headers(),
+        body: jsonEncode(catData),
+      );
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResult(data: CategoryModel.fromJson(data['category']));
+      }
+      return ApiResult(error: data['error'] ?? 'Failed to update category.');
+    } catch (e) {
+      return ApiResult(error: 'Connection error.');
+    }
+  }
+
   /// Delete a user category
   static Future<ApiResult<bool>> deleteCategory(int id) async {
     try {
@@ -539,8 +560,17 @@ class ApiService {
     }
   }
 
-  /// Logout — clear token
+  /// Logout — notify backend and clear local token
   static Future<void> logout() async {
+    try {
+      final url = await _url('/api/auth/logout/');
+      await http.post(
+        Uri.parse(url),
+        headers: await _headers(),
+      );
+    } catch (_) {
+      // Ignore errors on logout
+    }
     await AuthService.clearToken();
   }
 }

@@ -77,7 +77,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     }
   }
 
-  void _showAddCategorySheet() {
+  void _showCategoryForm({CategoryModel? category}) {
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.card,
@@ -85,8 +85,9 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (ctx) => _AddCategorySheet(
-        onCreated: () {
+      builder: (ctx) => _CategoryFormSheet(
+        category: category,
+        onSaved: () {
           Navigator.pop(ctx);
           _loadCategories();
         },
@@ -134,7 +135,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                   ),
                   const Spacer(),
                   GestureDetector(
-                    onTap: _showAddCategorySheet,
+                    onTap: () => _showCategoryForm(),
                     child: Container(
                       width: 40,
                       height: 40,
@@ -178,7 +179,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                                 const SizedBox(height: 8),
                                 ...userCats.map((cat) => _CategoryTile(
                                       category: cat,
-                                      canDelete: true,
+                                      canEdit: true,
+                                      onEdit: () => _showCategoryForm(category: cat),
                                       onDelete: () =>
                                           _deleteCategory(cat),
                                     )),
@@ -193,7 +195,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                               const SizedBox(height: 8),
                               ...systemCats.map((cat) => _CategoryTile(
                                     category: cat,
-                                    canDelete: false,
+                                    canEdit: false,
                                   )),
                             ],
                           ),
@@ -256,12 +258,14 @@ class _SectionHeader extends StatelessWidget {
 
 class _CategoryTile extends StatelessWidget {
   final CategoryModel category;
-  final bool canDelete;
+  final bool canEdit;
+  final VoidCallback? onEdit;
   final VoidCallback? onDelete;
 
   const _CategoryTile({
     required this.category,
-    required this.canDelete,
+    required this.canEdit,
+    this.onEdit,
     this.onDelete,
   });
 
@@ -318,8 +322,19 @@ class _CategoryTile extends StatelessWidget {
             ),
           ),
 
-          // Delete button (only for user categories)
-          if (canDelete)
+          // Actions (only for user categories)
+          if (canEdit) ...[
+            GestureDetector(
+              onTap: onEdit,
+              child: Container(
+                width: 32,
+                height: 32,
+                decoration: const BoxDecoration(shape: BoxShape.circle),
+                child: const Icon(Icons.edit_outlined,
+                    size: 18, color: AppColors.muted),
+              ),
+            ),
+            const SizedBox(width: 4),
             GestureDetector(
               onTap: onDelete,
               child: Container(
@@ -330,13 +345,14 @@ class _CategoryTile extends StatelessWidget {
                     size: 18, color: AppColors.muted),
               ),
             ),
+          ],
         ],
       ),
     );
   }
 }
 
-// ─── Add Category Bottom Sheet ──────────────────────────────────────────────
+// ─── Category Form Bottom Sheet ──────────────────────────────────────────────
 
 /// Available icon choices matching Django's Category.ICON_CHOICES.
 const _iconChoices = [
@@ -368,21 +384,30 @@ const _colorChoices = [
   '#AED6F1', '#D7BDE2', '#A3E4D7',
 ];
 
-class _AddCategorySheet extends StatefulWidget {
-  final VoidCallback onCreated;
+class _CategoryFormSheet extends StatefulWidget {
+  final CategoryModel? category;
+  final VoidCallback onSaved;
 
-  const _AddCategorySheet({required this.onCreated});
+  const _CategoryFormSheet({this.category, required this.onSaved});
 
   @override
-  State<_AddCategorySheet> createState() => _AddCategorySheetState();
+  State<_CategoryFormSheet> createState() => _CategoryFormSheetState();
 }
 
-class _AddCategorySheetState extends State<_AddCategorySheet> {
-  final _nameController = TextEditingController();
-  String _selectedIcon = 'category';
-  String _selectedColor = '#C8E64A';
+class _CategoryFormSheetState extends State<_CategoryFormSheet> {
+  late TextEditingController _nameController;
+  late String _selectedIcon;
+  late String _selectedColor;
   bool _isSaving = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.category?.name ?? '');
+    _selectedIcon = widget.category?.icon ?? 'category';
+    _selectedColor = widget.category?.color ?? '#C8E64A';
+  }
 
   Future<void> _save() async {
     final name = _nameController.text.trim();
@@ -396,19 +421,26 @@ class _AddCategorySheetState extends State<_AddCategorySheet> {
       _error = null;
     });
 
-    final result = await ApiService.createCategory({
+    final catData = {
       'name': name,
       'icon': _selectedIcon,
       'color': _selectedColor,
-    });
+    };
+
+    final ApiResult<CategoryModel> result;
+    if (widget.category != null) {
+      result = await ApiService.updateCategory(widget.category!.id, catData);
+    } else {
+      result = await ApiService.createCategory(catData);
+    }
 
     if (!mounted) return;
     setState(() => _isSaving = false);
 
     if (result.isSuccess) {
-      widget.onCreated();
+      widget.onSaved();
     } else {
-      setState(() => _error = result.error ?? 'Failed to create.');
+      setState(() => _error = result.error ?? 'Failed to save.');
     }
   }
 
@@ -442,10 +474,10 @@ class _AddCategorySheetState extends State<_AddCategorySheet> {
             const SizedBox(height: 16),
 
             // Title
-            const Center(
+            Center(
               child: Text(
-                'New Category',
-                style: TextStyle(
+                widget.category != null ? 'Edit Category' : 'New Category',
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: AppColors.text,
@@ -478,6 +510,7 @@ class _AddCategorySheetState extends State<_AddCategorySheet> {
             const SizedBox(height: 6),
             TextField(
               controller: _nameController,
+              onChanged: (_) => setState(() {}),
               style:
                   const TextStyle(fontSize: 14, color: AppColors.text),
               decoration: InputDecoration(
@@ -644,7 +677,7 @@ class _AddCategorySheetState extends State<_AddCategorySheet> {
                           color: AppColors.accent,
                         ),
                       )
-                    : const Text('Create Category'),
+                    : Text(widget.category != null ? 'Update Category' : 'Create Category'),
               ),
             ),
           ],

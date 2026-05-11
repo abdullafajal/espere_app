@@ -39,7 +39,9 @@ class DashboardScreenState extends State<DashboardScreen> {
   void reload() => _loadDashboard();
 
   Future<void> _loadDashboard() async {
-    setState(() => _isLoading = true);
+    if (_data == null) {
+      setState(() => _isLoading = true);
+    }
     final result = await ApiService.getDashboard();
     if (!mounted) return;
     setState(() {

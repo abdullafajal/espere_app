@@ -509,11 +509,73 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                       ),
                                     ),
                                     const SizedBox(height: 6),
-                                    _DropdownField(
-                                      value: _paymentMethod,
-                                      items: _paymentMethods,
-                                      onChanged: (v) => setState(
-                                          () => _paymentMethod = v),
+                                    GestureDetector(
+                                      onTap: () {
+                                        showModalBottomSheet(
+                                          context: context,
+                                          backgroundColor: AppColors.card,
+                                          shape: const RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.vertical(
+                                                top: Radius.circular(24)),
+                                          ),
+                                          builder: (ctx) =>
+                                              _PaymentMethodPickerSheet(
+                                            selectedMethod: _paymentMethod,
+                                            onSelected: (method) {
+                                              setState(() =>
+                                                  _paymentMethod = method);
+                                              Navigator.pop(ctx);
+                                            },
+                                          ),
+                                        );
+                                      },
+                                      child: Container(
+                                        width: double.infinity,
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 16, vertical: 14),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.surface,
+                                          borderRadius:
+                                              BorderRadius.circular(
+                                                  AppRadius.lg),
+                                          border: Border.all(
+                                              color: AppColors.border,
+                                              width: 1.5),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Container(
+                                              width: 32,
+                                              height: 32,
+                                              decoration: BoxDecoration(
+                                                color: AppColors.accent,
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
+                                              child: Icon(
+                                                IconMapper.map(_paymentMethod),
+                                                size: 18,
+                                                color: AppColors.dark,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Text(
+                                                _paymentMethods
+                                                    .firstWhere((m) =>
+                                                        m.$1 == _paymentMethod)
+                                                    .$2,
+                                                style: const TextStyle(
+                                                  fontSize: 14,
+                                                  color: AppColors.text,
+                                                ),
+                                              ),
+                                            ),
+                                            const Icon(Icons.arrow_drop_down,
+                                                color: AppColors.muted),
+                                          ],
+                                        ),
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -559,51 +621,6 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                     ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Custom styled dropdown matching the Django select inputs
-class _DropdownField extends StatelessWidget {
-  final String value;
-  final List<(String, String)> items;
-  final ValueChanged<String> onChanged;
-
-  const _DropdownField({
-    required this.value,
-    required this.items,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.border, width: 1.5),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: items.any((item) => item.$1 == value) ? value : null,
-          isExpanded: true,
-          icon: const Icon(Icons.arrow_drop_down, color: AppColors.muted),
-          style: const TextStyle(fontSize: 14, color: AppColors.text),
-          dropdownColor: AppColors.card,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          items: items
-              .map((item) => DropdownMenuItem<String>(
-                    value: item.$1,
-                    child: Text(item.$2),
-                  ))
-              .toList(),
-          onChanged: (v) {
-            if (v != null) onChanged(v);
-          },
         ),
       ),
     );
@@ -793,6 +810,155 @@ class _CategoryPickerSheetState extends State<_CategoryPickerSheet> {
                     ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Bottom sheet for picking a payment method with icons.
+class _PaymentMethodPickerSheet extends StatelessWidget {
+  final String selectedMethod;
+  final ValueChanged<String> onSelected;
+
+  const _PaymentMethodPickerSheet({
+    required this.selectedMethod,
+    required this.onSelected,
+  });
+
+  static const _methods = [
+    ('cash', 'Cash'),
+    ('card', 'Credit/Debit Card'),
+    ('bank', 'Bank Transfer'),
+    ('upi', 'UPI / Mobile Payment'),
+    ('other', 'Other'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Drag handle
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppColors.border,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          const Text(
+            'Payment Method',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppColors.text,
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          ..._methods.map((method) {
+            final isSelected = selectedMethod == method.$1;
+            return GestureDetector(
+              onTap: () => onSelected(method.$1),
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? AppColors.accent.withValues(alpha: 0.15)
+                      : AppColors.surface,
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                  border: Border.all(
+                    color: isSelected ? AppColors.accent : Colors.transparent,
+                    width: 1.5,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: AppColors.accent,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        IconMapper.map(method.$1),
+                        size: 18,
+                        color: AppColors.dark,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        method.$2,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight:
+                              isSelected ? FontWeight.w600 : FontWeight.w400,
+                          color: AppColors.text,
+                        ),
+                      ),
+                    ),
+                    if (isSelected)
+                      const Icon(Icons.check_circle,
+                          size: 20, color: AppColors.accent),
+                  ],
+                ),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+class _DropdownField extends StatelessWidget {
+  final String value;
+  final List<(String, String)> items;
+  final ValueChanged<String> onChanged;
+
+  const _DropdownField({
+    required this.value,
+    required this.items,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.border, width: 1.5),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: items.any((item) => item.$1 == value) ? value : null,
+          isExpanded: true,
+          icon: const Icon(Icons.arrow_drop_down, color: AppColors.muted),
+          style: const TextStyle(fontSize: 14, color: AppColors.text),
+          dropdownColor: AppColors.card,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          items: items
+              .map((item) => DropdownMenuItem<String>(
+                    value: item.$1,
+                    child: Text(item.$2),
+                  ))
+              .toList(),
+          onChanged: (v) {
+            if (v != null) onChanged(v);
+          },
         ),
       ),
     );

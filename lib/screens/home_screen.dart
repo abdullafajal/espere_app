@@ -42,7 +42,6 @@ class _HomeScreenState extends State<HomeScreen> {
             _currentIndex = index;
             _isBottomNavVisible = true;
           });
-          _refreshTab(index);
         },
       ),
       TransactionListScreen(key: _transactionListKey),
@@ -113,7 +112,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   _currentIndex = index;
                   _isBottomNavVisible = true;
                 });
-                _refreshTab(index);
               },
             ),
           ),
