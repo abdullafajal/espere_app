@@ -1,0 +1,46 @@
+name: espere_app
+description: "Espere — Modern Expense & Income Tracker"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.7.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0
+  shared_preferences: ^2.3.0
+  fl_chart: ^0.70.0
+  intl: ^0.19.0
+  google_fonts: ^6.2.0
+  firebase_core: ^3.13.0
+  firebase_messaging: ^15.2.4
+  share_plus: ^13.1.0
+  dynamic_color: ^1.7.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.3
+  flutter_native_splash: ^2.4.4
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/logo.jpeg"
+  adaptive_icon_background: "#1A1A1A"
+  adaptive_icon_foreground: "assets/logo.jpeg"
+
+flutter_native_splash:
+  color: "#1A1A1A"
+  android_12:
+    color: "#1A1A1A"
+    icon_background_color: "#1A1A1A"
+  fullscreen: true
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/logo.jpeg

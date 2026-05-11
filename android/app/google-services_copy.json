@@ -1,0 +1,28 @@
+{
+  "project_info": {
+    "project_number": "1057401697979",
+    "project_id": "espere-6e6ac",
+    "storage_bucket": "espere-6e6ac.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1057401697979:android:PLACEHOLDER",
+        "android_client_info": {
+          "package_name": "com.example.espere_app"
+        }
+      },
+      "api_key": [
+        {
+          "current_key": "AIzaSyAtqLpDR6tOvGDVDAqWNxgGE08AcX9jskg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
