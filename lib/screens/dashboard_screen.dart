@@ -6,12 +6,18 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'dart:math' as math;
+import 'dart:io';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../theme/app_theme.dart';
 import '../models/dashboard.dart';
 import '../services/api_service.dart';
 import '../widgets/balance_card.dart';
 import '../widgets/summary_card.dart';
 import '../widgets/transaction_tile.dart';
+import '../utils/icon_mapper.dart';
 import '../utils/app_toast.dart';
 import 'reports_screen.dart';
 
@@ -54,6 +60,17 @@ class DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
+  Color _parseColor(String? hex) {
+    if (hex == null || hex.isEmpty) return AppColors.error;
+    try {
+      String cleanHex = hex.replaceFirst('#', '');
+      if (cleanHex.length == 6) cleanHex = 'FF$cleanHex';
+      return Color(int.parse(cleanHex, radix: 16));
+    } catch (e) {
+      return AppColors.error;
+    }
+  }
+
   /// Calculates a "nice" interval for chart axes (like Chart.js/Django)
   double _getNiceInterval(double max) {
     if (max <= 0) return 1000;
@@ -89,7 +106,7 @@ class DashboardScreenState extends State<DashboardScreen> {
       color: AppColors.accent,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -150,6 +167,7 @@ class DashboardScreenState extends State<DashboardScreen> {
                 ],
               ),
             ),
+            const SizedBox(height: 16),
 
             // ─── Balance Card ───────────────────────────────────
             BalanceCard(
@@ -211,7 +229,7 @@ class DashboardScreenState extends State<DashboardScreen> {
 
             // ─── Promo Banner ──────────────────────────────────
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: AppColors.accent,
                 borderRadius: BorderRadius.circular(AppRadius.xl),
@@ -258,44 +276,56 @@ class DashboardScreenState extends State<DashboardScreen> {
                 ],
               ),
             ),
+            const SizedBox(height: 16),
 
             // ─── Budget Warnings ────────────────────────────────
-            if (d.budgetWarnings.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              ...d.budgetWarnings.map(
-                (w) => Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            if (d.budgetWarnings.isNotEmpty)
+              ...d.budgetWarnings.map((w) {
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding:
+                      const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: AppColors.dark,
-                    borderRadius: BorderRadius.circular(AppRadius.xl),
-                    boxShadow: AppShadows.soft,
+                    color: AppColors.card,
+                    borderRadius: BorderRadius.circular(AppRadius.xxl),
+                    boxShadow: AppShadows.card,
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.warning_amber_outlined, size: 18, color: AppColors.accent),
-                      const SizedBox(width: 12),
-                      Text(
-                        '${w['category']} budget exceeded!',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
                           color: AppColors.accent,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          IconMapper.map(w['icon'] ?? 'category'),
+                          size: 18,
+                          color: AppColors.dark,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          '${w['category']} budget exceeded!',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: AppColors.text,
+                          ),
                         ),
                       ),
                     ],
                   ),
-                ),
-              ),
-            ],
+                );
+              }),
 
             // ─── Insights ───────────────────────────────────────
-            if (d.insights.isNotEmpty) ...[
-              const SizedBox(height: 16),
+            if (d.insights.isNotEmpty)
               ...d.insights.map(
                 (insight) => Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: AppColors.card,
                     borderRadius: BorderRadius.circular(AppRadius.xxl),
@@ -323,10 +353,8 @@ class DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ),
               ),
-            ],
 
             // ─── Charts ─────────────────────────────────────────
-            const SizedBox(height: 16),
 
             // Spending by Category (horizontal bar)
             if (d.pieLabels.isNotEmpty) ...[
@@ -437,7 +465,6 @@ class DashboardScreenState extends State<DashboardScreen> {
                   ),
                 );
               }),
-              const SizedBox(height: 16),
             ],
 
             // Income vs Expenses (bar chart)
@@ -548,7 +575,6 @@ class DashboardScreenState extends State<DashboardScreen> {
                   ),
                 );
               }),
-              const SizedBox(height: 16),
             ],
 
             // 30-Day Spending Trend (line chart)
@@ -643,7 +669,6 @@ class DashboardScreenState extends State<DashboardScreen> {
                   ),
                 );
               }),
-              const SizedBox(height: 16),
             ],
 
             // ─── Recent Transactions ────────────────────────────
@@ -740,13 +765,24 @@ class DashboardScreenState extends State<DashboardScreen> {
                   icon: Icons.download,
                   label: 'Export',
                   subtitle: 'Download CSV',
-                  onTap: () => AppToast.success(context, 'Export Complete: CSV downloaded successfully.'),
+                  onTap: () => _showExportDialog(context),
                 ),
               ],
             ),
           ],
         ),
       ),
+    );
+  }
+
+  void _showExportDialog(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.card,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => const _ExportBottomSheet(),
     );
   }
 
@@ -771,7 +807,7 @@ class DashboardScreenState extends State<DashboardScreen> {
               _shimmer(48, 48, radius: AppRadius.xl),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           _shimmer(double.infinity, 200, radius: AppRadius.xxxl),
           const SizedBox(height: 16),
           Row(
@@ -838,7 +874,8 @@ class _ChartCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(AppRadius.xxl),
@@ -859,7 +896,7 @@ class _ChartCard extends StatelessWidget {
               Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.text)),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           child,
         ],
       ),
@@ -921,6 +958,266 @@ class _LegendItem extends StatelessWidget {
         const SizedBox(width: 6),
         Text(label, style: const TextStyle(fontSize: 12, color: AppColors.muted)),
       ],
+    );
+  }
+}
+
+class _ExportBottomSheet extends StatefulWidget {
+  const _ExportBottomSheet();
+
+  @override
+  State<_ExportBottomSheet> createState() => _ExportBottomSheetState();
+}
+
+class _ExportBottomSheetState extends State<_ExportBottomSheet> {
+  String _selectedPeriod = 'current_month';
+  DateTime? _startDate;
+  DateTime? _endDate;
+
+  Future<void> _pickDateRange() async {
+    final range = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: AppColors.accent,
+              onPrimary: AppColors.dark,
+              surface: AppColors.card,
+              onSurface: AppColors.text,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (range != null) {
+      setState(() {
+        _selectedPeriod = 'custom';
+        _startDate = range.start;
+        _endDate = range.end;
+      });
+    }
+  }
+
+  bool _isExporting = false;
+
+  Future<void> _export() async {
+    setState(() => _isExporting = true);
+    
+    final result = await ApiService.downloadCSV(
+      _selectedPeriod,
+      startDate: _startDate?.toIso8601String().split('T')[0],
+      endDate: _endDate?.toIso8601String().split('T')[0],
+    );
+
+    if (!mounted) return;
+    setState(() => _isExporting = false);
+
+    if (result.isSuccess && result.data != null) {
+      try {
+        String? finalPath;
+        final fileName = 'espere_transactions_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv';
+        
+        if (Platform.isAndroid) {
+          var status = await Permission.storage.request();
+          
+          // On Android 11+ (SDK 30+), storage permission often returns denied even if we can write to app-specific dirs.
+          // To write to public /Download, we try MANAGE_EXTERNAL_STORAGE as a fallback.
+          if (status.isDenied) {
+            status = await Permission.manageExternalStorage.request();
+          }
+
+          if (status.isGranted) {
+            final dirs = await getExternalStorageDirectories(type: StorageDirectory.downloads);
+            if (dirs != null && dirs.isNotEmpty) {
+              finalPath = '${dirs.first.path}/$fileName';
+            } else {
+              // Direct path attempt if dirs is empty
+              finalPath = '/storage/emulated/0/Download/$fileName';
+            }
+          }
+        }
+        
+        if (finalPath == null) {
+          final directory = await getApplicationDocumentsDirectory();
+          finalPath = '${directory.path}/$fileName';
+        }
+
+        final file = File(finalPath);
+        await file.writeAsString(result.data!);
+        
+        if (mounted) {
+          AppToast.success(context, 'Exported: $fileName');
+        }
+        
+        // Also share it for convenience
+        await Share.shareXFiles(
+          [XFile(finalPath)],
+          subject: 'Espere Transactions Export',
+          text: 'Here is your exported transaction history from Espere.',
+        );
+        
+        if (mounted) Navigator.pop(context);
+      } catch (e) {
+        debugPrint('Export Save Error: $e');
+        if (mounted) AppToast.error(context, 'Failed to save file locally.');
+      }
+    } else {
+      if (mounted) {
+        AppToast.error(context, result.error ?? 'Export failed.');
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Export Transactions',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppColors.text,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Select a period to download your CSV report.',
+            style: TextStyle(fontSize: 14, color: AppColors.muted),
+          ),
+          const SizedBox(height: 16),
+
+          _buildOption('current_month', 'Current Month', Icons.calendar_today),
+          _buildOption('last_month', 'Last Month', Icons.history),
+          _buildOption('3m', 'Last 3 Months', Icons.query_builder),
+          _buildOption('6m', 'Last 6 Months', Icons.timelapse),
+          _buildOption('all', 'All Time', Icons.all_inclusive),
+          
+          GestureDetector(
+            onTap: _pickDateRange,
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: _selectedPeriod == 'custom' ? AppColors.accent.withOpacity(0.1) : AppColors.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: _selectedPeriod == 'custom' ? AppColors.accent : AppColors.border,
+                  width: 1.5,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.date_range,
+                    color: _selectedPeriod == 'custom' ? AppColors.accent : AppColors.muted,
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Custom Date Range',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: _selectedPeriod == 'custom' ? AppColors.accent : AppColors.text,
+                          ),
+                        ),
+                        if (_startDate != null && _endDate != null)
+                          Text(
+                            '${DateFormat('MMM d').format(_startDate!)} - ${DateFormat('MMM d').format(_endDate!)}',
+                            style: const TextStyle(fontSize: 12, color: AppColors.muted),
+                          ),
+                      ],
+                    ),
+                  ),
+                  if (_selectedPeriod == 'custom')
+                    const Icon(Icons.check_circle, color: AppColors.accent, size: 20),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            height: 54,
+            child: ElevatedButton(
+              onPressed: _isExporting ? null : _export,
+              child: _isExporting
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        color: AppColors.dark,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Text('Export CSV'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOption(String period, String label, IconData icon) {
+    final isSelected = _selectedPeriod == period;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedPeriod = period),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.accent.withOpacity(0.1) : AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? AppColors.accent : AppColors.border,
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: isSelected ? AppColors.accent : AppColors.muted,
+            ),
+            const SizedBox(width: 16),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: isSelected ? AppColors.accent : AppColors.text,
+              ),
+            ),
+            const Spacer(),
+            if (isSelected)
+              const Icon(Icons.check_circle, color: AppColors.accent, size: 20),
+          ],
+        ),
+      ),
     );
   }
 }

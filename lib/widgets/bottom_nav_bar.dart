@@ -71,7 +71,7 @@ class EspereBottomNav extends StatelessWidget {
                   height: 60,
                   child: Center(
                     child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
+                      duration: const Duration(milliseconds: 150),
                       width: 48,
                       height: 48,
                       decoration: BoxDecoration(

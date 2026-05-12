@@ -12,7 +12,8 @@ import '../utils/icon_mapper.dart';
 import '../widgets/transaction_tile.dart';
 
 class TransactionListScreen extends StatefulWidget {
-  const TransactionListScreen({super.key});
+  final VoidCallback? onBack;
+  const TransactionListScreen({super.key, this.onBack});
 
   @override
   State<TransactionListScreen> createState() => TransactionListScreenState();
@@ -99,23 +100,32 @@ class TransactionListScreenState extends State<TransactionListScreen> {
   Future<void> _deleteTransaction(int id) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.xxl),
-        ),
-        title: const Text('Delete Transaction'),
-        content: const Text('Are you sure you want to delete this transaction?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel', style: TextStyle(color: AppColors.muted)),
+      builder:
+          (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadius.xxl),
+            ),
+            title: const Text('Delete Transaction'),
+            content: const Text(
+              'Are you sure you want to delete this transaction?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text(
+                  'Cancel',
+                  style: TextStyle(color: AppColors.muted),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(color: AppColors.error),
+                ),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete', style: TextStyle(color: AppColors.error)),
-          ),
-        ],
-      ),
     );
 
     if (confirm == true) {
@@ -136,21 +146,44 @@ class TransactionListScreenState extends State<TransactionListScreen> {
       children: [
         // ─── Top Bar ───────────────────────────────────────────
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
           child: Column(
             children: [
               // Header: Title + Add button
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+                  GestureDetector(
+                    onTap: () {
+                      if (Navigator.canPop(context)) {
+                        Navigator.pop(context);
+                      } else {
+                        widget.onBack?.call();
+                      }
+                    },
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.card,
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                        boxShadow: AppShadows.soft,
+                      ),
+                      child: const Icon(
+                        Icons.arrow_back,
+                        color: AppColors.text,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
                   const Text(
                     'Transactions',
                     style: TextStyle(
-                      fontSize: 20,
+                      fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: AppColors.text,
                     ),
                   ),
+                  const Spacer(),
                   GestureDetector(
                     onTap: () async {
                       await Navigator.pushNamed(context, '/transaction/add');
@@ -169,7 +202,7 @@ class TransactionListScreenState extends State<TransactionListScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
 
               // Search bar — matches the search input from transaction_list.html
               Container(
@@ -187,7 +220,11 @@ class TransactionListScreenState extends State<TransactionListScreen> {
                   style: const TextStyle(fontSize: 14, color: AppColors.text),
                   decoration: InputDecoration(
                     hintText: 'Search transactions...',
-                    prefixIcon: const Icon(Icons.search, size: 18, color: AppColors.muted),
+                    prefixIcon: const Icon(
+                      Icons.search,
+                      size: 18,
+                      color: AppColors.muted,
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(AppRadius.xl),
                       borderSide: BorderSide.none,
@@ -207,9 +244,10 @@ class TransactionListScreenState extends State<TransactionListScreen> {
                   children: [
                     // Type filter
                     _FilterChip(
-                      label: _typeFilter.isEmpty
-                          ? 'All Types'
-                          : _typeFilter == 'income'
+                      label:
+                          _typeFilter.isEmpty
+                              ? 'All Types'
+                              : _typeFilter == 'income'
                               ? 'Income'
                               : 'Expense',
                       onTap: () {
@@ -229,13 +267,14 @@ class TransactionListScreenState extends State<TransactionListScreen> {
 
                     // Category filter
                     _FilterChip(
-                      label: _categoryFilter == null
-                          ? 'All Categories'
-                          : _categories
-                                  .where((c) => c.id == _categoryFilter)
-                                  .firstOrNull
-                                  ?.name ??
-                              'Category',
+                      label:
+                          _categoryFilter == null
+                              ? 'All Categories'
+                              : _categories
+                                      .where((c) => c.id == _categoryFilter)
+                                      .firstOrNull
+                                      ?.name ??
+                                  'Category',
                       onTap: () => _showCategoryPicker(),
                     ),
                     const SizedBox(width: 8),
@@ -243,7 +282,9 @@ class TransactionListScreenState extends State<TransactionListScreen> {
                     // Month navigator
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 6),
+                        horizontal: 6,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.card,
                         borderRadius: BorderRadius.circular(AppRadius.md),
@@ -259,8 +300,11 @@ class TransactionListScreenState extends State<TransactionListScreen> {
                               child: const SizedBox(
                                 width: 24,
                                 height: 24,
-                                child: Icon(Icons.chevron_left,
-                                    size: 18, color: AppColors.muted),
+                                child: Icon(
+                                  Icons.chevron_left,
+                                  size: 18,
+                                  color: AppColors.muted,
+                                ),
                               ),
                             ),
                           ],
@@ -269,8 +313,9 @@ class TransactionListScreenState extends State<TransactionListScreen> {
                             child: Text(
                               _showAll
                                   ? 'All Time'
-                                  : DateFormat('MMMM yyyy')
-                                      .format(_currentMonth),
+                                  : DateFormat(
+                                    'MMMM yyyy',
+                                  ).format(_currentMonth),
                               style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
@@ -284,8 +329,11 @@ class TransactionListScreenState extends State<TransactionListScreen> {
                               child: const SizedBox(
                                 width: 24,
                                 height: 24,
-                                child: Icon(Icons.chevron_right,
-                                    size: 18, color: AppColors.muted),
+                                child: Icon(
+                                  Icons.chevron_right,
+                                  size: 18,
+                                  color: AppColors.muted,
+                                ),
                               ),
                             ),
                           ],
@@ -299,7 +347,9 @@ class TransactionListScreenState extends State<TransactionListScreen> {
                             onTap: _toggleAll,
                             child: Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 2),
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
                                 color: AppColors.accent,
                                 borderRadius: BorderRadius.circular(8),
@@ -324,88 +374,93 @@ class TransactionListScreenState extends State<TransactionListScreen> {
             ],
           ),
         ),
+        const SizedBox(height: 10),
 
         // ─── Transaction List ──────────────────────────────────
         Expanded(
-          child: _isLoading
-              ? _buildSkeleton()
-              : _error != null
+          child:
+              _isLoading
+                  ? _buildSkeleton()
+                  : _error != null
                   ? Center(
-                      child: Text(_error!,
-                          style: const TextStyle(color: AppColors.muted)),
-                    )
+                    child: Text(
+                      _error!,
+                      style: const TextStyle(color: AppColors.muted),
+                    ),
+                  )
                   : _transactions.isEmpty
-                      ? _buildEmpty()
-                      : RefreshIndicator(
-                          onRefresh: _loadTransactions,
-                          color: AppColors.accent,
-                          child: ListView.builder(
-                            padding:
-                                const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                            itemCount: _transactions.length,
-                            itemBuilder: (context, index) {
-                              final txn = _transactions[index];
-                              // Group header — show month separator
-                              bool showHeader = false;
-                              if (index == 0) {
-                                showHeader = true;
-                              } else {
-                                final prevTxn = _transactions[index - 1];
-                                if (txn.date.month != prevTxn.date.month ||
-                                    txn.date.year != prevTxn.date.year) {
-                                  showHeader = true;
-                                }
-                              }
+                  ? _buildEmpty()
+                  : RefreshIndicator(
+                    onRefresh: _loadTransactions,
+                    color: AppColors.accent,
+                    child: ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+                      itemCount: _transactions.length,
+                      itemBuilder: (context, index) {
+                        final txn = _transactions[index];
+                        // Group header — show month separator
+                        bool showHeader = false;
+                        if (index == 0) {
+                          showHeader = true;
+                        } else {
+                          final prevTxn = _transactions[index - 1];
+                          if (txn.date.month != prevTxn.date.month ||
+                              txn.date.year != prevTxn.date.year) {
+                            showHeader = true;
+                          }
+                        }
 
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (showHeader)
-                                    Padding(
-                                      padding: const EdgeInsets.only(
-                                          top: 12, bottom: 8, left: 4),
-                                      child: Text(
-                                        DateFormat('MMMM yyyy')
-                                            .format(txn.date.toLocal())
-                                            .toUpperCase(),
-                                        style: const TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w900,
-                                          letterSpacing: 2,
-                                          color: AppColors.muted,
-                                        ),
-                                      ),
-                                    ),
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 8),
-                                    child: TransactionTile(
-                                      transaction: txn,
-                                      showActions: true,
-                                      onTap: () async {
-                                        await Navigator.pushNamed(
-                                          context,
-                                          '/transaction/edit',
-                                          arguments: txn.id,
-                                        );
-                                        _loadTransactions();
-                                      },
-                                      onEdit: () async {
-                                        await Navigator.pushNamed(
-                                          context,
-                                          '/transaction/edit',
-                                          arguments: txn.id,
-                                        );
-                                        _loadTransactions();
-                                      },
-                                      onDelete: () =>
-                                          _deleteTransaction(txn.id),
-                                    ),
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (showHeader)
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                  top: 12,
+                                  bottom: 8,
+                                  left: 4,
+                                ),
+                                child: Text(
+                                  DateFormat(
+                                    'MMMM yyyy',
+                                  ).format(txn.date.toLocal()).toUpperCase(),
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 2,
+                                    color: AppColors.muted,
                                   ),
-                                ],
-                              );
-                            },
-                          ),
-                        ),
+                                ),
+                              ),
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: TransactionTile(
+                                transaction: txn,
+                                showActions: true,
+                                onTap: () async {
+                                  await Navigator.pushNamed(
+                                    context,
+                                    '/transaction/edit',
+                                    arguments: txn.id,
+                                  );
+                                  _loadTransactions();
+                                },
+                                onEdit: () async {
+                                  await Navigator.pushNamed(
+                                    context,
+                                    '/transaction/edit',
+                                    arguments: txn.id,
+                                  );
+                                  _loadTransactions();
+                                },
+                                onDelete: () => _deleteTransaction(txn.id),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
         ),
       ],
     );
@@ -444,7 +499,10 @@ class TransactionListScreenState extends State<TransactionListScreen> {
               const SizedBox(height: 16),
               // All categories option
               ListTile(
-                leading: const Icon(Icons.all_inclusive, color: AppColors.accent),
+                leading: const Icon(
+                  Icons.all_inclusive,
+                  color: AppColors.accent,
+                ),
                 title: const Text('All Categories'),
                 onTap: () {
                   setState(() => _categoryFilter = null);
@@ -467,8 +525,11 @@ class TransactionListScreenState extends State<TransactionListScreen> {
                           color: cat.colorValue,
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Icon(IconMapper.map(cat.icon),
-                            size: 16, color: AppColors.dark),
+                        child: Icon(
+                          IconMapper.map(cat.icon),
+                          size: 16,
+                          color: AppColors.dark,
+                        ),
                       ),
                       title: Text(cat.name),
                       selected: _categoryFilter == cat.id,
@@ -492,14 +553,15 @@ class TransactionListScreenState extends State<TransactionListScreen> {
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: 5,
-      itemBuilder: (_, __) => Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        height: 72,
-        decoration: BoxDecoration(
-          color: AppColors.card,
-          borderRadius: BorderRadius.circular(AppRadius.xxl),
-        ),
-      ),
+      itemBuilder:
+          (_, __) => Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            height: 72,
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: BorderRadius.circular(AppRadius.xxl),
+            ),
+          ),
     );
   }
 
@@ -508,8 +570,11 @@ class TransactionListScreenState extends State<TransactionListScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.receipt_long,
-              size: 56, color: AppColors.muted.withValues(alpha: 0.4)),
+          Icon(
+            Icons.receipt_long,
+            size: 56,
+            color: AppColors.muted.withValues(alpha: 0.4),
+          ),
           const SizedBox(height: 8),
           const Text(
             'No transactions found',

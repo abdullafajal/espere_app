@@ -346,7 +346,7 @@ class ApiService {
 
   /// ─── Budgets ─────────────────────────────────────────────────────────
 
-  static Future<ApiResult<List<Map<String, dynamic>>>> getBudgets() async {
+  static Future<ApiResult<Map<String, dynamic>>> getBudgets() async {
     try {
       final url = await _url('/api/budgets/');
       final response = await http.get(
@@ -356,18 +356,68 @@ class ApiService {
 
       final data = jsonDecode(response.body);
       if (response.statusCode == 200) {
-        final budgets = List<Map<String, dynamic>>.from(data['budgets']);
-        return ApiResult(data: budgets);
+        return ApiResult(data: data);
       }
-      return ApiResult(error: 'Failed to load budgets.');
+      return ApiResult(error: data['error'] ?? 'Failed to load budgets.');
+    } catch (e) {
+      return ApiResult(error: 'Connection error.');
+    }
+  }
+
+  static Future<ApiResult<Map<String, dynamic>>> createBudget(Map<String, dynamic> body) async {
+    try {
+      final url = await _url('/api/budgets/');
+      final response = await http.post(
+        Uri.parse(url),
+        headers: await _headers(),
+        body: jsonEncode(body),
+      );
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return ApiResult(data: data['budget']);
+      }
+      return ApiResult(error: data['error'] ?? 'Failed to save budget.', errors: data['errors']);
+    } catch (e) {
+      return ApiResult(error: 'Connection error.');
+    }
+  }
+
+  static Future<ApiResult<void>> deleteBudget(int id) async {
+    try {
+      final url = await _url('/api/budgets/$id/');
+      final response = await http.delete(Uri.parse(url), headers: await _headers());
+      if (response.statusCode == 200) {
+        return ApiResult(data: null);
+      }
+      final data = jsonDecode(response.body);
+      return ApiResult(error: data['error'] ?? 'Failed to delete budget.');
+    } catch (e) {
+      return ApiResult(error: 'Connection error.');
+    }
+  }
+
+  /// ─── Reports ─────────────────────────────────────────────────────────
+
+  /// Get report data
+  static Future<ApiResult<Map<String, dynamic>>> getReports({int? year}) async {
+    try {
+      final y = year ?? DateTime.now().year;
+      final url = await _url('/api/reports/?year=$y');
+      final response = await http.get(Uri.parse(url), headers: await _headers());
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResult(data: data);
+      }
+      return ApiResult(error: data['error'] ?? 'Failed to load reports.');
     } catch (e) {
       return ApiResult(error: 'Connection error.');
     }
   }
 
   /// ─── Savings ─────────────────────────────────────────────────────────
-
-  static Future<ApiResult<List<Map<String, dynamic>>>> getSavings() async {
+  /// Get savings goals
+  static Future<ApiResult<Map<String, dynamic>>> getSavings() async {
     try {
       final url = await _url('/api/savings/');
       final response = await http.get(
@@ -377,10 +427,91 @@ class ApiService {
 
       final data = jsonDecode(response.body);
       if (response.statusCode == 200) {
-        final goals = List<Map<String, dynamic>>.from(data['goals']);
-        return ApiResult(data: goals);
+        return ApiResult(data: data);
       }
       return ApiResult(error: 'Failed to load savings.');
+    } catch (e) {
+      return ApiResult(error: 'Connection error.');
+    }
+  }
+
+  /// Create a new savings goal
+  static Future<ApiResult<Map<String, dynamic>>> createSavingGoal(
+      Map<String, dynamic> goalData) async {
+    try {
+      final url = await _url('/api/savings/');
+      final response = await http.post(
+        Uri.parse(url),
+        headers: await _headers(),
+        body: jsonEncode(goalData),
+      );
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 201) {
+        return ApiResult(data: data['goal']);
+      }
+      return ApiResult(error: data['error'] ?? 'Failed to create goal.');
+    } catch (e) {
+      return ApiResult(error: 'Connection error.');
+    }
+  }
+
+  /// Update a savings goal
+  static Future<ApiResult<Map<String, dynamic>>> updateSavingGoal(
+      int id, Map<String, dynamic> goalData) async {
+    try {
+      final url = await _url('/api/savings/$id/');
+      final response = await http.put(
+        Uri.parse(url),
+        headers: await _headers(),
+        body: jsonEncode(goalData),
+      );
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResult(data: data['goal']);
+      }
+      return ApiResult(error: data['error'] ?? 'Failed to update goal.');
+    } catch (e) {
+      return ApiResult(error: 'Connection error.');
+    }
+  }
+
+  /// Delete a savings goal
+  static Future<ApiResult<bool>> deleteSavingGoal(int id) async {
+    try {
+      final url = await _url('/api/savings/$id/');
+      final response =
+          await http.delete(Uri.parse(url), headers: await _headers());
+
+      if (response.statusCode == 200) {
+        return ApiResult(data: true);
+      }
+      return ApiResult(error: 'Failed to delete goal.');
+    } catch (e) {
+      return ApiResult(error: 'Connection error.');
+    }
+  }
+
+  /// Add money to a savings goal
+  static Future<ApiResult<Map<String, dynamic>>> addMoneyToSavingGoal(
+      int id, double amount, {String? notes}) async {
+    try {
+      final url = await _url('/api/savings/$id/add-money/');
+      final response = await http.post(
+        Uri.parse(url),
+        headers: await _headers(),
+        body: jsonEncode({
+          'amount': amount,
+          'notes': notes ?? '',
+        }),
+      );
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResult(data: data['goal']);
+      }
+      return ApiResult(error: data['error'] ?? 'Failed to add money.');
     } catch (e) {
       return ApiResult(error: 'Connection error.');
     }
@@ -572,5 +703,34 @@ class ApiService {
       // Ignore errors on logout
     }
     await AuthService.clearToken();
+  }
+
+  /// Get the full URL for CSV export
+  static Future<String> getExportUrl(String period,
+      {String? startDate, String? endDate}) async {
+    final base = await AuthService.getBaseUrl();
+    var url = '$base/reports/export/csv/?period=$period';
+    if (startDate != null) url += '&start_date=$startDate';
+    if (endDate != null) url += '&end_date=$endDate';
+    return url;
+  }
+
+  /// Download CSV data
+  static Future<ApiResult<String>> downloadCSV(String period,
+      {String? startDate, String? endDate}) async {
+    try {
+      final url = await getExportUrl(period,
+          startDate: startDate, endDate: endDate);
+      final response = await http.get(
+        Uri.parse(url),
+        headers: await _headers(),
+      );
+      if (response.statusCode == 200) {
+        return ApiResult(data: response.body);
+      }
+      return ApiResult(error: 'Failed to download CSV: ${response.statusCode}');
+    } catch (e) {
+      return ApiResult(error: 'Connection error.');
+    }
   }
 }

@@ -374,6 +374,20 @@ const _iconChoices = [
   ('fitness_center', 'Fitness'),
   ('pets', 'Pets'),
   ('coffee', 'Coffee'),
+  ('medical_services', 'Medical'),
+  ('sports_esports', 'Gaming'),
+  ('sports_soccer', 'Sports'),
+  ('brush', 'Art'),
+  ('music_note', 'Music'),
+  ('science', 'Science'),
+  ('build', 'Tools'),
+  ('celebration', 'Party'),
+  ('fastfood', 'Fast Food'),
+  ('local_gas_station', 'Fuel'),
+  ('electric_bolt', 'Electric'),
+  ('water_drop', 'Water'),
+  ('family_restroom', 'Family'),
+  ('child_care', 'Baby'),
 ];
 
 /// Preset color palette for categories.

@@ -44,10 +44,13 @@ class _HomeScreenState extends State<HomeScreen> {
           });
         },
       ),
-      TransactionListScreen(key: _transactionListKey),
-      const BudgetsScreen(),
-      const SavingsScreen(),
-      const SplitGroupsScreen(),
+      TransactionListScreen(
+        key: _transactionListKey,
+        onBack: () => setState(() => _currentIndex = 0),
+      ),
+      BudgetsScreen(onBack: () => setState(() => _currentIndex = 0)),
+      SavingsScreen(onBack: () => setState(() => _currentIndex = 0)),
+      SplitGroupsScreen(onBack: () => setState(() => _currentIndex = 0)),
     ];
   }
 
@@ -80,8 +83,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 final velocity = notification.scrollDelta ?? 0;
 
                 if (currentOffset <= 0) {
-                  if (!_isBottomNavVisible) setState(() => _isBottomNavVisible = true);
-                } else if (velocity > 10 && _isBottomNavVisible && currentOffset > 80) {
+                  if (!_isBottomNavVisible)
+                    setState(() => _isBottomNavVisible = true);
+                } else if (velocity > 10 &&
+                    _isBottomNavVisible &&
+                    currentOffset > 80) {
                   // Scrolling down
                   setState(() => _isBottomNavVisible = false);
                 } else if (velocity < -10 && !_isBottomNavVisible) {
@@ -94,10 +100,7 @@ class _HomeScreenState extends State<HomeScreen> {
             },
             child: SafeArea(
               bottom: false, // Let content flow under floating nav
-              child: IndexedStack(
-                index: _currentIndex,
-                children: _screens,
-              ),
+              child: IndexedStack(index: _currentIndex, children: _screens),
             ),
           ),
           Positioned(
@@ -126,10 +129,7 @@ class _PlaceholderScreen extends StatelessWidget {
   final IconData icon;
   final String title;
 
-  const _PlaceholderScreen({
-    required this.icon,
-    required this.title,
-  });
+  const _PlaceholderScreen({required this.icon, required this.title});
 
   @override
   Widget build(BuildContext context) {

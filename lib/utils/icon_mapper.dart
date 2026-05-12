@@ -40,6 +40,20 @@ class IconMapper {
     'bank': Icons.account_balance,
     'upi': Icons.account_balance_wallet,
     'other': Icons.more_horiz,
+    'medical_services': Icons.medical_services,
+    'sports_esports': Icons.sports_esports,
+    'sports_soccer': Icons.sports_soccer,
+    'brush': Icons.brush,
+    'music_note': Icons.music_note,
+    'science': Icons.science,
+    'build': Icons.build,
+    'celebration': Icons.celebration,
+    'fastfood': Icons.fastfood,
+    'local_gas_station': Icons.local_gas_station,
+    'electric_bolt': Icons.electric_bolt,
+    'water_drop': Icons.water_drop,
+    'family_restroom': Icons.family_restroom,
+    'child_care': Icons.child_care,
   };
 
   /// Returns the Flutter [IconData] for a Django icon name.
