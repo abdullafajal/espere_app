@@ -3,6 +3,7 @@
 /// Features: search bar, type/category filter chips, month navigator,
 /// grouped transaction list with edit/delete actions
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../models/transaction.dart';
@@ -24,6 +25,7 @@ class TransactionListScreenState extends State<TransactionListScreen> {
   List<CategoryModel> _categories = [];
   bool _isLoading = true;
   String? _error;
+  String _currencySymbol = '₹';
 
   // Filters
   String _searchQuery = '';
@@ -49,7 +51,7 @@ class TransactionListScreenState extends State<TransactionListScreen> {
     // Load categories in parallel
     final catResult = await ApiService.getCategories();
     if (catResult.isSuccess) {
-      _categories = catResult.data!;
+      _categories = catResult.data!['categories'] as List<CategoryModel>;
     }
 
     await _loadTransactions();
@@ -70,6 +72,7 @@ class TransactionListScreenState extends State<TransactionListScreen> {
       _isLoading = false;
       if (result.isSuccess) {
         _transactions = result.data!['transactions'] as List<TransactionModel>;
+        _currencySymbol = result.data!['currency_symbol'] as String? ?? '₹';
       } else {
         _error = result.error;
       }
@@ -129,8 +132,11 @@ class TransactionListScreenState extends State<TransactionListScreen> {
     );
 
     if (confirm == true) {
-      await ApiService.deleteTransaction(id);
-      _loadTransactions();
+      final result = await ApiService.deleteTransaction(id);
+      if (result.isSuccess) {
+        HapticFeedback.heavyImpact();
+        _loadTransactions();
+      }
     }
   }
 
@@ -436,6 +442,7 @@ class TransactionListScreenState extends State<TransactionListScreen> {
                               padding: const EdgeInsets.only(bottom: 8),
                               child: TransactionTile(
                                 transaction: txn,
+                                currencySymbol: _currencySymbol,
                                 showActions: true,
                                 onTap: () async {
                                   await Navigator.pushNamed(
@@ -467,83 +474,125 @@ class TransactionListScreenState extends State<TransactionListScreen> {
   }
 
   void _showCategoryPicker() {
+    final searchCtrl = TextEditingController();
+    List<CategoryModel> filtered = _categories;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.card,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) {
-        return Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.border,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                'Select Category',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.text,
-                ),
-              ),
-              const SizedBox(height: 16),
-              // All categories option
-              ListTile(
-                leading: const Icon(
-                  Icons.all_inclusive,
-                  color: AppColors.accent,
-                ),
-                title: const Text('All Categories'),
-                onTap: () {
-                  setState(() => _categoryFilter = null);
-                  Navigator.pop(ctx);
-                  _loadTransactions();
-                },
-              ),
-              const Divider(color: AppColors.border),
-              Flexible(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: _categories.length,
-                  itemBuilder: (_, i) {
-                    final cat = _categories[i];
-                    return ListTile(
-                      leading: Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: cat.colorValue,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          IconMapper.map(cat.icon),
-                          size: 16,
-                          color: AppColors.dark,
-                        ),
+        return StatefulBuilder(
+          builder: (ctx, ss) {
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                  24, 16, 24, 24 + MediaQuery.of(ctx).viewInsets.bottom),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.border,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Select Category',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.text,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Search bar
+                  TextField(
+                    controller: searchCtrl,
+                    onChanged: (v) {
+                      ss(() {
+                        filtered = _categories
+                            .where((c) =>
+                                c.name.toLowerCase().contains(v.toLowerCase()))
+                            .toList();
+                      });
+                    },
+                    style: const TextStyle(fontSize: 14, color: AppColors.text),
+                    decoration: InputDecoration(
+                      hintText: 'Search categories...',
+                      prefixIcon: const Icon(Icons.search,
+                          size: 18, color: AppColors.muted),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.xl),
+                        borderSide: BorderSide.none,
                       ),
-                      title: Text(cat.name),
-                      selected: _categoryFilter == cat.id,
+                      filled: true,
+                      fillColor: AppColors.surface,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // All categories option (only if search is empty)
+                  if (searchCtrl.text.isEmpty)
+                    ListTile(
+                      leading: const Icon(
+                        Icons.all_inclusive,
+                        color: AppColors.accent,
+                      ),
+                      title: const Text('All Categories'),
                       onTap: () {
-                        setState(() => _categoryFilter = cat.id);
+                        setState(() => _categoryFilter = null);
                         Navigator.pop(ctx);
                         _loadTransactions();
                       },
-                    );
-                  },
-                ),
+                    ),
+                  if (searchCtrl.text.isEmpty)
+                    const Divider(color: AppColors.border),
+                  Flexible(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: MediaQuery.of(context).size.height * 0.6,
+                      ),
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: filtered.length,
+                        itemBuilder: (_, i) {
+                          final cat = filtered[i];
+                          return ListTile(
+                            leading: Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: cat.colorValue,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                IconMapper.map(cat.icon),
+                                size: 16,
+                                color: AppColors.dark,
+                              ),
+                            ),
+                            title: Text(cat.name),
+                            selected: _categoryFilter == cat.id,
+                            onTap: () {
+                              setState(() => _categoryFilter = cat.id);
+                              Navigator.pop(ctx);
+                              _loadTransactions();
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );

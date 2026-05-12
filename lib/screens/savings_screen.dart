@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
+import '../widgets/espere_input.dart';
 import 'package:intl/intl.dart';
 
 class SavingsScreen extends StatefulWidget {
@@ -43,71 +45,20 @@ class _SavingsScreenState extends State<SavingsScreen> {
   }
 
   void _showAddMoney(Map<String, dynamic> goal) {
-    final amountController = TextEditingController();
-    final noteController = TextEditingController();
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder:
-          (ctx) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(24),
-            ),
-            backgroundColor: AppColors.card,
-            title: Text(
-              'Add to ${goal['name']}',
-              style: const TextStyle(color: AppColors.text),
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: amountController,
-                  keyboardType: TextInputType.number,
-                  style: const TextStyle(color: AppColors.text),
-                  decoration: InputDecoration(
-                    labelText: 'Amount',
-                    prefixText: _currencySymbol,
-                    hintText: '0.00',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: noteController,
-                  style: const TextStyle(color: AppColors.text),
-                  decoration: const InputDecoration(
-                    labelText: 'Notes (Optional)',
-                    hintText: 'e.g. Monthly contribution',
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text(
-                  'Cancel',
-                  style: TextStyle(color: AppColors.muted),
-                ),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  final amount = double.tryParse(amountController.text) ?? 0;
-                  if (amount > 0) {
-                    final res = await ApiService.addMoneyToSavingGoal(
-                      goal['id'],
-                      amount,
-                      notes: noteController.text,
-                    );
-                    if (res.isSuccess) {
-                      Navigator.pop(ctx);
-                      _loadSavings();
-                    }
-                  }
-                },
-                child: const Text('Add'),
-              ),
-            ],
-          ),
+      backgroundColor: AppColors.card,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => _AddMoneySheet(
+        goal: goal,
+        currencySymbol: _currencySymbol,
+        onSuccess: () {
+          _loadSavings();
+        },
+      ),
     );
   }
 
@@ -139,7 +90,10 @@ class _SavingsScreenState extends State<SavingsScreen> {
 
     if (confirm == true) {
       final res = await ApiService.deleteSavingGoal(goal['id']);
-      if (res.isSuccess) _loadSavings();
+      if (res.isSuccess) {
+        HapticFeedback.heavyImpact();
+        _loadSavings();
+      }
     }
   }
 
@@ -796,19 +750,145 @@ class _GoalFormSheetState extends State<_GoalFormSheet> {
       if (_deadline != null)
         'deadline': DateFormat('yyyy-MM-dd').format(_deadline!),
     };
+    final result = widget.goal == null
+        ? await ApiService.createSavingGoal(data)
+        : await ApiService.updateSavingGoal(widget.goal!['id'], data);
 
-    final result =
-        widget.goal == null
-            ? await ApiService.createSavingGoal(data)
-            : await ApiService.updateSavingGoal(widget.goal!['id'], data);
-
-    if (result.isSuccess) {
-      widget.onSaved();
-    } else {
+    if (mounted) {
       setState(() => _isSaving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result.error ?? 'Error saving goal')),
-      );
+      if (result.isSuccess) {
+        HapticFeedback.mediumImpact();
+        widget.onSaved();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result.error ?? 'Error saving goal')),
+        );
+      }
     }
+  }
+}
+class _AddMoneySheet extends StatefulWidget {
+  final Map<String, dynamic> goal;
+  final String currencySymbol;
+  final VoidCallback onSuccess;
+
+  const _AddMoneySheet({
+    required this.goal,
+    required this.currencySymbol,
+    required this.onSuccess,
+  });
+
+  @override
+  State<_AddMoneySheet> createState() => _AddMoneySheetState();
+}
+
+class _AddMoneySheetState extends State<_AddMoneySheet> {
+  final _amountController = TextEditingController();
+  final _noteController = TextEditingController();
+  bool _isSaving = false;
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _noteController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+          24, 16, 24, 24 + MediaQuery.of(context).viewInsets.bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppColors.border,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Add to ${widget.goal['name']}',
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppColors.text,
+            ),
+          ),
+          const SizedBox(height: 24),
+          EspereInput(
+            label: 'Amount',
+            hint: '0.00',
+            controller: _amountController,
+            prefixText: widget.currencySymbol,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            autofocus: true,
+          ),
+          const SizedBox(height: 16),
+          EspereInput(
+            label: 'Notes (Optional)',
+            hint: 'e.g. Monthly contribution',
+            controller: _noteController,
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            height: 54,
+            child: ElevatedButton(
+              onPressed: _isSaving
+                  ? null
+                  : () async {
+                      final amount =
+                          double.tryParse(_amountController.text) ?? 0;
+                      if (amount <= 0) return;
+
+                      setState(() => _isSaving = true);
+                      final res = await ApiService.addMoneyToSavingGoal(
+                        widget.goal['id'],
+                        amount,
+                        notes: _noteController.text,
+                      );
+                      setState(() => _isSaving = false);
+
+                      if (res.isSuccess) {
+                        HapticFeedback.mediumImpact();
+                        if (!mounted) return;
+                        Navigator.pop(context);
+                        widget.onSuccess();
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                foregroundColor: AppColors.dark,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.xl),
+                ),
+                elevation: 0,
+              ),
+              child: _isSaving
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.dark,
+                      ),
+                    )
+                  : const Text(
+                      'Add Money',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

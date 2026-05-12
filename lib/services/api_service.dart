@@ -185,6 +185,7 @@ class ApiService {
             .toList();
         return ApiResult(data: {
           'transactions': transactions,
+          'currency_symbol': data['currency_symbol'] ?? '₹',
           'total': data['total'],
           'has_next': data['has_next'],
         });
@@ -262,7 +263,7 @@ class ApiService {
 
   /// ─── Categories ────────────────────────────────────────────────────────
 
-  static Future<ApiResult<List<CategoryModel>>> getCategories() async {
+  static Future<ApiResult<Map<String, dynamic>>> getCategories() async {
     try {
       final url = await _url('/api/categories/');
       final response = await http.get(
@@ -275,7 +276,10 @@ class ApiService {
         final categories = (data['categories'] as List)
             .map((c) => CategoryModel.fromJson(c))
             .toList();
-        return ApiResult(data: categories);
+        return ApiResult(data: {
+          'categories': categories,
+          'currency_symbol': data['currency_symbol'] ?? '₹',
+        });
       }
       return ApiResult(error: 'Failed to load categories.');
     } catch (e) {

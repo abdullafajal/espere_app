@@ -49,8 +49,8 @@ class _HomeScreenState extends State<HomeScreen> {
         onBack: () => setState(() => _currentIndex = 0),
       ),
       BudgetsScreen(onBack: () => setState(() => _currentIndex = 0)),
-      SavingsScreen(onBack: () => setState(() => _currentIndex = 0)),
-      SplitGroupsScreen(onBack: () => setState(() => _currentIndex = 0)),
+      const SavingsScreen(),
+      const SplitGroupsScreen(),
     ];
   }
 

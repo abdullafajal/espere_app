@@ -5,6 +5,7 @@
 ///   Active: bg-mn-accent text-mn-dark
 ///   Inactive: text-gray-400
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 
 class EspereBottomNav extends StatelessWidget {
@@ -64,8 +65,10 @@ class EspereBottomNav extends StatelessWidget {
               final isActive = index == currentIndex;
               
               return GestureDetector(
-                onTap: () => onTap(index),
-                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  onTap(index);
+                },
                 child: SizedBox(
                   width: 60,
                   height: 60,

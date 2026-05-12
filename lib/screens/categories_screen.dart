@@ -33,7 +33,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     setState(() {
       _isLoading = false;
       if (result.isSuccess) {
-        _categories = result.data!;
+        _categories = result.data!['categories'] as List<CategoryModel>;
       } else {
         _error = result.error;
       }

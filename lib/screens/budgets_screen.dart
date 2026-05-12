@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../widgets/espere_input.dart';
 import '../utils/app_toast.dart';
 import '../utils/icon_mapper.dart';
+import '../models/category.dart';
 
 class BudgetsScreen extends StatefulWidget {
   final VoidCallback? onBack;
@@ -52,8 +54,9 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
       setState(() {
         _isLoadingCats = false;
         if (result.isSuccess && result.data != null) {
-          _categories = result.data!
-              .map((c) => {
+          final cats = result.data!['categories'] as List<CategoryModel>;
+          _categories = cats
+              .map<Map<String, dynamic>>((c) => {
                     'id': c.id,
                     'name': c.name,
                     'icon': c.icon,
@@ -105,6 +108,7 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
       final result = await ApiService.deleteBudget(id);
       if (mounted) {
         if (result.isSuccess) {
+          HapticFeedback.heavyImpact();
           AppToast.success(context, 'Budget deleted.');
           _loadBudgets();
         } else {
@@ -480,6 +484,7 @@ class _BudgetFormSheetState extends State<_BudgetFormSheet> {
     if (mounted) {
       setState(() => _isSaving = false);
       if (result.isSuccess) {
+        HapticFeedback.mediumImpact();
         AppToast.success(context,
             widget.budget == null ? 'Budget created.' : 'Budget updated.');
         widget.onSuccess();
@@ -688,12 +693,12 @@ class _CategoryPickerSheetState extends State<_CategoryPickerSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final maxHeight = MediaQuery.of(context).size.height * 0.65;
+    final maxHeight = MediaQuery.of(context).size.height * 0.85;
 
     return ConstrainedBox(
       constraints: BoxConstraints(maxHeight: maxHeight),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+        padding: EdgeInsets.fromLTRB(24, 16, 24, 24 + MediaQuery.of(context).viewInsets.bottom),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [

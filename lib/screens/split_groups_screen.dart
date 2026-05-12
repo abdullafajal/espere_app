@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import 'split_group_detail_screen.dart';
@@ -174,7 +175,10 @@ class _SplitGroupsScreenState extends State<SplitGroupsScreen> {
                                         });
                                     if (!ctx.mounted) return;
                                     Navigator.pop(ctx);
-                                    if (result.isSuccess) _loadGroups();
+                                    if (result.isSuccess) {
+                                      HapticFeedback.mediumImpact();
+                                      _loadGroups();
+                                    }
                                   },
                           child:
                               isSaving

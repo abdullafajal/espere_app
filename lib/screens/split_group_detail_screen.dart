@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
@@ -80,8 +81,15 @@ class _S extends State<SplitGroupDetailScreen> with SingleTickerProviderStateMix
               if (ctrl.text.trim().isEmpty) return;
               final r = await ApiService.addSplitMember(widget.groupId, ctrl.text.trim());
               if (!ctx.mounted) return; Navigator.pop(ctx);
-              if (r.isSuccess) { _load(); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Member added!'))); }
-              else { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r.error ?? 'Error'))); }
+              if (r.isSuccess) {
+                HapticFeedback.mediumImpact();
+                _load();
+                ScaffoldMessenger.of(context)
+                    .showSnackBar(const SnackBar(content: Text('Member added!')));
+              } else {
+                ScaffoldMessenger.of(context)
+                    .showSnackBar(SnackBar(content: Text(r.error ?? 'Error')));
+              }
             },
             child: const Text('Add Member', style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.w600)))),
         ]))));
@@ -191,8 +199,15 @@ class _S extends State<SplitGroupDetailScreen> with SingleTickerProviderStateMix
                 }).toList();
               }
               final r = await ApiService.addSplitExpense(widget.groupId, body);
-              if (!ctx.mounted) return; Navigator.pop(ctx); if (r.isSuccess) _load();
-              else { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r.error ?? 'Error'))); }
+              if (!ctx.mounted) return;
+              Navigator.pop(ctx);
+              if (r.isSuccess) {
+                HapticFeedback.mediumImpact();
+                _load();
+              } else {
+                ScaffoldMessenger.of(context)
+                    .showSnackBar(SnackBar(content: Text(r.error ?? 'Error')));
+              }
             }, child: const Text('Add Expense'))),
         ])))));
   }
@@ -225,7 +240,12 @@ class _S extends State<SplitGroupDetailScreen> with SingleTickerProviderStateMix
           SizedBox(width: double.infinity, height: 52, child: ElevatedButton(
             onPressed: () async {
               final r = await ApiService.settleDebt(widget.groupId, {'paid_to_id': d['to_user_id'], 'amount': ac.text.trim()});
-              if (!ctx.mounted) return; Navigator.pop(ctx); if (r.isSuccess) _load();
+              if (!ctx.mounted) return;
+              Navigator.pop(ctx);
+              if (r.isSuccess) {
+                HapticFeedback.mediumImpact();
+                _load();
+              }
             }, child: const Text('Mark as Settled'))),
         ])));
   }

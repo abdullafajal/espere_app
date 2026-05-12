@@ -4,6 +4,7 @@
 /// Used for both create and edit.
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../models/category.dart';
 import '../models/transaction.dart';
@@ -40,6 +41,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   bool _isLoading = true;
   bool _isSaving = false;
   String? _error;
+  String _currencySymbol = '₹';
 
   bool get isEdit => widget.transactionId != null;
 
@@ -62,7 +64,8 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     // Load categories
     final catResult = await ApiService.getCategories();
     if (catResult.isSuccess) {
-      _categories = catResult.data!;
+      _categories = catResult.data!['categories'] as List<CategoryModel>;
+      _currencySymbol = catResult.data!['currency_symbol'] as String? ?? '₹';
     }
 
     // If edit, load existing transaction
@@ -143,6 +146,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     setState(() => _isSaving = false);
 
     if (result.isSuccess) {
+      HapticFeedback.mediumImpact();
       Navigator.pop(context, true);
     } else {
       setState(() => _error = result.error ?? 'Failed to save.');
@@ -324,14 +328,72 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                         ),
                                       ),
                                       const SizedBox(height: 6),
-                                      _DropdownField(
-                                        value: _type,
-                                        items: const [
-                                          ('income', 'Income'),
-                                          ('expense', 'Expense'),
-                                        ],
-                                        onChanged: (v) =>
-                                            setState(() => _type = v),
+                                      GestureDetector(
+                                        onTap: () {
+                                          showModalBottomSheet(
+                                            context: context,
+                                            backgroundColor: AppColors.card,
+                                            shape: const RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.vertical(
+                                                  top: Radius.circular(24)),
+                                            ),
+                                            builder: (ctx) =>
+                                                _TransactionTypePickerSheet(
+                                              selectedType: _type,
+                                              onSelected: (type) {
+                                                setState(() => _type = type);
+                                                Navigator.pop(ctx);
+                                              },
+                                            ),
+                                          );
+                                        },
+                                        child: Container(
+                                          width: double.infinity,
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 16, vertical: 14),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.surface,
+                                            borderRadius:
+                                                BorderRadius.circular(AppRadius.lg),
+                                            border: Border.all(
+                                                color: AppColors.border,
+                                                width: 1.5),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                width: 32,
+                                                height: 32,
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.accent,
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                                child: Icon(
+                                                  _type == 'income'
+                                                      ? Icons.arrow_upward
+                                                      : Icons.arrow_downward,
+                                                  size: 18,
+                                                  color: AppColors.dark,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: Text(
+                                                  _type == 'income'
+                                                      ? 'Income'
+                                                      : 'Expense',
+                                                  style: const TextStyle(
+                                                    fontSize: 14,
+                                                    color: AppColors.text,
+                                                  ),
+                                                ),
+                                              ),
+                                              const Icon(Icons.arrow_drop_down,
+                                                  color: AppColors.muted),
+                                            ],
+                                          ),
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -343,6 +405,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                   label: 'Amount',
                                   hint: '0.00',
                                   controller: _amountController,
+                                  prefixText: _currencySymbol,
                                   keyboardType:
                                       const TextInputType.numberWithOptions(
                                           decimal: true),
@@ -674,12 +737,12 @@ class _CategoryPickerSheetState extends State<_CategoryPickerSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final maxHeight = MediaQuery.of(context).size.height * 0.65;
+    final maxHeight = MediaQuery.of(context).size.height * 0.85;
 
     return ConstrainedBox(
       constraints: BoxConstraints(maxHeight: maxHeight),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+        padding: EdgeInsets.fromLTRB(24, 16, 24, 24 + MediaQuery.of(context).viewInsets.bottom),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -750,17 +813,20 @@ class _CategoryPickerSheetState extends State<_CategoryPickerSheet> {
                         return GestureDetector(
                           onTap: () => widget.onSelected(cat),
                           child: Container(
-                            margin:
-                                const EdgeInsets.only(bottom: 4),
+                            margin: const EdgeInsets.only(bottom: 8),
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 12),
+                                horizontal: 16, vertical: 14),
                             decoration: BoxDecoration(
                               color: isSelected
-                                  ? AppColors.accent
-                                      .withValues(alpha: 0.15)
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(
-                                  AppRadius.md),
+                                  ? AppColors.accent.withValues(alpha: 0.15)
+                                  : AppColors.surface,
+                              borderRadius: BorderRadius.circular(AppRadius.lg),
+                              border: Border.all(
+                                color: isSelected
+                                    ? AppColors.accent
+                                    : AppColors.border,
+                                width: isSelected ? 2 : 1,
+                              ),
                             ),
                             child: Row(
                               children: [
@@ -817,6 +883,107 @@ class _CategoryPickerSheetState extends State<_CategoryPickerSheet> {
 }
 
 /// Bottom sheet for picking a payment method with icons.
+class _TransactionTypePickerSheet extends StatelessWidget {
+  final String selectedType;
+  final ValueChanged<String> onSelected;
+
+  const _TransactionTypePickerSheet({
+    required this.selectedType,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppColors.border,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Select Type',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppColors.text,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildItem(
+            context,
+            'income',
+            'Income',
+            Icons.arrow_upward,
+            AppColors.income,
+          ),
+          _buildItem(
+            context,
+            'expense',
+            'Expense',
+            Icons.arrow_downward,
+            AppColors.expense,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildItem(BuildContext context, String value, String label,
+      IconData icon, Color color) {
+    final isSelected = selectedType == value;
+    return GestureDetector(
+      onTap: () => onSelected(value),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppColors.accent.withValues(alpha: 0.15)
+              : AppColors.surface,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(
+            color: isSelected ? AppColors.accent : AppColors.border,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: AppColors.accent,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, size: 20, color: AppColors.dark),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: AppColors.text,
+              ),
+            ),
+            const Spacer(),
+            if (isSelected)
+              const Icon(Icons.check_circle, color: AppColors.accent, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _PaymentMethodPickerSheet extends StatelessWidget {
   final String selectedMethod;
   final ValueChanged<String> onSelected;

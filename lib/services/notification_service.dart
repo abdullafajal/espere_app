@@ -20,15 +20,20 @@ class NotificationService {
       await fcm.requestPermission(alert: true, badge: true, sound: true);
 
       void handleMessageAction(Map<String, dynamic> data) {
-        if (data['action'] == 'open_split_group' && data['group_id'] != null && navigatorKey?.currentContext != null) {
+        if (data['action'] == 'open_split_group' &&
+            data['group_id'] != null &&
+            navigatorKey?.currentContext != null) {
           navigatorKey!.currentState?.push(
             MaterialPageRoute(
-              builder: (_) => SplitGroupDetailScreen(
-                groupId: int.parse(data['group_id'].toString()),
-                groupName: data['group_name']?.toString() ?? 'Group',
-              ),
+              builder:
+                  (_) => SplitGroupDetailScreen(
+                    groupId: int.parse(data['group_id'].toString()),
+                    groupName: data['group_name']?.toString() ?? 'Group',
+                  ),
             ),
           );
+        } else if (data['action'] == 'open_dashboard') {
+          navigatorKey!.currentState?.popUntil((route) => route.isFirst);
         }
       }
 
