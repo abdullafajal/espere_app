@@ -27,6 +27,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final _dashboardKey = GlobalKey<DashboardScreenState>();
   final _transactionListKey = GlobalKey<TransactionListScreenState>();
+  final _budgetsKey = GlobalKey<BudgetsScreenState>();
+  final _savingsKey = GlobalKey<SavingsScreenState>();
+  final _splitGroupsKey = GlobalKey<SplitGroupsScreenState>();
 
   late final List<Widget> _screens;
 
@@ -42,15 +45,23 @@ class _HomeScreenState extends State<HomeScreen> {
             _currentIndex = index;
             _isBottomNavVisible = true;
           });
+          _refreshTab(index);
         },
       ),
       TransactionListScreen(
         key: _transactionListKey,
         onBack: () => setState(() => _currentIndex = 0),
       ),
-      BudgetsScreen(onBack: () => setState(() => _currentIndex = 0)),
-      const SavingsScreen(),
-      const SplitGroupsScreen(),
+      BudgetsScreen(
+        key: _budgetsKey,
+        onBack: () => setState(() => _currentIndex = 0)
+      ),
+      SavingsScreen(
+        key: _savingsKey,
+      ),
+      SplitGroupsScreen(
+        key: _splitGroupsKey,
+      ),
     ];
   }
 
@@ -63,10 +74,22 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// Trigger a data refresh on the given tab index.
   void _refreshTab(int index) {
-    if (index == 0) {
-      _dashboardKey.currentState?.reload();
-    } else if (index == 1) {
-      _transactionListKey.currentState?.reload();
+    switch (index) {
+      case 0:
+        _dashboardKey.currentState?.reload();
+        break;
+      case 1:
+        _transactionListKey.currentState?.reload();
+        break;
+      case 2:
+        _budgetsKey.currentState?.reload();
+        break;
+      case 3:
+        _savingsKey.currentState?.reload();
+        break;
+      case 4:
+        _splitGroupsKey.currentState?.reload();
+        break;
     }
   }
 
@@ -115,6 +138,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   _currentIndex = index;
                   _isBottomNavVisible = true;
                 });
+                _refreshTab(index);
               },
             ),
           ),

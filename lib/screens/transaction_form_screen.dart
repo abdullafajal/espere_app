@@ -9,6 +9,9 @@ import '../theme/app_theme.dart';
 import '../models/category.dart';
 import '../models/transaction.dart';
 import '../services/api_service.dart';
+import '../services/cache_service.dart';
+import '../services/connectivity_service.dart';
+import '../services/sync_service.dart';
 import '../utils/icon_mapper.dart';
 import '../widgets/espere_input.dart';
 
@@ -43,6 +46,11 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   String? _error;
   String _currencySymbol = '₹';
 
+  // Track old state for offline updates
+  String? _oldAmount;
+  String? _oldType;
+  int? _oldCategoryId;
+
   bool get isEdit => widget.transactionId != null;
 
   /// Returns the currently selected category or null.
@@ -61,38 +69,113 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   }
 
   Future<void> _loadData() async {
-    // Load categories
-    final catResult = await ApiService.getCategories();
-    if (catResult.isSuccess) {
-      _categories = catResult.data!['categories'] as List<CategoryModel>;
-      _currencySymbol = catResult.data!['currency_symbol'] as String? ?? '₹';
+    // 1. Load categories from cache first
+    final cachedCats = await CacheService.getCachedCategories();
+    if (cachedCats != null) {
+      setState(() {
+        _categories = (cachedCats['categories'] as List)
+            .map((c) => CategoryModel.fromJson(c as Map<String, dynamic>))
+            .toList();
+        _currencySymbol = cachedCats['currency_symbol'] as String? ?? '₹';
+        _isLoading = false; // HIDE LOADER IMMEDIATELY
+      });
     }
 
-    // If edit, load existing transaction
-    if (isEdit) {
-      final url =
-          '/api/transactions/${widget.transactionId}/';
-      // Use the detail endpoint via getTransactions or direct
-      // For simplicity, we'll fetch the full list and find
-      // Actually, let's make a direct call
-      final baseUrl = await _getBaseUrl();
-      try {
-        final response = await _fetchTransaction(baseUrl);
-        if (response != null) {
-          _amountController.text = response.amount;
-          _notesController.text = response.notes;
-          _type = response.type;
-          _categoryId = response.category.id;
-          _date = response.date;
-          _paymentMethod = response.paymentMethod;
+    // 2. Fetch fresh categories from API ONLY IF ONLINE
+    if (ConnectivityService.isOnline) {
+      ApiService.getCategories().then((catResult) {
+        if (catResult.isSuccess && mounted) {
+          setState(() {
+            _categories = catResult.data!['categories'] as List<CategoryModel>;
+            _currencySymbol = catResult.data!['currency_symbol'] as String? ?? '₹';
+            _isLoading = false;
+          });
+
+          // Update cache
+          CacheService.cacheCategories({
+            'categories': _categories.map((c) => c.toJson()).toList(),
+            'currency_symbol': _currencySymbol,
+          });
         }
-      } catch (e) {
-        // Ignore fetch errors for edit
+      });
+    } else {
+      if (mounted) setState(() => _isLoading = false);
+    }
+
+    // 3. If edit, load existing transaction
+    if (isEdit) {
+      TransactionModel? initialData;
+
+      // Try cache first (Main Transaction List)
+      final cachedTxns = await CacheService.getCachedTransactions();
+      if (cachedTxns != null) {
+        final list = List<Map<String, dynamic>>.from(cachedTxns['transactions'] ?? []);
+        final found = list.firstWhere(
+          (t) => t['id']?.toString() == widget.transactionId?.toString(), 
+          orElse: () => {}
+        );
+        if (found.isNotEmpty) {
+          initialData = TransactionModel.fromJson(found);
+        }
+      }
+
+      // If still not found, try Dashboard cache (Recent Transactions)
+      if (initialData == null) {
+        final cachedDashboard = await CacheService.getCachedDashboard();
+        if (cachedDashboard != null) {
+          final recent = List<Map<String, dynamic>>.from(cachedDashboard['recent_transactions'] ?? []);
+          final found = recent.firstWhere(
+            (t) => t['id']?.toString() == widget.transactionId?.toString(), 
+            orElse: () => {}
+          );
+          if (found.isNotEmpty) {
+            initialData = TransactionModel.fromJson(found);
+          }
+        }
+      }
+
+      if (initialData != null) {
+        setState(() {
+          _amountController.text = initialData!.amount;
+          _notesController.text = initialData!.notes;
+          _type = initialData!.type;
+          _categoryId = initialData!.category.id;
+          _date = initialData!.date;
+          _paymentMethod = initialData!.paymentMethod;
+
+          // Store old values for offline update reversal
+          _oldAmount = initialData!.amount;
+          _oldType = initialData!.type;
+          _oldCategoryId = initialData!.category.id;
+          
+          _isLoading = false;
+        });
+      }
+
+      // Then try API in background if online
+      if (ConnectivityService.isOnline) {
+        _getBaseUrl().then((baseUrl) {
+          _fetchTransaction(baseUrl).then((response) {
+            if (response != null && mounted) {
+              setState(() {
+                _amountController.text = response.amount;
+                _notesController.text = response.notes;
+                _type = response.type;
+                _categoryId = response.category.id;
+                _date = response.date;
+                _paymentMethod = response.paymentMethod;
+
+                _oldAmount = response.amount;
+                _oldType = response.type;
+                _oldCategoryId = response.category.id;
+                
+                _isLoading = false;
+              });
+            }
+          });
+        });
       }
     }
-
-    if (!mounted) return;
-    setState(() => _isLoading = false);
   }
 
   Future<String> _getBaseUrl() async {
@@ -138,9 +221,106 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       'notes': _notesController.text.trim(),
     };
 
-    final result = isEdit
-        ? await ApiService.updateTransaction(widget.transactionId!, txnData)
-        : await ApiService.createTransaction(txnData);
+    ApiResult result;
+    if (ConnectivityService.isOnline) {
+      result = isEdit
+          ? await ApiService.updateTransaction(widget.transactionId!, txnData)
+          : await ApiService.createTransaction(txnData);
+    } else {
+      // Offline mode: queue the operation
+      await SyncService.queueOperation(
+        action: isEdit ? 'update' : 'create',
+        entity: 'transaction',
+        data: txnData,
+        entityId: isEdit ? widget.transactionId : null,
+      );
+
+      // ─── Optimistic Update ──────────────────────────────────────────
+      // To show the transaction in the list immediately, we inject it into the cache
+      final selectedCat = _selectedCategory;
+      final fullTxnJson = {
+        'id': isEdit ? widget.transactionId : DateTime.now().millisecondsSinceEpoch, // Temp ID
+        'amount': amount,
+        'type': _type,
+        'category': selectedCat?.toJson() ?? {'name': 'Other', 'icon': 'category'},
+        'date': _date.toIso8601String(),
+        'payment_method': _paymentMethod,
+        'payment_method_display': _paymentMethods.firstWhere((m) => m.$1 == _paymentMethod).$2,
+        'notes': _notesController.text.trim(),
+      };
+
+      if (!isEdit) {
+        await CacheService.addTransactionToCache(fullTxnJson);
+        // Also update dashboard totals
+        await CacheService.updateDashboardOptimistically(
+          _type, 
+          double.tryParse(amount) ?? 0.0, 
+          fullTxnJson
+        );
+        // Update budget if it's an expense
+        if (_type == 'expense' && _categoryId != null) {
+          await CacheService.updateBudgetOptimistically(
+            _categoryId!, 
+            double.tryParse(amount) ?? 0.0
+          );
+        }
+      } else {
+        // Optimistic Update for Edit
+        await CacheService.updateTransactionInCache(widget.transactionId!, fullTxnJson);
+        
+        // Reverse old impact and add new impact to dashboard/budgets
+        if (_oldAmount != null && _oldType != null) {
+          final oldCatName = _categories.firstWhere((c) => c.id == _oldCategoryId, orElse: () => CategoryModel(id: 0, name: 'Other', icon: 'category', color: '#000000', isSystem: true)).name;
+          
+          await CacheService.reverseDashboardImpact(
+            _oldType!, 
+            double.tryParse(_oldAmount!) ?? 0.0, 
+            widget.transactionId!,
+            categoryName: oldCatName,
+          );
+          await CacheService.updateDashboardOptimistically(
+            _type, 
+            double.tryParse(amount) ?? 0.0, 
+            fullTxnJson
+          );
+
+          // Budgets
+          if (_oldType == 'expense' && _oldCategoryId != null) {
+            await CacheService.updateBudgetOptimistically(
+              _oldCategoryId!, 
+              double.tryParse(_oldAmount!) ?? 0.0, 
+              isDelete: true
+            );
+          }
+          if (_type == 'expense' && _categoryId != null) {
+            await CacheService.updateBudgetOptimistically(
+              _categoryId!, 
+              double.tryParse(amount) ?? 0.0
+            );
+          }
+        }
+      }
+      // ───────────────────────────────────────────────────────────────
+      
+      // We don't have the server response, but we notify success to close the screen
+      result = ApiResult(data: null); 
+      
+      // Provide immediate feedback
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Offline: Transaction saved locally and will sync later.',
+              style: TextStyle(
+                color: AppColors.accent,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            backgroundColor: AppColors.text,
+          ),
+        );
+      }
+    }
 
     if (!mounted) return;
     setState(() => _isSaving = false);

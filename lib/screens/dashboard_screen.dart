@@ -14,11 +14,13 @@ import 'package:permission_handler/permission_handler.dart';
 import '../theme/app_theme.dart';
 import '../models/dashboard.dart';
 import '../services/api_service.dart';
+import '../services/cache_service.dart';
 import '../widgets/balance_card.dart';
 import '../widgets/summary_card.dart';
 import '../widgets/transaction_tile.dart';
 import '../utils/icon_mapper.dart';
 import '../utils/app_toast.dart';
+import '../services/connectivity_service.dart';
 import 'reports_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -45,16 +47,32 @@ class DashboardScreenState extends State<DashboardScreen> {
   void reload() => _loadDashboard();
 
   Future<void> _loadDashboard() async {
-    if (_data == null) {
-      setState(() => _isLoading = true);
+    // 1. Always check cache first to show optimistic updates
+    final cached = await CacheService.getCachedDashboard();
+    if (cached != null && mounted) {
+      setState(() {
+        _data = DashboardData.fromJson(cached);
+        _isLoading = false;
+      });
     }
+
+    // 2. Fetch fresh data from API in background ONLY if online
+    if (!ConnectivityService.isOnline) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
+
     final result = await ApiService.getDashboard();
     if (!mounted) return;
+    
     setState(() {
       _isLoading = false;
       if (result.isSuccess) {
         _data = result.data;
-      } else {
+        // Cache the fresh data
+        CacheService.cacheDashboard(result.data!.toJson());
+      } else if (_data == null) {
+        // Only show error if we have no cached data
         _error = result.error;
       }
     });
@@ -445,12 +463,15 @@ class DashboardScreenState extends State<DashboardScreen> {
                             ),
                             borderData: FlBorderData(show: false),
                             barGroups: List.generate(d.pieLabels.length, (i) {
-                              final colorHex = d.pieColors[i].replaceFirst('#', '');
+                              final colorStr = i < d.pieColors.length ? d.pieColors[i] : '#CCCCCC';
+                              final colorHex = colorStr.replaceFirst('#', '');
+                              final value = i < d.pieValues.length ? d.pieValues[i] : 0.0;
+                              
                               return BarChartGroupData(
                                 x: i,
                                 barRods: [
                                   BarChartRodData(
-                                    toY: d.pieValues[i],
+                                    toY: value,
                                     color: Color(int.parse('FF$colorHex', radix: 16)),
                                     width: d.pieLabels.length <= 3 ? 28 : 14,
                                     borderRadius: BorderRadius.circular(4),

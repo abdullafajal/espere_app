@@ -11,6 +11,8 @@ import 'screens/transaction_form_screen.dart';
 import 'screens/categories_screen.dart';
 import 'screens/profile_screen.dart';
 import 'services/notification_service.dart';
+import 'services/connectivity_service.dart';
+import 'services/sync_service.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 
 final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
@@ -26,6 +28,15 @@ void main() async {
   } catch (e) {
     debugPrint('[Firebase] Init failed: $e');
   }
+
+  // Initialize connectivity monitoring
+  await ConnectivityService.init();
+
+  // Auto-sync when device comes back online
+  ConnectivityService.onReconnect.listen((_) {
+    debugPrint('[Sync] Device reconnected — syncing pending operations...');
+    SyncService.processSyncQueue();
+  });
 
   // Set status bar style to match the app design
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(

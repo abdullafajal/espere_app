@@ -31,4 +31,12 @@ class CategoryModel {
       isSystem: json['is_system'] ?? false,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'icon': icon,
+        'color': color,
+        'is_system': isSystem,
+      };
 }

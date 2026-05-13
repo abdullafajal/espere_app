@@ -6,6 +6,9 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../models/category.dart';
 import '../services/api_service.dart';
+import '../services/cache_service.dart';
+import '../services/connectivity_service.dart';
+import '../services/sync_service.dart';
 import '../utils/icon_mapper.dart';
 
 class CategoriesScreen extends StatefulWidget {
@@ -27,14 +30,34 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   }
 
   Future<void> _loadCategories() async {
-    setState(() => _isLoading = true);
+    // 1. Always check cache first to show optimistic updates
+    final cached = await CacheService.getCachedCategories();
+    if (cached != null && mounted) {
+      setState(() {
+        _categories = (cached['categories'] as List)
+            .map((c) => CategoryModel.fromJson(c as Map<String, dynamic>))
+            .toList();
+        _isLoading = false;
+      });
+    }
+
+    // 2. Fetch fresh from API ONLY if online
+    if (!ConnectivityService.isOnline) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
+
     final result = await ApiService.getCategories();
     if (!mounted) return;
     setState(() {
       _isLoading = false;
       if (result.isSuccess) {
         _categories = result.data!['categories'] as List<CategoryModel>;
-      } else {
+        CacheService.cacheCategories({
+          'categories': _categories.map((c) => c.toJson()).toList(),
+          'currency_symbol': result.data!['currency_symbol'],
+        });
+      } else if (_categories.isEmpty) {
         _error = result.error;
       }
     });
@@ -65,14 +88,42 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     );
 
     if (confirm == true) {
-      final result = await ApiService.deleteCategory(cat.id);
-      if (!mounted) return;
-      if (result.isSuccess) {
-        _loadCategories();
+      if (ConnectivityService.isOnline) {
+        final result = await ApiService.deleteCategory(cat.id);
+        if (!mounted) return;
+        if (result.isSuccess) {
+          _loadCategories();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(result.error ?? 'Failed to delete.')),
+          );
+        }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result.error ?? 'Failed to delete.')),
+        // Offline mode: queue deletion
+        await SyncService.queueOperation(
+          action: 'delete',
+          entity: 'category',
+          entityId: cat.id,
         );
+        
+        setState(() {
+          _categories.removeWhere((c) => c.id == cat.id);
+        });
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Offline: Category will be deleted when online.',
+                style: TextStyle(
+                  color: AppColors.accent,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              backgroundColor: AppColors.text,
+            ),
+          );
+        }
       }
     }
   }
@@ -441,11 +492,52 @@ class _CategoryFormSheetState extends State<_CategoryFormSheet> {
       'color': _selectedColor,
     };
 
-    final ApiResult<CategoryModel> result;
-    if (widget.category != null) {
-      result = await ApiService.updateCategory(widget.category!.id, catData);
+    ApiResult<CategoryModel> result;
+    if (ConnectivityService.isOnline) {
+      if (widget.category != null) {
+        result = await ApiService.updateCategory(widget.category!.id, catData);
+      } else {
+        result = await ApiService.createCategory(catData);
+      }
     } else {
-      result = await ApiService.createCategory(catData);
+      // Offline mode: queue operation
+      final tempId = DateTime.now().millisecondsSinceEpoch;
+      await SyncService.queueOperation(
+        action: widget.category != null ? 'update' : 'create',
+        entity: 'category',
+        data: catData,
+        entityId: widget.category?.id ?? tempId,
+      );
+
+      // ─── Optimistic Update ──────────────────────────────────────────
+      if (widget.category == null) {
+        final newCatJson = {
+          'id': tempId,
+          'name': name,
+          'icon': _selectedIcon,
+          'color': _selectedColor,
+          'is_system': false,
+        };
+        await CacheService.addCategoryToCache(newCatJson);
+      }
+      // ───────────────────────────────────────────────────────────────
+      
+      result = ApiResult(data: null);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Offline: Category saved locally and will sync later.',
+              style: TextStyle(
+                color: AppColors.accent,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            backgroundColor: AppColors.text,
+          ),
+        );
+      }
     }
 
     if (!mounted) return;

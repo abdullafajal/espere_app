@@ -78,4 +78,26 @@ class DashboardData {
       insights: List<String>.from(json['insights'] ?? []),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'greeting': greeting,
+        'user': user.toJson(),
+        'total_balance': totalBalance,
+        'monthly_income': monthlyIncome,
+        'monthly_expenses': monthlyExpenses,
+        'monthly_savings': monthlySavings,
+        'currency_symbol': currencySymbol,
+        'recent_transactions':
+            recentTransactions.map((t) => t.toJson()).toList(),
+        'pie_labels': pieLabels,
+        'pie_values': pieValues,
+        'pie_colors': pieColors,
+        'bar_labels': barLabels,
+        'bar_income': barIncome,
+        'bar_expense': barExpense,
+        'line_labels': lineLabels,
+        'line_values': lineValues,
+        'budget_warnings': budgetWarnings,
+        'insights': insights,
+      };
 }

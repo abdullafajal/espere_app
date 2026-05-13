@@ -49,10 +49,14 @@ class UserModel {
   }
 
   Map<String, dynamic> toJson() => {
+        'id': id,
+        'username': username,
         'first_name': firstName,
         'last_name': lastName,
         'email': email,
+        'avatar': avatar,
         'currency': currency,
+        'currency_symbol': currencySymbol,
         'theme': theme,
         'email_reminders': emailReminders,
       };

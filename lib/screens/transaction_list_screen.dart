@@ -9,6 +9,9 @@ import '../theme/app_theme.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
 import '../services/api_service.dart';
+import '../services/cache_service.dart';
+import '../services/connectivity_service.dart';
+import '../services/sync_service.dart';
 import '../utils/icon_mapper.dart';
 import '../widgets/transaction_tile.dart';
 
@@ -46,18 +49,66 @@ class TransactionListScreenState extends State<TransactionListScreen> {
   void reload() => _loadTransactions();
 
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
-
-    // Load categories in parallel
-    final catResult = await ApiService.getCategories();
-    if (catResult.isSuccess) {
-      _categories = catResult.data!['categories'] as List<CategoryModel>;
+    // 1. Load from cache instantly
+    final cachedCats = await CacheService.getCachedCategories();
+    final cachedTxns = await CacheService.getCachedTransactions();
+    if (mounted && (cachedCats != null || cachedTxns != null)) {
+      setState(() {
+        if (cachedCats != null) {
+          _categories = (cachedCats['categories'] as List)
+              .map((c) => CategoryModel.fromJson(c as Map<String, dynamic>))
+              .toList();
+          _currencySymbol =
+              (cachedCats['currency_symbol'] as String?) ?? '₹';
+        }
+        if (cachedTxns != null) {
+          _transactions = (cachedTxns['transactions'] as List)
+              .map((t) => TransactionModel.fromJson(t as Map<String, dynamic>))
+              .toList();
+          _currencySymbol =
+              (cachedTxns['currency_symbol'] as String?) ?? _currencySymbol;
+        }
+        _isLoading = false;
+      });
     }
 
-    await _loadTransactions();
+    // 2. Fetch fresh data from API ONLY if online
+    if (ConnectivityService.isOnline) {
+      final catResult = await ApiService.getCategories();
+      if (catResult.isSuccess) {
+        _categories = catResult.data!['categories'] as List<CategoryModel>;
+        // Cache categories
+        CacheService.cacheCategories({
+          'categories': _categories.map((c) => c.toJson()).toList(),
+          'currency_symbol': catResult.data!['currency_symbol'],
+        });
+        if (mounted) setState(() {});
+      }
+      
+      _loadTransactions();
+    } else {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _loadTransactions() async {
+    // 1. Always check cache first to show optimistic updates
+    final cached = await CacheService.getCachedTransactions();
+    if (cached != null && mounted) {
+      setState(() {
+        _transactions = (cached['transactions'] as List)
+            .map((t) => TransactionModel.fromJson(t as Map<String, dynamic>))
+            .toList();
+        _currencySymbol = (cached['currency_symbol'] as String?) ?? '₹';
+      });
+    }
+
+    // 2. Fetch fresh from API ONLY if online
+    if (!ConnectivityService.isOnline) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
+
     final monthStr = DateFormat('yyyy-M').format(_currentMonth);
     final result = await ApiService.getTransactions(
       query: _searchQuery.isNotEmpty ? _searchQuery : null,
@@ -73,7 +124,14 @@ class TransactionListScreenState extends State<TransactionListScreen> {
       if (result.isSuccess) {
         _transactions = result.data!['transactions'] as List<TransactionModel>;
         _currencySymbol = result.data!['currency_symbol'] as String? ?? '₹';
-      } else {
+        // Cache transactions
+        CacheService.cacheTransactions({
+          'transactions':
+              _transactions.map((t) => t.toJson()).toList(),
+          'currency_symbol': _currencySymbol,
+        });
+        _error = null;
+      } else if (_transactions.isEmpty) {
         _error = result.error;
       }
     });
@@ -132,10 +190,72 @@ class TransactionListScreenState extends State<TransactionListScreen> {
     );
 
     if (confirm == true) {
-      final result = await ApiService.deleteTransaction(id);
-      if (result.isSuccess) {
-        HapticFeedback.heavyImpact();
-        _loadTransactions();
+      if (ConnectivityService.isOnline) {
+        final result = await ApiService.deleteTransaction(id);
+        if (result.isSuccess) {
+          _loadTransactions();
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(result.error ?? 'Failed to delete')),
+            );
+          }
+        }
+      } else {
+        // Offline mode: queue deletion
+        await SyncService.queueOperation(
+          action: 'delete',
+          entity: 'transaction',
+          entityId: id,
+        );
+
+        // ─── Optimistic Update ──────────────────────────────────────────
+        final txn = _transactions.firstWhere((t) => t.id == id);
+        await CacheService.reverseDashboardImpact(
+          txn.type, 
+          double.tryParse(txn.amount) ?? 0.0, 
+          id,
+          categoryName: txn.category.name,
+        );
+        // Reverse budget impact if expense
+        if (txn.type == 'expense') {
+          await CacheService.updateBudgetOptimistically(
+            txn.category.id, 
+            double.tryParse(txn.amount) ?? 0.0, 
+            isDelete: true
+          );
+        }
+        // Also remove from transaction cache
+        final cachedTxns = await CacheService.getCachedTransactions();
+        if (cachedTxns != null) {
+          final list = List<Map<String, dynamic>>.from(cachedTxns['transactions'] ?? []);
+          list.removeWhere((t) => t['id'] == id);
+          await CacheService.cacheTransactions({
+            'transactions': list,
+            'currency_symbol': cachedTxns['currency_symbol'],
+          });
+        }
+        // ───────────────────────────────────────────────────────────────
+
+        // Update local UI immediately
+        setState(() {
+          _transactions.removeWhere((t) => t.id == id);
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Offline: Transaction will be deleted when online.',
+                style: TextStyle(
+                  color: AppColors.accent,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              backgroundColor: AppColors.text,
+            ),
+          );
+        }
       }
     }
   }

@@ -44,7 +44,20 @@ class TransactionModel {
     );
   }
 
+  /// Full serialization for caching (round-trips with fromJson)
   Map<String, dynamic> toJson() => {
+        'id': id,
+        'amount': amount,
+        'type': type,
+        'category': category.toJson(),
+        'date': date.toIso8601String(),
+        'payment_method': paymentMethod,
+        'payment_method_display': paymentMethodDisplay,
+        'notes': notes,
+      };
+
+  /// Slim payload for API create/update
+  Map<String, dynamic> toApiJson() => {
         'amount': amount,
         'type': type,
         'category_id': category.id,

@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
+import '../services/cache_service.dart';
+import '../services/connectivity_service.dart';
 import '../widgets/espere_input.dart';
 import '../utils/app_toast.dart';
 
@@ -51,22 +53,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadProfile() async {
-    final result = await ApiService.getProfile();
-    if (!mounted) return;
-    setState(() {
-      _isLoading = false;
-      if (result.isSuccess) {
-        _user = result.data;
+    // 1. Load from cache first
+    final cached = await CacheService.getCachedUser();
+    if (cached != null && mounted) {
+      setState(() {
+        _user = UserModel.fromJson(cached);
         _firstNameController.text = _user!.firstName;
         _lastNameController.text = _user!.lastName;
         _emailController.text = _user!.email;
         _currency = _user!.currency;
         _theme = _user!.theme;
         _emailReminders = _user!.emailReminders;
-      } else {
-        _error = result.error;
-      }
-    });
+        _isLoading = false;
+      });
+    }
+
+    // 2. Fetch fresh from API ONLY IF ONLINE
+    if (ConnectivityService.isOnline) {
+      ApiService.getProfile().then((result) {
+        if (result.isSuccess && mounted) {
+          setState(() {
+            _isLoading = false;
+            _user = result.data;
+            _firstNameController.text = _user!.firstName;
+            _lastNameController.text = _user!.lastName;
+            _emailController.text = _user!.email;
+            _currency = _user!.currency;
+            _theme = _user!.theme;
+            _emailReminders = _user!.emailReminders;
+          });
+          // Update cache
+          CacheService.cacheUser(_user!.toJson());
+        } else if (_user == null && mounted) {
+          setState(() {
+            _isLoading = false;
+            _error = result.error;
+          });
+        }
+      });
+    } else {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _save() async {
@@ -98,6 +125,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _logout() async {
     await ApiService.logout();
+    await CacheService.clearAll();
     if (!mounted) return;
     Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
   }

@@ -3,6 +3,8 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
+import '../services/cache_service.dart';
+import '../services/connectivity_service.dart';
 import '../utils/icon_mapper.dart';
 
 class ReportsScreen extends StatefulWidget {
@@ -25,18 +27,35 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
-    final result = await ApiService.getReports(year: _selectedYear);
-    if (!mounted) return;
+    // 1. Load from cache first
+    final cached = await CacheService.getCachedReports();
+    if (cached != null && mounted) {
+      setState(() {
+        _reportData = cached;
+        _isLoading = false;
+      });
+    }
 
-    setState(() {
-      _isLoading = false;
-      if (result.isSuccess) {
-        _reportData = result.data;
-      } else {
-        _error = result.error;
-      }
-    });
+    // 2. Fetch fresh from API ONLY IF ONLINE
+    if (ConnectivityService.isOnline) {
+      ApiService.getReports(year: _selectedYear).then((result) {
+        if (result.isSuccess && mounted) {
+          setState(() {
+            _isLoading = false;
+            _reportData = result.data;
+          });
+          // Cache the fresh data
+          CacheService.cacheReports(result.data!);
+        } else if (_reportData == null && mounted) {
+          setState(() {
+            _isLoading = false;
+            _error = result.error;
+          });
+        }
+      });
+    } else {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override

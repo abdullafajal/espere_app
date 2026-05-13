@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
+import '../services/cache_service.dart';
+import '../services/connectivity_service.dart';
 import 'split_group_detail_screen.dart';
 
 class SplitGroupsScreen extends StatefulWidget {
@@ -9,10 +11,10 @@ class SplitGroupsScreen extends StatefulWidget {
   const SplitGroupsScreen({super.key, this.onBack});
 
   @override
-  State<SplitGroupsScreen> createState() => _SplitGroupsScreenState();
+  State<SplitGroupsScreen> createState() => SplitGroupsScreenState();
 }
 
-class _SplitGroupsScreenState extends State<SplitGroupsScreen> {
+class SplitGroupsScreenState extends State<SplitGroupsScreen> {
   List<Map<String, dynamic>> _groups = [];
   bool _isLoading = true;
   String? _error;
@@ -23,18 +25,37 @@ class _SplitGroupsScreenState extends State<SplitGroupsScreen> {
     _loadGroups();
   }
 
+  void reload() => _loadGroups();
+
   Future<void> _loadGroups() async {
-    setState(() => _isLoading = true);
-    final result = await ApiService.getSplitGroups();
-    if (!mounted) return;
-    setState(() {
-      _isLoading = false;
-      if (result.isSuccess) {
-        _groups = result.data!;
-      } else {
-        _error = result.error;
-      }
-    });
+    // 1. Always check cache first
+    final cached = await CacheService.getCachedSplitGroups();
+    if (cached != null && mounted) {
+      setState(() {
+        _groups = cached;
+        _isLoading = false;
+      });
+    }
+
+    // 2. Fetch fresh from API ONLY IF ONLINE
+    if (ConnectivityService.isOnline) {
+      ApiService.getSplitGroups().then((result) {
+        if (result.isSuccess && mounted) {
+          setState(() {
+            _isLoading = false;
+            _groups = result.data!;
+          });
+          CacheService.cacheSplitGroups(_groups);
+        } else if (_groups.isEmpty && mounted) {
+          setState(() {
+            _isLoading = false;
+            _error = result.error;
+          });
+        }
+      });
+    } else {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   void _showCreateGroupSheet() {
