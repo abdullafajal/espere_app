@@ -183,6 +183,24 @@ class CacheService {
     });
   }
 
+  /// Update an existing budget in the local cache immediately
+  static Future<void> updateBudgetInCache(int id, Map<String, dynamic> budgetJson) async {
+    final cached = await getCachedBudgets();
+    if (cached == null) return;
+    final list = List<Map<String, dynamic>>.from(cached['budgets'] ?? []);
+    final index = list.indexWhere((b) => b['id'].toString() == id.toString());
+    if (index != -1) {
+      list[index] = {
+        ...list[index],
+        ...budgetJson,
+      };
+      await cacheBudgets({
+        'budgets': list,
+        'currency_symbol': cached['currency_symbol'],
+      });
+    }
+  }
+
   /// Add a saving goal to the local cache immediately
   static Future<void> addSavingToCache(Map<String, dynamic> goalJson) async {
     final cached = await getCachedSavings();
@@ -194,6 +212,7 @@ class CacheService {
       'currency_symbol': cached['currency_symbol'],
     });
   }
+
 
   /// Update dashboard totals and recent transactions optimistically
   static Future<void> updateDashboardOptimistically(
@@ -337,10 +356,11 @@ class CacheService {
           spent += amount;
         }
 
-        budgets[i]['spent'] = spent;
-        budgets[i]['remaining'] = total - spent;
+        budgets[i]['spent'] = double.parse(spent.toStringAsFixed(2));
+        budgets[i]['remaining'] = double.parse((total - spent).toStringAsFixed(2));
         budgets[i]['percentage'] =
-            total > 0 ? (spent / total * 100).clamp(0, 100) : 0;
+            total > 0 ? double.parse((spent / total * 100).clamp(0, 100).toStringAsFixed(2)) : 0.0;
+        budgets[i]['is_exceeded'] = spent >= total;
         updated = true;
         break;
       }
@@ -485,15 +505,17 @@ class CacheService {
 
 
   /// Update an existing saving goal in cache
-  static Future<void> updateSavingInCache(int id, Map<String, dynamic> updatedData) async {
+  static Future<void> updateSavingInCache(int id, Map<String, dynamic> updatedData, {int? oldId}) async {
     final cached = await getCachedSavings();
     if (cached == null) return;
 
     final goals = List<Map<String, dynamic>>.from(cached['goals'] ?? []);
     bool updated = false;
 
+    final idToFind = oldId?.toString() ?? id.toString();
+
     for (int i = 0; i < goals.length; i++) {
-      if (goals[i]['id']?.toString() == id.toString()) {
+      if (goals[i]['id']?.toString() == idToFind) {
         final curr = double.tryParse((updatedData['current_amount'] ?? goals[i]['current_amount']).toString()) ?? 0.0;
         final targ = double.tryParse((updatedData['target_amount'] ?? goals[i]['target_amount']).toString()) ?? 1.0;
         goals[i] = {

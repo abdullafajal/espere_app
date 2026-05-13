@@ -191,6 +191,17 @@ class BudgetsScreenState extends State<BudgetsScreen> {
           entityId: id,
         );
 
+        // Remove from cache
+        final cached = await CacheService.getCachedBudgets();
+        if (cached != null) {
+          final list = List<Map<String, dynamic>>.from(cached['budgets'] ?? []);
+          list.removeWhere((b) => b['id'] == id);
+          await CacheService.cacheBudgets({
+            'budgets': list,
+            'currency_symbol': cached['currency_symbol'],
+          });
+        }
+
         setState(() {
           _budgets.removeWhere((b) => b['id'] == id);
         });
@@ -616,11 +627,18 @@ class _BudgetFormSheetState extends State<_BudgetFormSheet> {
     if (ConnectivityService.isOnline) {
       result = await ApiService.createBudget(data);
     } else {
-      // Offline mode: queue creation
+      // Offline mode: queue creation/update
+      final isUpdate = widget.budget != null;
+      int? tempId;
+      if (!isUpdate) {
+        tempId = DateTime.now().millisecondsSinceEpoch;
+      }
+      
       await SyncService.queueOperation(
-        action: 'create',
+        action: 'create', // backend handles upsert on POST
         entity: 'budget',
         data: data,
+        entityId: isUpdate ? widget.budget!['id'] : tempId,
       );
 
       // ─── Optimistic Update ──────────────────────────────────────────
@@ -628,8 +646,35 @@ class _BudgetFormSheetState extends State<_BudgetFormSheet> {
         (c) => c['id'].toString() == _selectedCategoryId.toString(),
         orElse: () => {},
       );
+      
+      double computedSpent = 0.0;
+      if (!isUpdate) {
+        final cachedTxns = await CacheService.getCachedTransactions();
+        if (cachedTxns != null && cachedTxns['transactions'] != null) {
+          final now = DateTime.now();
+          for (final t in cachedTxns['transactions']) {
+            if (t['type'] == 'expense' && 
+                t['category']?['id']?.toString() == _selectedCategoryId.toString()) {
+              final dateStr = t['date']?.toString();
+              if (dateStr != null) {
+                final d = DateTime.tryParse(dateStr);
+                if (d != null && d.year == now.year && d.month == now.month) {
+                  computedSpent += double.tryParse(t['amount'].toString()) ?? 0.0;
+                }
+              }
+            }
+          }
+        }
+      }
+      
+      final budgetAmount = double.tryParse(_amountController.text) ?? 0.0;
+      final spentAmount = isUpdate ? (double.tryParse(widget.budget!['spent'].toString()) ?? 0.0) : computedSpent;
+      final remainingAmount = budgetAmount - spentAmount;
+      final percentage = budgetAmount > 0 ? (spentAmount / budgetAmount * 100).clamp(0.0, 100.0) : 0.0;
+      final isExceeded = spentAmount > budgetAmount;
+
       final newBudgetJson = {
-        'id': DateTime.now().millisecondsSinceEpoch,
+        'id': isUpdate ? widget.budget!['id'] : tempId,
         'category': {
           'id': _selectedCategoryId,
           'name': cat['name'] ?? 'Other',
@@ -637,13 +682,18 @@ class _BudgetFormSheetState extends State<_BudgetFormSheet> {
           'color': cat['color'] ?? '#C8E64A',
         },
         'amount': _amountController.text,
-        'spent': 0.0,
-        'remaining': double.tryParse(_amountController.text) ?? 0.0,
-        'percentage': 0.0,
+        'spent': double.parse(spentAmount.toStringAsFixed(2)),
+        'remaining': double.parse(remainingAmount.toStringAsFixed(2)),
+        'percentage': double.parse(percentage.toStringAsFixed(2)),
         'month': data['month'],
-        'is_exceeded': false,
+        'is_exceeded': isExceeded,
       };
-      await CacheService.addBudgetToCache(newBudgetJson);
+      
+      if (isUpdate) {
+        await CacheService.updateBudgetInCache(widget.budget!['id'], newBudgetJson);
+      } else {
+        await CacheService.addBudgetToCache(newBudgetJson);
+      }
       // ───────────────────────────────────────────────────────────────
 
       result = ApiResult(data: null);

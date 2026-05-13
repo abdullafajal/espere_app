@@ -38,19 +38,44 @@ class SyncService {
             resultData = res.data; // Capture real ID
             break;
           case 'budget':
-            success = (await _syncBudget(action, data, entityId)).isSuccess;
+            final res = await _syncBudget(action, data, entityId);
+            success = res.isSuccess;
+            resultData = res.data;
             break;
           case 'saving':
-            success = (await _syncSaving(action, data, entityId)).isSuccess;
+            final res = await _syncSaving(action, data, entityId);
+            success = res.isSuccess;
+            resultData = res.data;
             break;
           case 'saving_add_money':
-            success = await _syncSavingAddMoney(data, entityId);
+            final res = await _syncSavingAddMoney(data, entityId);
+            success = res.isSuccess;
+            resultData = res.data;
             break;
         }
 
         if (success) {
           await CacheService.removeFromSyncQueue(opId);
           debugPrint('[SyncService] ✓ Synced: $action $entity ${entityId ?? ""}');
+
+          // ─── Cache Sync (Immediate) ───────────────────────────────
+          // This prevents background refreshes from wiping optimistic data 
+          // before the sync queue is fully processed.
+          if (entity == 'saving' && resultData != null) {
+            if (action == 'create' || action == 'update') {
+              await CacheService.updateSavingInCache(
+                resultData['id'] as int, 
+                resultData, 
+                oldId: action == 'create' ? entityId : null
+              );
+            }
+          } else if (entity == 'saving_add_money' && resultData != null) {
+            await CacheService.updateSavingInCache(
+              resultData['id'] as int, 
+              resultData
+            );
+          }
+
 
           // ─── ID Remapping ──────────────────────────────────────────
           if (entity == 'category' && action == 'create' && resultData != null) {
@@ -65,9 +90,52 @@ class SyncService {
               final nextOp = queue[j];
               if (nextOp['entity'] == 'transaction' && nextOp['action'] == 'create') {
                 final nextData = nextOp['data'] as Map<String, dynamic>?;
-                if (nextData != null && nextData['category_id'] == oldId) {
+                if (nextData != null && nextData['category_id']?.toString() == oldId?.toString()) {
                   nextData['category_id'] = newId;
                 }
+              }
+            }
+          } else if (entity == 'saving' && action == 'create' && resultData != null) {
+            final oldId = entityId;
+            final newId = resultData['id'] as int;
+            
+            // 1. Update Storage
+            await _remapSavingIdsInQueue(oldId, newId);
+            
+            // 2. Update local loop queue so subsequent items have the real ID
+            for (int j = i + 1; j < queue.length; j++) {
+              final nextOp = queue[j];
+              if ((nextOp['entity'] == 'saving_add_money' || nextOp['entity'] == 'saving') && 
+                  nextOp['entityId']?.toString() == oldId?.toString()) {
+                nextOp['entityId'] = newId;
+              }
+            }
+          } else if (entity == 'transaction' && action == 'create' && resultData != null) {
+            final oldId = entityId;
+            final newId = resultData.id as int;
+            
+            // 1. Update Storage
+            await _remapTransactionIdsInQueue(oldId, newId);
+            
+            // 2. Update local loop queue so subsequent items have the real ID
+            for (int j = i + 1; j < queue.length; j++) {
+              final nextOp = queue[j];
+              if (nextOp['entityId']?.toString() == oldId?.toString()) {
+                nextOp['entityId'] = newId;
+              }
+            }
+          } else if (entity == 'budget' && action == 'create' && resultData != null) {
+            final oldId = entityId;
+            final newId = resultData['id'] as int;
+            
+            // 1. Update Storage
+            await _remapBudgetIdsInQueue(oldId, newId);
+            
+            // 2. Update local loop queue so subsequent items have the real ID
+            for (int j = i + 1; j < queue.length; j++) {
+              final nextOp = queue[j];
+              if (nextOp['entityId']?.toString() == oldId?.toString()) {
+                nextOp['entityId'] = newId;
               }
             }
           }
@@ -89,11 +157,69 @@ class SyncService {
     for (final op in queue) {
       if (op['entity'] == 'transaction' && op['action'] == 'create') {
         final data = op['data'] as Map<String, dynamic>?;
-        if (data != null && data['category_id'] == oldId) {
+        if (data != null && data['category_id']?.toString() == oldId?.toString()) {
           data['category_id'] = newId;
           changed = true;
           debugPrint('[SyncService] Remapped category ID $oldId to $newId in queued transaction');
         }
+      }
+    }
+
+    if (changed) {
+      await CacheService.saveSyncQueue(queue);
+    }
+  }
+
+  /// Replace temporary saving IDs with real IDs in the sync queue.
+  static Future<void> _remapSavingIdsInQueue(int? oldId, int newId) async {
+    if (oldId == null) return;
+    final queue = await CacheService.getSyncQueue();
+    bool changed = false;
+
+    for (final op in queue) {
+      if ((op['entity'] == 'saving_add_money' || op['entity'] == 'saving') && 
+          op['entityId']?.toString() == oldId?.toString()) {
+        op['entityId'] = newId;
+        changed = true;
+        debugPrint('[SyncService] Remapped saving ID $oldId to $newId in queued operation');
+      }
+    }
+
+    if (changed) {
+      await CacheService.saveSyncQueue(queue);
+    }
+  }
+
+  /// Replace temporary transaction IDs with real IDs in the sync queue.
+  static Future<void> _remapTransactionIdsInQueue(int? oldId, int newId) async {
+    if (oldId == null) return;
+    final queue = await CacheService.getSyncQueue();
+    bool changed = false;
+
+    for (final op in queue) {
+      if (op['entityId']?.toString() == oldId.toString()) {
+        op['entityId'] = newId;
+        changed = true;
+        debugPrint('[SyncService] Remapped transaction ID $oldId to $newId in queued operation');
+      }
+    }
+
+    if (changed) {
+      await CacheService.saveSyncQueue(queue);
+    }
+  }
+
+  /// Replace temporary budget IDs with real IDs in the sync queue.
+  static Future<void> _remapBudgetIdsInQueue(int? oldId, int newId) async {
+    if (oldId == null) return;
+    final queue = await CacheService.getSyncQueue();
+    bool changed = false;
+
+    for (final op in queue) {
+      if (op['entityId']?.toString() == oldId.toString()) {
+        op['entityId'] = newId;
+        changed = true;
+        debugPrint('[SyncService] Remapped budget ID $oldId to $newId in queued operation');
       }
     }
 
@@ -172,15 +298,14 @@ class SyncService {
     }
   }
 
-  static Future<bool> _syncSavingAddMoney(
+  static Future<ApiResult<dynamic>> _syncSavingAddMoney(
       Map<String, dynamic>? data, int? entityId) async {
-    if (data == null || entityId == null) return false;
-    final res = await ApiService.addMoneyToSavingGoal(
+    if (data == null || entityId == null) return ApiResult(error: 'Missing data/ID');
+    return await ApiService.addMoneyToSavingGoal(
       entityId,
       (data['amount'] as num).toDouble(),
       notes: data['notes'] as String?,
     );
-    return res.isSuccess;
   }
 
   /// Queue a pending operation for later sync.

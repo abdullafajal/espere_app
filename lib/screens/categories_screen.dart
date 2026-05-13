@@ -106,6 +106,16 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
           entityId: cat.id,
         );
         
+        // Remove from cache
+        final cached = await CacheService.getCachedCategories();
+        if (cached != null) {
+          final list = List<Map<String, dynamic>>.from(cached['categories'] ?? []);
+          list.removeWhere((c) => c['id'] == cat.id);
+          await CacheService.cacheCategories({
+            'categories': list,
+          });
+        }
+        
         setState(() {
           _categories.removeWhere((c) => c.id == cat.id);
         });

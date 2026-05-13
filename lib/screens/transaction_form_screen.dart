@@ -228,18 +228,23 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
           : await ApiService.createTransaction(txnData);
     } else {
       // Offline mode: queue the operation
+      int? tempId;
+      if (!isEdit) {
+        tempId = DateTime.now().millisecondsSinceEpoch;
+      }
+      
       await SyncService.queueOperation(
         action: isEdit ? 'update' : 'create',
         entity: 'transaction',
         data: txnData,
-        entityId: isEdit ? widget.transactionId : null,
+        entityId: isEdit ? widget.transactionId : tempId,
       );
 
       // ─── Optimistic Update ──────────────────────────────────────────
       // To show the transaction in the list immediately, we inject it into the cache
       final selectedCat = _selectedCategory;
       final fullTxnJson = {
-        'id': isEdit ? widget.transactionId : DateTime.now().millisecondsSinceEpoch, // Temp ID
+        'id': isEdit ? widget.transactionId : tempId, // Temp ID
         'amount': amount,
         'type': _type,
         'category': selectedCat?.toJson() ?? {'name': 'Other', 'icon': 'category'},

@@ -126,6 +126,17 @@ class SavingsScreenState extends State<SavingsScreen> {
           entityId: goal['id'],
         );
         
+        // Remove from cache
+        final cached = await CacheService.getCachedSavings();
+        if (cached != null) {
+          final list = List<Map<String, dynamic>>.from(cached['goals'] ?? []);
+          list.removeWhere((g) => g['id'] == goal['id']);
+          await CacheService.cacheSavings({
+            'goals': list,
+            'currency_symbol': cached['currency_symbol'],
+          });
+        }
+        
         setState(() {
           _goals.removeWhere((g) => g['id'] == goal['id']);
         });
@@ -806,17 +817,22 @@ class _GoalFormSheetState extends State<_GoalFormSheet> {
           : await ApiService.updateSavingGoal(widget.goal!['id'], data);
     } else {
       // Offline mode: queue operation
+      int? tempId;
+      if (widget.goal == null) {
+        tempId = DateTime.now().millisecondsSinceEpoch;
+      }
+      
       await SyncService.queueOperation(
         action: widget.goal == null ? 'create' : 'update',
         entity: 'saving',
         data: data,
-        entityId: widget.goal?['id'],
+        entityId: widget.goal == null ? tempId : widget.goal!['id'],
       );
 
       // ─── Optimistic Update ──────────────────────────────────────────
       if (widget.goal == null) {
         final newGoalJson = {
-          'id': DateTime.now().millisecondsSinceEpoch,
+          'id': tempId,
           'name': name,
           'target_amount': target,
           'current_amount': current,
