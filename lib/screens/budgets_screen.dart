@@ -437,7 +437,7 @@ class BudgetsScreenState extends State<BudgetsScreen> {
                                       color:
                                           isExceeded
                                               ? categoryColor
-                                              : AppColors.accent,
+                                              : AppColors.text,
                                     ),
                                   ),
                                 ],
