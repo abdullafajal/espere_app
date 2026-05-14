@@ -43,10 +43,14 @@ class BudgetsScreenState extends State<BudgetsScreen> {
     // 1. Always check cache first to show optimistic updates
     final cached = await CacheService.getCachedBudgets();
     if (cached != null && mounted) {
+      final List list = cached['budgets'] ?? [];
       setState(() {
-        _budgets = List<Map<String, dynamic>>.from(
-          cached['budgets'] as Iterable? ?? [],
-        );
+        _budgets = List<Map<String, dynamic>>.from(list)
+          ..sort((a, b) {
+            int cmp = (a['name'] ?? '').compareTo(b['name'] ?? '');
+            if (cmp != 0) return cmp;
+            return (b['id'] ?? 0).compareTo(a['id'] ?? 0);
+          });
         _currencySymbol = (cached['currency_symbol'] as String?) ?? '₹';
         _isLoading = false;
       });
@@ -66,7 +70,11 @@ class BudgetsScreenState extends State<BudgetsScreen> {
         final Map<String, dynamic> data = result.data!;
         _budgets = List<Map<String, dynamic>>.from(
           data['budgets'] as Iterable? ?? [],
-        );
+        )..sort((a, b) {
+            int cmp = (a['name'] ?? '').compareTo(b['name'] ?? '');
+            if (cmp != 0) return cmp;
+            return (b['id'] ?? 0).compareTo(a['id'] ?? 0);
+          });
         _currencySymbol = (data['currency_symbol'] as String?) ?? '₹';
         CacheService.cacheBudgets(data);
       } else if (_budgets.isEmpty) {
@@ -205,21 +213,6 @@ class BudgetsScreenState extends State<BudgetsScreen> {
         setState(() {
           _budgets.removeWhere((b) => b['id'] == id);
         });
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Offline: Budget will be deleted when online.',
-                style: TextStyle(
-                  color: AppColors.accent,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              backgroundColor: AppColors.text,
-            ),
-          );
-        }
       }
     }
   }
@@ -697,21 +690,6 @@ class _BudgetFormSheetState extends State<_BudgetFormSheet> {
       // ───────────────────────────────────────────────────────────────
 
       result = ApiResult(data: null);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Offline: Budget saved locally and will sync later.',
-              style: TextStyle(
-                color: AppColors.accent,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            backgroundColor: AppColors.text,
-          ),
-        );
-      }
     }
 
     if (mounted) {

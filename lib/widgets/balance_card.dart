@@ -108,7 +108,7 @@ class _BalanceCardState extends State<BalanceCard> {
                   },
                   child: Text(
                     _isVisible
-                        ? '${widget.currencySymbol}${widget.totalBalance}'
+                        ? '${widget.currencySymbol}${double.parse(widget.totalBalance.replaceAll(',', '')).toStringAsFixed(2)}'
                         : '••••••••',
                     key: ValueKey(_isVisible),
                     style: const TextStyle(
@@ -127,13 +127,13 @@ class _BalanceCardState extends State<BalanceCard> {
                   children: [
                     _StatBadge(
                       icon: Icons.arrow_upward,
-                      value: '${widget.currencySymbol}${widget.monthlyIncome}',
+                      value: '${widget.currencySymbol}${double.parse(widget.monthlyIncome.replaceAll(',', '')).toStringAsFixed(2)}',
                       color: AppColors.income,
                     ),
                     const SizedBox(width: 16),
                     _StatBadge(
                       icon: Icons.arrow_downward,
-                      value: '${widget.currencySymbol}${widget.monthlyExpenses}',
+                      value: '${widget.currencySymbol}${double.parse(widget.monthlyExpenses.replaceAll(',', '')).toStringAsFixed(2)}',
                       color: AppColors.expense,
                     ),
                   ],
@@ -155,7 +155,7 @@ class _BalanceCardState extends State<BalanceCard> {
                       const Icon(Icons.savings_outlined, size: 14, color: Colors.white),
                       const SizedBox(width: 6),
                       Text(
-                        'Saved ${widget.currencySymbol}${widget.monthlySavings} this month',
+                        'Saved ${widget.currencySymbol}${double.parse(widget.monthlySavings.replaceAll(',', '')).toStringAsFixed(2)} this month',
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,

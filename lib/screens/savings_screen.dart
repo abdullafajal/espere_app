@@ -35,11 +35,15 @@ class SavingsScreenState extends State<SavingsScreen> {
     // 1. Always check cache first to show optimistic updates
     final cached = await CacheService.getCachedSavings();
     if (cached != null && mounted) {
+      final List list = cached['goals'] ?? [];
       setState(() {
-        _goals = List<Map<String, dynamic>>.from(
-            cached['goals'] as Iterable? ?? []);
-        _currencySymbol =
-            (cached['currency_symbol'] as String?) ?? '₹';
+        _goals = List<Map<String, dynamic>>.from(list)
+          ..sort((a, b) {
+            int cmp = (a['name'] ?? '').compareTo(b['name'] ?? '');
+            if (cmp != 0) return cmp;
+            return (b['id'] ?? 0).compareTo(a['id'] ?? 0);
+          });
+        _currencySymbol = (cached['currency_symbol'] as String?) ?? '₹';
         _isLoading = false;
       });
     }
@@ -58,7 +62,11 @@ class SavingsScreenState extends State<SavingsScreen> {
         final Map<String, dynamic> data = result.data!;
         _goals = List<Map<String, dynamic>>.from(
           data['goals'] as Iterable? ?? [],
-        );
+        )..sort((a, b) {
+            int cmp = (a['name'] ?? '').compareTo(b['name'] ?? '');
+            if (cmp != 0) return cmp;
+            return (b['id'] ?? 0).compareTo(a['id'] ?? 0);
+          });
         _currencySymbol = (data['currency_symbol'] as String?) ?? '₹';
         CacheService.cacheSavings(data);
       } else if (_goals.isEmpty) {
@@ -140,21 +148,6 @@ class SavingsScreenState extends State<SavingsScreen> {
         setState(() {
           _goals.removeWhere((g) => g['id'] == goal['id']);
         });
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Offline: Goal will be deleted when online.',
-                style: TextStyle(
-                  color: AppColors.accent,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              backgroundColor: AppColors.text,
-            ),
-          );
-        }
       }
     }
   }
@@ -852,21 +845,6 @@ class _GoalFormSheetState extends State<_GoalFormSheet> {
       // ───────────────────────────────────────────────────────────────
       
       result = ApiResult(data: null);
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Offline: Goal saved locally and will sync later.',
-              style: TextStyle(
-                color: AppColors.accent,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            backgroundColor: AppColors.text,
-          ),
-        );
-      }
     }
 
     if (mounted) {
@@ -1012,21 +990,6 @@ class _AddMoneySheetState extends State<_AddMoneySheet> {
                         // ───────────────────────────────────────────────────────────────
 
                         res = ApiResult(data: null);
-                        
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Offline: Contribution saved locally and will sync later.',
-                                style: TextStyle(
-                                  color: AppColors.accent,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              backgroundColor: AppColors.text,
-                            ),
-                          );
-                        }
                       }
                       
                       setState(() => _isSaving = false);

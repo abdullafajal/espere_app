@@ -65,17 +65,24 @@ class DashboardScreenState extends State<DashboardScreen> {
     final result = await ApiService.getDashboard();
     if (!mounted) return;
     
-    setState(() {
-      _isLoading = false;
-      if (result.isSuccess) {
-        _data = result.data;
-        // Cache the fresh data
-        CacheService.cacheDashboard(result.data!.toJson());
-      } else if (_data == null) {
-        // Only show error if we have no cached data
-        _error = result.error;
+    if (result.isSuccess) {
+      final mergedData = await CacheService.cacheDashboard(result.data!.toJson());
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _data = DashboardData.fromJson(mergedData);
+        });
       }
-    });
+    } else {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          if (_data == null) {
+            _error = result.error;
+          }
+        });
+      }
+    }
   }
 
   Color _parseColor(String? hex) {
@@ -221,7 +228,7 @@ class DashboardScreenState extends State<DashboardScreen> {
                   child: SummaryCard(
                     icon: Icons.arrow_upward,
                     label: 'Income',
-                    value: '${d.currencySymbol}${d.monthlyIncome}',
+                    value: '${d.currencySymbol}${double.parse(d.monthlyIncome.replaceAll(',', '')).toStringAsFixed(2)}',
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -229,7 +236,7 @@ class DashboardScreenState extends State<DashboardScreen> {
                   child: SummaryCard(
                     icon: Icons.arrow_downward,
                     label: 'Expenses',
-                    value: '${d.currencySymbol}${d.monthlyExpenses}',
+                    value: '${d.currencySymbol}${double.parse(d.monthlyExpenses.replaceAll(',', '')).toStringAsFixed(2)}',
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -237,7 +244,7 @@ class DashboardScreenState extends State<DashboardScreen> {
                   child: SummaryCard(
                     icon: Icons.savings_outlined,
                     label: 'Savings',
-                    value: '${d.currencySymbol}${d.monthlySavings}',
+                    value: '${d.currencySymbol}${double.parse(d.monthlySavings.replaceAll(',', '')).toStringAsFixed(2)}',
                   ),
                 ),
               ],

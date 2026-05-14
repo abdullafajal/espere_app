@@ -32,6 +32,11 @@ void main() async {
   // Initialize connectivity monitoring
   await ConnectivityService.init();
 
+  // Initial sync if online
+  if (ConnectivityService.isOnline) {
+    SyncService.processSyncQueue();
+  }
+
   // Auto-sync when device comes back online
   ConnectivityService.onReconnect.listen((_) {
     debugPrint('[Sync] Device reconnected — syncing pending operations...');

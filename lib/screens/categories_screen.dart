@@ -3,6 +3,7 @@
 /// Displays system categories (read-only) and user categories (deletable).
 /// Includes a form to add new categories with icon and color pickers.
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../models/category.dart';
 import '../services/api_service.dart';
@@ -30,13 +31,20 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   }
 
   Future<void> _loadCategories() async {
-    // 1. Always check cache first to show optimistic updates
-    final cached = await CacheService.getCachedCategories();
-    if (cached != null && mounted) {
+    // 1. Load from cache first
+    final cachedCats = await CacheService.getCachedCategories();
+    if (cachedCats != null && mounted) {
+      final List catsRaw = cachedCats['categories'] ?? [];
       setState(() {
-        _categories = (cached['categories'] as List)
-            .map((c) => CategoryModel.fromJson(c as Map<String, dynamic>))
-            .toList();
+        _categories =
+            catsRaw
+                .map<CategoryModel>((c) => CategoryModel.fromJson(Map<String, dynamic>.from(c)))
+                .toList()
+              ..sort((a, b) {
+                int cmp = a.name.compareTo(b.name);
+                if (cmp != 0) return cmp;
+                return b.id.compareTo(a.id);
+              });
         _isLoading = false;
       });
     }
@@ -48,19 +56,27 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     }
 
     final result = await ApiService.getCategories();
-    if (!mounted) return;
-    setState(() {
-      _isLoading = false;
-      if (result.isSuccess) {
-        _categories = result.data!['categories'] as List<CategoryModel>;
-        CacheService.cacheCategories({
-          'categories': _categories.map((c) => c.toJson()).toList(),
-          'currency_symbol': result.data!['currency_symbol'],
-        });
-      } else if (_categories.isEmpty) {
-        _error = result.error;
-      }
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+        if (result.isSuccess) {
+          _categories = (result.data!['categories'] as List<CategoryModel>)
+            ..sort((a, b) {
+              int cmp = a.name.compareTo(b.name);
+              if (cmp != 0) return cmp;
+              return b.id.compareTo(a.id);
+            });
+          _error = null;
+          // Cache
+          CacheService.cacheCategories({
+            'categories': _categories.map((c) => c.toJson()).toList(),
+            'currency_symbol': '₹',
+          });
+        } else if (_categories.isEmpty) {
+          _error = result.error;
+        }
+      });
+    }
   }
 
   Future<void> _deleteCategory(CategoryModel cat) async {
@@ -119,21 +135,6 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
         setState(() {
           _categories.removeWhere((c) => c.id == cat.id);
         });
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Offline: Category will be deleted when online.',
-                style: TextStyle(
-                  color: AppColors.accent,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              backgroundColor: AppColors.text,
-            ),
-          );
-        }
       }
     }
   }
@@ -495,6 +496,7 @@ class _CategoryFormSheetState extends State<_CategoryFormSheet> {
       _isSaving = true;
       _error = null;
     });
+    HapticFeedback.heavyImpact();
 
     final catData = {
       'name': name,
@@ -533,21 +535,6 @@ class _CategoryFormSheetState extends State<_CategoryFormSheet> {
       // ───────────────────────────────────────────────────────────────
       
       result = ApiResult(data: null);
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Offline: Category saved locally and will sync later.',
-              style: TextStyle(
-                color: AppColors.accent,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            backgroundColor: AppColors.text,
-          ),
-        );
-      }
     }
 
     if (!mounted) return;

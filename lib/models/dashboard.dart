@@ -52,9 +52,27 @@ class DashboardData {
       monthlyExpenses: json['monthly_expenses'] ?? '0.00',
       monthlySavings: json['monthly_savings'] ?? '0.00',
       currencySymbol: json['currency_symbol'] ?? '₹',
-      recentTransactions: (json['recent_transactions'] as List? ?? [])
-          .map((t) => TransactionModel.fromJson(t))
-          .toList(),
+      recentTransactions: () {
+        final rawList = (json['recent_transactions'] as List? ?? [])
+            .map((t) => TransactionModel.fromJson(t))
+            .toList();
+        
+        final seenKeys = <String>{};
+        final uniqueList = <TransactionModel>[];
+        for (var t in rawList) {
+          final amt = double.tryParse(t.amount.toString()) ?? 0;
+          final key = "${amt.toStringAsFixed(2)}_${t.category.name}_${t.date.toUtc().toIso8601String().substring(0, 16)}";
+          if (!seenKeys.contains(key)) {
+            seenKeys.add(key);
+            uniqueList.add(t);
+          }
+        }
+        return uniqueList..sort((a, b) {
+          int cmp = b.date.compareTo(a.date);
+          if (cmp != 0) return cmp;
+          return b.id.compareTo(a.id);
+        });
+      }(),
       pieLabels: List<String>.from(json['pie_labels'] ?? []),
       pieValues: (json['pie_values'] as List? ?? [])
           .map((v) => (v as num).toDouble())

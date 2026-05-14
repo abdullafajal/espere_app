@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'api_service.dart';
 import 'cache_service.dart';
 import 'connectivity_service.dart';
+import '../models/transaction.dart';
+import '../models/category.dart';
 
 class SyncService {
   /// Process all pending operations in the sync queue.
@@ -31,6 +33,7 @@ class SyncService {
           case 'transaction':
             final res = await _syncTransaction(action, data, entityId);
             success = res.isSuccess;
+            resultData = res.data;
             break;
           case 'category':
             final res = await _syncCategory(action, data, entityId);
@@ -61,19 +64,52 @@ class SyncService {
           // ─── Cache Sync (Immediate) ───────────────────────────────
           // This prevents background refreshes from wiping optimistic data 
           // before the sync queue is fully processed.
-          if (entity == 'saving' && resultData != null) {
-            if (action == 'create' || action == 'update') {
+          if (resultData != null) {
+            if (entity == 'transaction') {
+              if (action == 'create' || action == 'update') {
+                final txnJson = (resultData as TransactionModel).toJson();
+                await CacheService.updateTransactionInCache(
+                  txnJson['id'], 
+                  txnJson, 
+                  oldId: action == 'create' ? entityId : null
+                );
+                await CacheService.updateTransactionInDashboardCache(
+                  txnJson['id'], 
+                  txnJson, 
+                  oldId: action == 'create' ? entityId : null
+                );
+              }
+            } else if (entity == 'category') {
+              if (action == 'create' || action == 'update') {
+                final catJson = (resultData as CategoryModel).toJson();
+                await CacheService.updateCategoryInCache(
+                  catJson['id'], 
+                  catJson, 
+                  oldId: action == 'create' ? entityId : null
+                );
+              }
+            } else if (entity == 'budget') {
+              if (action == 'create' || action == 'update') {
+                await CacheService.updateBudgetInCache(
+                  resultData['id'], 
+                  resultData, 
+                  oldId: action == 'create' ? entityId : null
+                );
+              }
+            } else if (entity == 'saving') {
+              if (action == 'create' || action == 'update') {
+                await CacheService.updateSavingInCache(
+                  resultData['id'] as int, 
+                  resultData, 
+                  oldId: action == 'create' ? entityId : null
+                );
+              }
+            } else if (entity == 'saving_add_money') {
               await CacheService.updateSavingInCache(
                 resultData['id'] as int, 
-                resultData, 
-                oldId: action == 'create' ? entityId : null
+                resultData
               );
             }
-          } else if (entity == 'saving_add_money' && resultData != null) {
-            await CacheService.updateSavingInCache(
-              resultData['id'] as int, 
-              resultData
-            );
           }
 
 

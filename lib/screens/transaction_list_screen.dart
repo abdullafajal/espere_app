@@ -95,10 +95,56 @@ class TransactionListScreenState extends State<TransactionListScreen> {
     // 1. Always check cache first to show optimistic updates
     final cached = await CacheService.getCachedTransactions();
     if (cached != null && mounted) {
+      var list = (cached['transactions'] as List)
+          .map((t) => TransactionModel.fromJson(t as Map<String, dynamic>))
+          .toList();
+
+      // UI-level De-duplication: 
+      // Prevents showing duplicates if sync race conditions occurred in the past.
+      final seenKeys = <String>{};
+      final uniqueList = <TransactionModel>[];
+      for (var t in list) {
+        // Create a unique key based on Amount + Category + Date (minute precision)
+        final amt = double.tryParse(t.amount.toString()) ?? 0;
+        final key = "${amt.toStringAsFixed(2)}_${t.category.name}_${t.date.toUtc().toIso8601String().substring(0, 16)}";
+        if (!seenKeys.contains(key)) {
+          seenKeys.add(key);
+          uniqueList.add(t);
+        }
+      }
+      list = uniqueList;
+
+      // Apply Filters Locally
+      if (_typeFilter.isNotEmpty) {
+        list = list.where((t) => t.type == _typeFilter).toList();
+      }
+      if (_categoryFilter != null) {
+        list = list.where((t) => t.category.id == _categoryFilter).toList();
+      }
+      if (_searchQuery.isNotEmpty) {
+        final query = _searchQuery.toLowerCase();
+        list = list.where((t) {
+          return t.notes.toLowerCase().contains(query) ||
+              t.category.name.toLowerCase().contains(query) ||
+              t.amount.toString().contains(query);
+        }).toList();
+      }
+      if (!_showAll) {
+        final monthStr = DateFormat('yyyy-MM').format(_currentMonth);
+        list = list.where((t) {
+          return DateFormat('yyyy-MM').format(t.date) == monthStr;
+        }).toList();
+      }
+
+      // Sort by date (descending) + ID (descending) for deterministic order
+      list.sort((a, b) {
+        int cmp = b.date.compareTo(a.date);
+        if (cmp != 0) return cmp;
+        return b.id.compareTo(a.id);
+      });
+
       setState(() {
-        _transactions = (cached['transactions'] as List)
-            .map((t) => TransactionModel.fromJson(t as Map<String, dynamic>))
-            .toList();
+        _transactions = list;
         _currencySymbol = (cached['currency_symbol'] as String?) ?? '₹';
       });
     }
@@ -122,7 +168,29 @@ class TransactionListScreenState extends State<TransactionListScreen> {
     setState(() {
       _isLoading = false;
       if (result.isSuccess) {
-        _transactions = result.data!['transactions'] as List<TransactionModel>;
+        final rawTransactions = result.data!['transactions'] as List<TransactionModel>;
+        
+        // API-level De-duplication:
+        // Handles cases where an item just synced but is still being processed in the queue
+        final seenKeys = <String>{};
+        final uniqueList = <TransactionModel>[];
+        for (var t in rawTransactions) {
+          final amt = double.tryParse(t.amount.toString()) ?? 0;
+          final key = "${amt.toStringAsFixed(2)}_${t.category.name}_${t.date.toUtc().toIso8601String().substring(0, 16)}";
+          if (!seenKeys.contains(key)) {
+            seenKeys.add(key);
+            uniqueList.add(t);
+          }
+        }
+        _transactions = uniqueList;
+        
+        // Also sort API response just to be consistent
+        _transactions.sort((a, b) {
+          int cmp = b.date.compareTo(a.date);
+          if (cmp != 0) return cmp;
+          return b.id.compareTo(a.id);
+        });
+        
         _currencySymbol = result.data!['currency_symbol'] as String? ?? '₹';
         // Cache transactions
         CacheService.cacheTransactions({
@@ -190,6 +258,7 @@ class TransactionListScreenState extends State<TransactionListScreen> {
     );
 
     if (confirm == true) {
+      HapticFeedback.heavyImpact();
       if (ConnectivityService.isOnline) {
         final result = await ApiService.deleteTransaction(id);
         if (result.isSuccess) {
@@ -241,21 +310,6 @@ class TransactionListScreenState extends State<TransactionListScreen> {
         setState(() {
           _transactions.removeWhere((t) => t.id == id);
         });
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Offline: Transaction will be deleted when online.',
-                style: TextStyle(
-                  color: AppColors.accent,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              backgroundColor: AppColors.text,
-            ),
-          );
-        }
       }
     }
   }

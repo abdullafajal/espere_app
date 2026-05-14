@@ -1,5 +1,6 @@
 /// Cache service — JSON read/write for offline-first data using SharedPreferences.
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class CacheService {
@@ -42,8 +43,154 @@ class CacheService {
 
   // ─── Dashboard ───────────────────────────────────────────────────────
 
-  static Future<void> cacheDashboard(Map<String, dynamic> data) async {
+  static Future<Map<String, dynamic>> cacheDashboard(Map<String, dynamic> data) async {
+    final current = await getCachedDashboard();
+    if (current != null) {
+      final oldTxns = List<Map<String, dynamic>>.from(current['recent_transactions'] ?? []);
+      final newTxns = List<Map<String, dynamic>>.from(data['recent_transactions'] ?? []);
+
+      final unsynced = oldTxns.where((t) {
+        final id = t['id'];
+        return id is int && id > 1000000000000;
+      }).toList();
+
+      for (var item in unsynced) {
+        // Smart De-duplication:
+        bool exists = newTxns.any((t) {
+          if (t['id'].toString() == item['id'].toString()) return true;
+          
+          double amt1 = double.tryParse(t['amount'].toString()) ?? 0.0;
+          double amt2 = double.tryParse(item['amount'].toString()) ?? 0.0;
+          bool amountMatch = (amt1 - amt2).abs() < 0.01;
+          
+          bool categoryMatch = t['category']?['name'] == item['category']?['name'];
+          
+          DateTime d1 = DateTime.tryParse(t['date'].toString()) ?? DateTime(2000);
+          DateTime d2 = DateTime.tryParse(item['date'].toString()) ?? DateTime(2001);
+          bool dateMatch = d1.toUtc().difference(d2.toUtc()).inMinutes.abs() <= 2;
+          
+          return amountMatch && categoryMatch && dateMatch;
+        });
+
+        if (!exists) {
+          newTxns.insert(0, item);
+          // Apply optimistic impact to fresh API data to keep charts consistent
+          _applyTransactionImpact(data, item);
+        }
+      }
+      data['recent_transactions'] = newTxns;
+    }
     await _write(_dashboardKey, data);
+    return data;
+  }
+
+  /// Internal helper to apply a transaction's impact to a dashboard data map
+  static void _applyTransactionImpact(Map<String, dynamic> cached, Map<String, dynamic> txnJson) {
+    final type = txnJson['type']?.toString() ?? 'expense';
+    final amount = double.tryParse(txnJson['amount']?.toString() ?? '0.0') ?? 0.0;
+
+    double total = double.tryParse(cached['total_balance'].toString().replaceAll(',', '')) ?? 0.0;
+    double income = double.tryParse(cached['monthly_income'].toString().replaceAll(',', '')) ?? 0.0;
+    double expense = double.tryParse(cached['monthly_expenses'].toString().replaceAll(',', '')) ?? 0.0;
+    double savings = double.tryParse(cached['monthly_savings'].toString().replaceAll(',', '')) ?? 0.0;
+
+    if (type == 'income') {
+      total += amount;
+      income += amount;
+    } else {
+      total -= amount;
+      expense += amount;
+    }
+
+    cached['total_balance'] = total.toStringAsFixed(2);
+    cached['monthly_income'] = income.toStringAsFixed(2);
+    cached['monthly_expenses'] = expense.toStringAsFixed(2);
+    cached['monthly_savings'] = (income - expense).toStringAsFixed(2);
+
+    // Update charts (Pie Chart)
+    if (type == 'expense') {
+      final categoryName = txnJson['category']?['name'] ?? 'Other';
+      final categoryColor = txnJson['category']?['color'] ?? '#CCCCCC';
+      final labels = List<String>.from(cached['pie_labels'] ?? []);
+      final values = List<double>.from((cached['pie_values'] as List? ?? []).map((v) => (v as num).toDouble()));
+      final colors = List<String>.from(cached['pie_colors'] ?? []);
+
+      int idx = labels.indexOf(categoryName);
+      if (idx != -1) {
+        values[idx] += amount;
+      } else {
+        labels.add(categoryName);
+        values.add(amount);
+        colors.add(categoryColor);
+      }
+
+      final combined = List.generate(labels.length, (i) => {
+        'label': labels[i],
+        'value': values[i],
+        'color': colors[i],
+      });
+
+      combined.sort((a, b) {
+        int cmp = (b['value'] as double).compareTo(a['value'] as double);
+        if (cmp != 0) return cmp;
+        return (a['label'] as String).compareTo(b['label'] as String);
+      });
+
+      cached['pie_labels'] = combined.map((i) => i['label'] as String).toList();
+      cached['pie_values'] = combined.map((i) => i['value'] as double).toList();
+      cached['pie_colors'] = combined.map((i) => i['color'] as String).toList();
+    }
+
+    final monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final currentMonth = monthNames[DateTime.now().month - 1];
+    final barLabels = List<String>.from(cached['bar_labels'] ?? []);
+    int barIdx = barLabels.indexOf(currentMonth);
+    if (barIdx != -1) {
+      if (type == 'income') {
+        final incomeValues = List<double>.from((cached['bar_income'] as List? ?? []).map((v) => (v as num).toDouble()));
+        if (barIdx < incomeValues.length) {
+          incomeValues[barIdx] += amount;
+          cached['bar_income'] = incomeValues;
+        }
+      } else if (type == 'expense') {
+        final expenseValues = List<double>.from((cached['bar_expense'] as List? ?? []).map((v) => (v as num).toDouble()));
+        if (barIdx < expenseValues.length) {
+          expenseValues[barIdx] += amount;
+          cached['bar_expense'] = expenseValues;
+        }
+      }
+    }
+
+    if (type == 'expense') {
+      final lineLabels = List<String>.from(cached['line_labels'] ?? []);
+      final day = DateTime.now().day.toString().padLeft(2, '0');
+      final dayShort = DateTime.now().day.toString();
+      final dayFull = "$day $currentMonth";
+
+      int lineIdx = lineLabels.indexOf(day);
+      if (lineIdx == -1) lineIdx = lineLabels.indexOf(dayShort);
+      if (lineIdx == -1) lineIdx = lineLabels.indexOf(dayFull);
+
+      if (lineIdx != -1) {
+        final lineValues = List<double>.from((cached['line_values'] as List? ?? []).map((v) => (v as num).toDouble()));
+        if (lineIdx < lineValues.length) {
+          lineValues[lineIdx] += amount;
+          cached['line_values'] = lineValues;
+        }
+      }
+    }
+
+    if (type == 'savings') {
+      final lineLabels = List<String>.from(cached['line_labels'] ?? []);
+      int lineIdx = lineLabels.indexOf(currentMonth);
+      if (lineIdx != -1) {
+        final lineValues = List<double>.from((cached['line_values'] as List? ?? []).map((v) => (v as num).toDouble()));
+        if (lineIdx < lineValues.length) {
+          lineValues[lineIdx] += amount;
+          cached['line_values'] = lineValues;
+        }
+      }
+    }
   }
 
   static Future<Map<String, dynamic>?> getCachedDashboard() async {
@@ -53,6 +200,47 @@ class CacheService {
   // ─── Transactions ────────────────────────────────────────────────────
 
   static Future<void> cacheTransactions(Map<String, dynamic> data) async {
+    final current = await getCachedTransactions();
+    if (current != null) {
+      final oldList = List<Map<String, dynamic>>.from(current['transactions'] ?? []);
+      final newList = List<Map<String, dynamic>>.from(data['transactions'] ?? []);
+      
+      // Preserving entries with temporary IDs (DateTime.now().millisecondsSinceEpoch)
+      // These are > 1,000,000,000,000
+      final unsynced = oldList.where((t) {
+        final id = t['id'];
+        return id is int && id > 1000000000000;
+      }).toList();
+
+      for (var item in unsynced) {
+        // Smart De-duplication:
+        // Check if an item with the same ID exists, OR if a very similar item 
+        // (same amount, category, and time) exists (handles temp -> real ID transition)
+        bool exists = newList.any((t) {
+          if (t['id'].toString() == item['id'].toString()) return true;
+          
+          // Compare amounts
+          double amt1 = double.tryParse(t['amount'].toString()) ?? 0;
+          double amt2 = double.tryParse(item['amount'].toString()) ?? 0;
+          bool amountMatch = (amt1 - amt2).abs() < 0.01;
+          
+          // Compare categories
+          bool categoryMatch = t['category']?['name'] == item['category']?['name'];
+          
+          // Compare dates properly as DateTime objects (handles timezone differences)
+          DateTime d1 = DateTime.tryParse(t['date'].toString()) ?? DateTime(2000);
+          DateTime d2 = DateTime.tryParse(item['date'].toString()) ?? DateTime(2001);
+          bool dateMatch = d1.toUtc().difference(d2.toUtc()).inMinutes.abs() <= 2;
+          
+          return amountMatch && categoryMatch && dateMatch;
+        });
+
+        if (!exists) {
+          newList.insert(0, item);
+        }
+      }
+      data['transactions'] = newList;
+    }
     await _write(_transactionsKey, data);
   }
 
@@ -63,6 +251,23 @@ class CacheService {
   // ─── Categories ──────────────────────────────────────────────────────
 
   static Future<void> cacheCategories(Map<String, dynamic> data) async {
+    final current = await getCachedCategories();
+    if (current != null) {
+      final oldList = List<Map<String, dynamic>>.from(current['categories'] ?? []);
+      final newList = List<Map<String, dynamic>>.from(data['categories'] ?? []);
+
+      final unsynced = oldList.where((c) {
+        final id = c['id'];
+        return id is int && id > 1000000000000;
+      }).toList();
+
+      for (var item in unsynced) {
+        if (!newList.any((c) => c['id'] == item['id'])) {
+          newList.insert(0, item);
+        }
+      }
+      data['categories'] = newList;
+    }
     await _write(_categoriesKey, data);
   }
 
@@ -73,6 +278,23 @@ class CacheService {
   // ─── Budgets ─────────────────────────────────────────────────────────
 
   static Future<void> cacheBudgets(Map<String, dynamic> data) async {
+    final current = await getCachedBudgets();
+    if (current != null) {
+      final oldList = List<Map<String, dynamic>>.from(current['budgets'] ?? []);
+      final newList = List<Map<String, dynamic>>.from(data['budgets'] ?? []);
+
+      final unsynced = oldList.where((b) {
+        final id = b['id'];
+        return id is int && id > 1000000000000;
+      }).toList();
+
+      for (var item in unsynced) {
+        if (!newList.any((b) => b['id'] == item['id'])) {
+          newList.insert(0, item);
+        }
+      }
+      data['budgets'] = newList;
+    }
     await _write(_budgetsKey, data);
   }
 
@@ -83,6 +305,23 @@ class CacheService {
   // ─── Savings ─────────────────────────────────────────────────────────
 
   static Future<void> cacheSavings(Map<String, dynamic> data) async {
+    final current = await getCachedSavings();
+    if (current != null) {
+      final oldList = List<Map<String, dynamic>>.from(current['goals'] ?? []);
+      final newList = List<Map<String, dynamic>>.from(data['goals'] ?? []);
+
+      final unsynced = oldList.where((g) {
+        final id = g['id'];
+        return id is int && id > 1000000000000;
+      }).toList();
+
+      for (var item in unsynced) {
+        if (!newList.any((g) => g['id'] == item['id'])) {
+          newList.insert(0, item);
+        }
+      }
+      data['goals'] = newList;
+    }
     await _write(_savingsKey, data);
   }
 
@@ -145,13 +384,19 @@ class CacheService {
 
   /// Update an existing transaction in the local cache
   static Future<void> updateTransactionInCache(
-      int id, Map<String, dynamic> txnJson) async {
+      int id, Map<String, dynamic> txnJson, {int? oldId}) async {
     final cached = await getCachedTransactions();
     if (cached == null) return;
-    final list = List<Map<String, dynamic>>.from(cached['transactions'] ?? []);
-    final idx = list.indexWhere((t) => t['id'] == id);
+    var list = List<Map<String, dynamic>>.from(cached['transactions'] ?? []);
+    
+    final idToFind = oldId ?? id;
+    final idx = list.indexWhere((t) => t['id'] == idToFind);
+    
     if (idx != -1) {
       list[idx] = txnJson;
+      // Cleanup: Remove any other entry with the same real ID (prevents duplicates)
+      list.removeWhere((t) => t != txnJson && t['id'] == id);
+      
       await cacheTransactions({
         'transactions': list,
         'currency_symbol': cached['currency_symbol'],
@@ -171,6 +416,24 @@ class CacheService {
     });
   }
 
+  /// Update an existing category in the local cache immediately
+  static Future<void> updateCategoryInCache(int id, Map<String, dynamic> catJson, {int? oldId}) async {
+    final cached = await getCachedCategories();
+    if (cached == null) return;
+    final list = List<Map<String, dynamic>>.from(cached['categories'] ?? []);
+    
+    final idToFind = oldId ?? id;
+    final index = list.indexWhere((c) => c['id'].toString() == idToFind.toString());
+    
+    if (index != -1) {
+      list[index] = catJson;
+      await cacheCategories({
+        'categories': list,
+        'currency_symbol': cached['currency_symbol'],
+      });
+    }
+  }
+
   /// Add a budget to the local cache immediately
   static Future<void> addBudgetToCache(Map<String, dynamic> budgetJson) async {
     final cached = await getCachedBudgets();
@@ -184,11 +447,14 @@ class CacheService {
   }
 
   /// Update an existing budget in the local cache immediately
-  static Future<void> updateBudgetInCache(int id, Map<String, dynamic> budgetJson) async {
+  static Future<void> updateBudgetInCache(int id, Map<String, dynamic> budgetJson, {int? oldId}) async {
     final cached = await getCachedBudgets();
     if (cached == null) return;
     final list = List<Map<String, dynamic>>.from(cached['budgets'] ?? []);
-    final index = list.indexWhere((b) => b['id'].toString() == id.toString());
+    
+    final idToFind = oldId ?? id;
+    final index = list.indexWhere((b) => b['id'].toString() == idToFind.toString());
+    
     if (index != -1) {
       list[index] = {
         ...list[index],
@@ -220,120 +486,40 @@ class CacheService {
     final cached = await getCachedDashboard();
     if (cached == null) return;
 
-    double total = double.tryParse(cached['total_balance'].toString()) ?? 0;
-    double income = double.tryParse(cached['monthly_income'].toString()) ?? 0;
-    double expense = double.tryParse(cached['monthly_expenses'].toString()) ?? 0;
-    double savings = double.tryParse(cached['monthly_savings'].toString()) ?? 0;
+    // Apply totals and chart impact
+    _applyTransactionImpact(cached, txnJson);
 
-    if (type == 'income') {
-      total += amount;
-      income += amount;
-    } else if (type == 'savings') {
-      total -= amount;
-      savings += amount;
-    } else {
-      total -= amount;
-      expense += amount;
-    }
-
-    cached['total_balance'] = total.toStringAsFixed(2);
-    cached['monthly_income'] = income.toStringAsFixed(2);
-    cached['monthly_expenses'] = expense.toStringAsFixed(2);
-    cached['monthly_savings'] = savings.toStringAsFixed(2);
-
-    // Update recent transactions list in dashboard and sort by date
-    final recent =
-        List<Map<String, dynamic>>.from(cached['recent_transactions'] ?? []);
+    // Update recent transactions list separately
+    final recent = List<Map<String, dynamic>>.from(cached['recent_transactions'] ?? []);
     recent.add(txnJson);
     recent.sort((a, b) => DateTime.parse(b['date'].toString())
         .compareTo(DateTime.parse(a['date'].toString())));
     if (recent.length > 5) recent.removeRange(5, recent.length);
     cached['recent_transactions'] = recent;
 
-    // Update charts (Pie Chart)
-    if (type == 'expense') {
-      final categoryName = txnJson['category']?['name'] ?? 'Other';
-      final categoryColor = txnJson['category']?['color'] ?? '#CCCCCC';
-      final labels = List<String>.from(cached['pie_labels'] ?? []);
-      final values = List<double>.from(
-          (cached['pie_values'] as List? ?? []).map((v) => (v as num).toDouble()));
-      final colors = List<String>.from(cached['pie_colors'] ?? []);
+    await _write(_dashboardKey, cached);
+  }
 
-      int idx = labels.indexOf(categoryName);
-      if (idx != -1) {
-        values[idx] += amount;
-      } else {
-        labels.add(categoryName);
-        values.add(amount);
-        colors.add(categoryColor);
-      }
-      cached['pie_labels'] = labels;
-      cached['pie_values'] = values;
-      cached['pie_colors'] = colors;
+  /// Update a transaction in the dashboard's recent transactions list (sync transition)
+  static Future<void> updateTransactionInDashboardCache(
+      int id, Map<String, dynamic> txnJson, {int? oldId}) async {
+    final cached = await getCachedDashboard();
+    if (cached == null) return;
+    
+    var recent = List<Map<String, dynamic>>.from(cached['recent_transactions'] ?? []);
+    final idToFind = oldId ?? id;
+    final idx = recent.indexWhere((t) => t['id'].toString() == idToFind.toString());
+    
+    if (idx != -1) {
+      recent[idx] = txnJson;
+      // Cleanup
+      recent.removeWhere((t) => t != txnJson && t['id'].toString() == id.toString());
+      
+      cached['recent_transactions'] = recent;
+      // Use raw write to avoid the merge logic in cacheDashboard
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cache_dashboard', jsonEncode(cached));
     }
-
-    // Update Bar Chart (Monthly Income vs Expense)
-    final monthNames = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-    ];
-    final currentMonth = monthNames[DateTime.now().month - 1];
-    final barLabels = List<String>.from(cached['bar_labels'] ?? []);
-    int barIdx = barLabels.indexOf(currentMonth);
-    if (barIdx != -1) {
-      if (type == 'income') {
-        final incomeValues = List<double>.from(
-            (cached['bar_income'] as List? ?? []).map((v) => (v as num).toDouble()));
-        if (barIdx < incomeValues.length) {
-          incomeValues[barIdx] += amount;
-          cached['bar_income'] = incomeValues;
-        }
-      } else if (type == 'expense') {
-        final expenseValues = List<double>.from(
-            (cached['bar_expense'] as List? ?? []).map((v) => (v as num).toDouble()));
-        if (barIdx < expenseValues.length) {
-          expenseValues[barIdx] += amount;
-          cached['bar_expense'] = expenseValues;
-        }
-      }
-    }
-
-    // Update Line Chart (30-Day Spending Trend)
-    if (type == 'expense') {
-      final lineLabels = List<String>.from(cached['line_labels'] ?? []);
-      final day = DateTime.now().day.toString().padLeft(2, '0');
-      final dayShort = DateTime.now().day.toString();
-      final dayFull = "$day $currentMonth";
-
-      int lineIdx = lineLabels.indexOf(day);
-      if (lineIdx == -1) lineIdx = lineLabels.indexOf(dayShort);
-      if (lineIdx == -1) lineIdx = lineLabels.indexOf(dayFull);
-
-      if (lineIdx != -1) {
-        final lineValues = List<double>.from(
-            (cached['line_values'] as List? ?? []).map((v) => (v as num).toDouble()));
-        if (lineIdx < lineValues.length) {
-          lineValues[lineIdx] += amount;
-          cached['line_values'] = lineValues;
-        }
-      }
-    }
-
-    // Update Savings Chart (If also present as line chart)
-    if (type == 'savings') {
-      final lineLabels = List<String>.from(cached['line_labels'] ?? []);
-      int lineIdx = lineLabels.indexOf(currentMonth);
-      if (lineIdx != -1) {
-        final lineValues = List<double>.from(
-            (cached['line_values'] as List? ?? []).map((v) => (v as num).toDouble()));
-        if (lineIdx < lineValues.length) {
-          lineValues[lineIdx] += amount;
-          cached['line_values'] = lineValues;
-        }
-      }
-    }
-
-    await cacheDashboard(cached);
   }
 
   /// Update budget spent amount optimistically
@@ -381,9 +567,9 @@ class CacheService {
     final cached = await getCachedDashboard();
     if (cached == null) return;
 
-    double total = double.tryParse(cached['total_balance'].toString()) ?? 0;
-    double income = double.tryParse(cached['monthly_income'].toString()) ?? 0;
-    double expense = double.tryParse(cached['monthly_expenses'].toString()) ?? 0;
+    double total = double.tryParse(cached['total_balance'].toString().replaceAll(',', '')) ?? 0.0;
+    double income = double.tryParse(cached['monthly_income'].toString().replaceAll(',', '')) ?? 0.0;
+    double expense = double.tryParse(cached['monthly_expenses'].toString().replaceAll(',', '')) ?? 0.0;
 
     if (type == 'income') {
       total -= amount;
@@ -396,6 +582,7 @@ class CacheService {
     cached['total_balance'] = total.toStringAsFixed(2);
     cached['monthly_income'] = income.toStringAsFixed(2);
     cached['monthly_expenses'] = expense.toStringAsFixed(2);
+    cached['monthly_savings'] = (income - expense).toStringAsFixed(2);
 
     // Remove from recent transactions if present
     final recent =
