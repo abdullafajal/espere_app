@@ -6,7 +6,14 @@ import 'connectivity_service.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
 
+import 'dart:async';
+
 class SyncService {
+  static final _syncController = StreamController<void>.broadcast();
+
+  /// Stream that emits when a sync cycle finishes (queue processed).
+  static Stream<void> get onSyncComplete => _syncController.stream;
+
   /// Process all pending operations in the sync queue.
   /// Called when device comes back online.
   static Future<void> processSyncQueue() async {
@@ -52,6 +59,21 @@ class SyncService {
             break;
           case 'saving_add_money':
             final res = await _syncSavingAddMoney(data, entityId);
+            success = res.isSuccess;
+            resultData = res.data;
+            break;
+          case 'split_group':
+            final res = await ApiService.createSplitGroup(data!, localId: opId);
+            success = res.isSuccess;
+            resultData = res.data;
+            break;
+          case 'split_expense':
+            final res = await ApiService.addSplitExpense(entityId!, data!, localId: opId);
+            success = res.isSuccess;
+            resultData = res.data;
+            break;
+          case 'split_settle':
+            final res = await ApiService.settleDebt(entityId!, data!, localId: opId);
             success = res.isSuccess;
             resultData = res.data;
             break;
@@ -182,6 +204,8 @@ class SyncService {
         debugPrint('[SyncService] Error processing op: $e');
       }
     }
+    // Notify listeners that sync is done
+    _syncController.add(null);
   }
 
   /// Replace temporary category IDs with real IDs in the sync queue.

@@ -2,10 +2,12 @@
 ///
 /// Layout: greeting header → balance card → 3 summary cards → promo banner
 ///         → insights → charts → recent transactions → quick links
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'dart:math' as math;
+import 'dart:async';
 import 'dart:io';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:path_provider/path_provider.dart';
@@ -22,6 +24,8 @@ import '../utils/icon_mapper.dart';
 import '../utils/app_toast.dart';
 import '../services/connectivity_service.dart';
 import 'reports_screen.dart';
+import '../services/sync_service.dart';
+import '../services/widget_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   final Function(int)? onTabChange;
@@ -36,11 +40,23 @@ class DashboardScreenState extends State<DashboardScreen> {
   DashboardData? _data;
   bool _isLoading = true;
   String? _error;
+  StreamSubscription<void>? _syncSub;
 
-  @override
   void initState() {
     super.initState();
     _loadDashboard();
+
+    // Listen for background sync completions to refresh UI immediately
+    _syncSub = SyncService.onSyncComplete.listen((_) {
+      debugPrint('[Dashboard] Background sync detected — refreshing data...');
+      _loadDashboard();
+    });
+  }
+
+  @override
+  void dispose() {
+    _syncSub?.cancel();
+    super.dispose();
   }
 
   /// Public method for parent to trigger a data reload.
@@ -68,10 +84,19 @@ class DashboardScreenState extends State<DashboardScreen> {
     if (result.isSuccess) {
       final mergedData = await CacheService.cacheDashboard(result.data!.toJson());
       if (mounted) {
+        final d = DashboardData.fromJson(mergedData);
         setState(() {
           _isLoading = false;
-          _data = DashboardData.fromJson(mergedData);
+          _data = d;
         });
+
+        // Update home screen widget
+        WidgetService.updateDashboard(
+          totalBalance: double.tryParse(d.totalBalance.replaceAll(',', '')) ?? 0,
+          totalIncome: double.tryParse(d.monthlyIncome.replaceAll(',', '')) ?? 0,
+          totalExpense: double.tryParse(d.monthlyExpenses.replaceAll(',', '')) ?? 0,
+          currencySymbol: d.currencySymbol,
+        );
       }
     } else {
       if (mounted) {

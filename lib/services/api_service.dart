@@ -544,9 +544,10 @@ class ApiService {
 
   /// Create a new split group
   static Future<ApiResult<Map<String, dynamic>>> createSplitGroup(
-      Map<String, dynamic> groupData) async {
+      Map<String, dynamic> groupData, {String? localId}) async {
     try {
       final url = await _url('/api/split/groups/');
+      if (localId != null) groupData['local_id'] = localId;
       final response = await http.post(
         Uri.parse(url),
         headers: await _headers(),
@@ -558,6 +559,46 @@ class ApiService {
         return ApiResult(data: Map<String, dynamic>.from(data['group']));
       }
       return ApiResult(error: data['error'] ?? 'Failed to create group.');
+    } catch (e) {
+      return ApiResult(error: 'Connection error.');
+    }
+  }
+
+  /// Update an existing split group
+  static Future<ApiResult<Map<String, dynamic>>> updateSplitGroup(
+      int id, Map<String, dynamic> groupData) async {
+    try {
+      final url = await _url('/api/split/groups/$id/');
+      final response = await http.patch(
+        Uri.parse(url),
+        headers: await _headers(),
+        body: jsonEncode(groupData),
+      );
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResult(data: Map<String, dynamic>.from(data['group']));
+      }
+      return ApiResult(error: data['error'] ?? 'Failed to update group.');
+    } catch (e) {
+      return ApiResult(error: 'Connection error.');
+    }
+  }
+
+  /// Delete a split group
+  static Future<ApiResult<void>> deleteSplitGroup(int id) async {
+    try {
+      final url = await _url('/api/split/groups/$id/');
+      final response = await http.delete(
+        Uri.parse(url),
+        headers: await _headers(),
+      );
+
+      if (response.statusCode == 200) {
+        return ApiResult(data: null);
+      }
+      final data = jsonDecode(response.body);
+      return ApiResult(error: data['error'] ?? 'Failed to delete group.');
     } catch (e) {
       return ApiResult(error: 'Connection error.');
     }
@@ -576,7 +617,7 @@ class ApiService {
       if (response.statusCode == 200) {
         return ApiResult(data: Map<String, dynamic>.from(data['group']));
       }
-      return ApiResult(error: 'Failed to load group.');
+      return ApiResult(error: data['error'] ?? 'Failed to load group.', errors: data is Map ? Map<String, dynamic>.from(data) : null);
     } catch (e) {
       return ApiResult(error: 'Connection error.');
     }
@@ -584,9 +625,10 @@ class ApiService {
 
   /// Add an expense to a group
   static Future<ApiResult<Map<String, dynamic>>> addSplitExpense(
-      int groupId, Map<String, dynamic> expenseData) async {
+      int groupId, Map<String, dynamic> expenseData, {String? localId}) async {
     try {
       final url = await _url('/api/split/groups/$groupId/expenses/');
+      if (localId != null) expenseData['local_id'] = localId;
       final response = await http.post(
         Uri.parse(url),
         headers: await _headers(),
@@ -603,11 +645,63 @@ class ApiService {
     }
   }
 
+  /// Get an expense detail
+  static Future<ApiResult<Map<String, dynamic>>> getSplitExpenseDetail(int groupId, int expenseId) async {
+    try {
+      final url = await _url('/api/split/groups/$groupId/expenses/$expenseId/');
+      final response = await http.get(Uri.parse(url), headers: await _headers());
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResult(data: Map<String, dynamic>.from(data['expense']));
+      }
+      return ApiResult(error: data['error'] ?? 'Failed to load expense.');
+    } catch (e) {
+      return ApiResult(error: 'Connection error.');
+    }
+  }
+
+  /// Update an expense in a group
+  static Future<ApiResult<Map<String, dynamic>>> updateSplitExpense(
+      int groupId, int expenseId, Map<String, dynamic> expenseData) async {
+    try {
+      final url = await _url('/api/split/groups/$groupId/expenses/$expenseId/');
+      final response = await http.patch(
+        Uri.parse(url),
+        headers: await _headers(),
+        body: jsonEncode(expenseData),
+      );
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResult(data: Map<String, dynamic>.from(data['expense']));
+      }
+      return ApiResult(error: data['error'] ?? 'Failed to update expense.');
+    } catch (e) {
+      return ApiResult(error: 'Connection error.');
+    }
+  }
+
+  /// Delete an expense from a group
+  static Future<ApiResult<void>> deleteSplitExpense(int groupId, int expenseId) async {
+    try {
+      final url = await _url('/api/split/groups/$groupId/expenses/$expenseId/');
+      final response = await http.delete(Uri.parse(url), headers: await _headers());
+      if (response.statusCode == 200) {
+        return ApiResult(data: null);
+      }
+      final data = jsonDecode(response.body);
+      return ApiResult(error: data['error'] ?? 'Failed to delete expense.');
+    } catch (e) {
+      return ApiResult(error: 'Connection error.');
+    }
+  }
+
   /// Settle a debt in a group
   static Future<ApiResult<Map<String, dynamic>>> settleDebt(
-      int groupId, Map<String, dynamic> settleData) async {
+      int groupId, Map<String, dynamic> settleData, {String? localId}) async {
     try {
       final url = await _url('/api/split/groups/$groupId/settle/');
+      if (localId != null) settleData['local_id'] = localId;
       final response = await http.post(
         Uri.parse(url),
         headers: await _headers(),
@@ -624,18 +718,23 @@ class ApiService {
     }
   }
   /// Add a member to a group by username/email
+  /// Add a member to a group by username/email
   static Future<ApiResult<Map<String, dynamic>>> addSplitMember(
-      int groupId, String identifier) async {
+      int groupId, {String? identifier, List<int>? userIds}) async {
     try {
       final url = await _url('/api/split/groups/$groupId/members/');
+      final body = {};
+      if (identifier != null) body['identifier'] = identifier;
+      if (userIds != null) body['user_ids'] = userIds;
+
       final response = await http.post(
         Uri.parse(url),
         headers: await _headers(),
-        body: jsonEncode({'identifier': identifier}),
+        body: jsonEncode(body),
       );
       final data = jsonDecode(response.body);
-      if (response.statusCode == 201) {
-        return ApiResult(data: Map<String, dynamic>.from(data['member']));
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        return ApiResult(data: Map<String, dynamic>.from(data));
       }
       return ApiResult(error: data['error'] ?? 'Failed to add member.');
     } catch (e) {
@@ -671,6 +770,95 @@ class ApiService {
         return ApiResult(data: List<Map<String, dynamic>>.from(data['users']));
       }
       return ApiResult(error: 'Search failed.');
+    } catch (e) {
+      return ApiResult(error: 'Connection error.');
+    }
+  }
+
+  /// ─── Friends & Invitations ─────────────────────────────────────────────
+
+  /// Get friends list and pending requests
+  static Future<ApiResult<Map<String, dynamic>>> getFriends() async {
+    try {
+      final url = await _url('/api/split/friends/');
+      final response = await http.get(Uri.parse(url), headers: await _headers());
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResult(data: Map<String, dynamic>.from(data));
+      }
+      return ApiResult(error: 'Failed to load friends.');
+    } catch (e) {
+      return ApiResult(error: 'Connection error.');
+    }
+  }
+
+  /// Invite a friend by email
+  static Future<ApiResult<void>> inviteFriend(String email) async {
+    try {
+      final url = await _url('/api/split/friends/');
+      final response = await http.post(
+        Uri.parse(url),
+        headers: await _headers(),
+        body: jsonEncode({'email': email}),
+      );
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        return ApiResult(data: null);
+      }
+      return ApiResult(error: data['error'] ?? 'Failed to invite friend.');
+    } catch (e) {
+      return ApiResult(error: 'Connection error.');
+    }
+  }
+
+  /// Take action on a friend request
+  static Future<ApiResult<void>> handleFriendRequest(int requestId, String action) async {
+    try {
+      final url = await _url('/api/split/friends/action/');
+      final response = await http.post(
+        Uri.parse(url),
+        headers: await _headers(),
+        body: jsonEncode({'request_id': requestId, 'action': action}),
+      );
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResult(data: null);
+      }
+      return ApiResult(error: data['error'] ?? 'Action failed.');
+    } catch (e) {
+      return ApiResult(error: 'Connection error.');
+    }
+  }
+
+  /// Get pending group invitations
+  static Future<ApiResult<List<Map<String, dynamic>>>> getGroupInvitations() async {
+    try {
+      final url = await _url('/api/split/invitations/');
+      final response = await http.get(Uri.parse(url), headers: await _headers());
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResult(data: List<Map<String, dynamic>>.from(data['invitations']));
+      }
+      return ApiResult(error: 'Failed to load invitations.');
+    } catch (e) {
+      return ApiResult(error: 'Connection error.');
+    }
+  }
+
+  /// Take action on a group invitation
+  static Future<ApiResult<void>> handleGroupInvitation(int invitationId, String action) async {
+    try {
+      final url = await _url('/api/split/invitations/$invitationId/action/');
+      final response = await http.post(
+        Uri.parse(url),
+        headers: await _headers(),
+        body: jsonEncode({'action': action}),
+      );
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResult(data: null);
+      }
+      return ApiResult(error: data['error'] ?? 'Action failed.');
     } catch (e) {
       return ApiResult(error: 'Connection error.');
     }
@@ -733,6 +921,38 @@ class ApiService {
         return ApiResult(data: response.body);
       }
       return ApiResult(error: 'Failed to download CSV: ${response.statusCode}');
+    } catch (e) {
+      return ApiResult(error: 'Connection error.');
+    }
+  }
+
+  /// Get pending group invitations
+  static Future<ApiResult<Map<String, dynamic>>> getSplitInvitations() async {
+    try {
+      final url = await _url('/api/split/invitations/');
+      final response = await http.get(Uri.parse(url), headers: await _headers());
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResult(data: Map<String, dynamic>.from(data));
+      }
+      return ApiResult(error: data['error'] ?? 'Failed to load invitations.');
+    } catch (e) {
+      return ApiResult(error: 'Connection error.');
+    }
+  }
+
+  /// Accept or reject a group invitation
+  static Future<ApiResult<bool>> handleSplitInvitation(int invitationId, String action) async {
+    try {
+      final url = await _url('/api/split/invitations/$invitationId/action/');
+      final response = await http.post(
+        Uri.parse(url),
+        headers: await _headers(),
+        body: jsonEncode({'action': action}),
+      );
+      if (response.statusCode == 200) return ApiResult(data: true);
+      final data = jsonDecode(response.body);
+      return ApiResult(error: data['error'] ?? 'Failed to handle invitation.');
     } catch (e) {
       return ApiResult(error: 'Connection error.');
     }

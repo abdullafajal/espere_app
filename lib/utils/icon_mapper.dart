@@ -54,6 +54,7 @@ class IconMapper {
     'water_drop': Icons.water_drop,
     'family_restroom': Icons.family_restroom,
     'child_care': Icons.child_care,
+    'groups': Icons.groups,
   };
 
   /// Returns the Flutter [IconData] for a Django icon name.

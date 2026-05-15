@@ -2,6 +2,7 @@
 ///
 /// Features: search bar, type/category filter chips, month navigator,
 /// grouped transaction list with edit/delete actions
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -29,6 +30,7 @@ class TransactionListScreenState extends State<TransactionListScreen> {
   bool _isLoading = true;
   String? _error;
   String _currencySymbol = '₹';
+  StreamSubscription<void>? _syncSub;
 
   // Filters
   String _searchQuery = '';
@@ -39,10 +41,15 @@ class TransactionListScreenState extends State<TransactionListScreen> {
 
   final _searchController = TextEditingController();
 
-  @override
   void initState() {
     super.initState();
     _loadData();
+
+    // Listen for background sync completions
+    _syncSub = SyncService.onSyncComplete.listen((_) {
+      debugPrint('[TxnList] Background sync detected — refreshing data...');
+      _loadTransactions();
+    });
   }
 
   /// Public method for parent to trigger a data reload.
@@ -317,6 +324,7 @@ class TransactionListScreenState extends State<TransactionListScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _syncSub?.cancel();
     super.dispose();
   }
 

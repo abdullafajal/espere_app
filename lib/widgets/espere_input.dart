@@ -20,6 +20,7 @@ class EspereInput extends StatelessWidget {
   final void Function(String)? onChanged;
   final Widget? suffixIcon;
   final String? prefixText;
+  final String? errorText;
 
   const EspereInput({
     super.key,
@@ -34,6 +35,7 @@ class EspereInput extends StatelessWidget {
     this.onChanged,
     this.suffixIcon,
     this.prefixText,
+    this.errorText,
   });
 
   @override
@@ -66,6 +68,16 @@ class EspereInput extends StatelessWidget {
           ),
           decoration: InputDecoration(
             hintText: hint,
+            errorText: errorText,
+            errorStyle: const TextStyle(color: AppColors.accent, fontSize: 12),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
+            ),
             suffixIcon: suffixIcon,
             prefixText: prefixText,
             prefixStyle: const TextStyle(

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
@@ -22,11 +23,17 @@ class SavingsScreenState extends State<SavingsScreen> {
   String? _error;
   int? _expandedGoalId;
   String _currencySymbol = '₹';
+  StreamSubscription<void>? _syncSub;
 
-  @override
   void initState() {
     super.initState();
     _loadSavings();
+
+    // Listen for background sync completions
+    _syncSub = SyncService.onSyncComplete.listen((_) {
+      debugPrint('[Savings] Background sync detected — refreshing data...');
+      _loadSavings();
+    });
   }
 
   void reload() => _loadSavings();
@@ -170,6 +177,10 @@ class SavingsScreenState extends State<SavingsScreen> {
   }
 
   @override
+  void dispose() {
+    _syncSub?.cancel();
+    super.dispose();
+  }
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,

@@ -13,6 +13,7 @@ import 'screens/profile_screen.dart';
 import 'services/notification_service.dart';
 import 'services/connectivity_service.dart';
 import 'services/sync_service.dart';
+import 'services/deep_link_service.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 
 final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
@@ -31,6 +32,9 @@ void main() async {
 
   // Initialize connectivity monitoring
   await ConnectivityService.init();
+
+  // Initialize Deep Linking
+  DeepLinkService.init(rootNavigatorKey);
 
   // Initial sync if online
   if (ConnectivityService.isOnline) {
