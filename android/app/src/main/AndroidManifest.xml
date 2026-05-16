@@ -41,6 +41,7 @@
                 <data android:pathPrefix="/split/invite/" />
                 <data android:pathPrefix="/split/invitations" />
                 <data android:pathPrefix="/transaction/add" />
+                <data android:pathPrefix="/transactions" />
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

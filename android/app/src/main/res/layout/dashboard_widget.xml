@@ -1,175 +1,169 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="16dp"
-    android:background="@drawable/widget_background">
+    android:orientation="horizontal"
+    android:padding="20dp"
+    android:background="@drawable/widget_background"
+    android:gravity="center_vertical">
 
-    <ImageView
-        android:id="@+id/btn_hide_balance"
-        android:layout_width="20dp"
-        android:layout_height="20dp"
-        android:layout_alignParentEnd="true"
-        android:layout_alignParentTop="true"
-        android:src="@drawable/ic_eye_hide"
-        android:alpha="0.6" />
-
+    <!-- Left side: Financial Info -->
     <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
         android:orientation="vertical">
 
-        <TextView
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Total Balance"
-            android:textColor="@color/widget_text_secondary"
-            android:textSize="13sp" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Total Balance"
+                android:textColor="@color/widget_text_secondary"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+            <ImageView
+                android:id="@+id/btn_hide_balance"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_eye_hide"
+                android:layout_marginLeft="8dp"
+                android:padding="2dp"
+                android:tint="@color/widget_text_secondary" />
+        </LinearLayout>
 
-        <TextView
-            android:id="@+id/widget_balance"
+        <FrameLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="₹0.00"
-            android:textColor="@color/widget_text_primary"
-            android:textSize="28sp"
-            android:textStyle="bold"
-            android:layout_marginTop="2dp"
-            android:visibility="gone" />
-
-        <TextView
-            android:id="@+id/widget_balance_dots"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="● ● ● ● ● ● ●"
-            android:textColor="@color/accent_lime"
-            android:textSize="20sp"
-            android:layout_marginTop="8dp" />
+            android:layout_marginTop="2dp">
+            <TextView
+                android:id="@+id/widget_balance"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="₹0.00"
+                android:textColor="@color/widget_text_primary"
+                android:textSize="32sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+            <TextView
+                android:id="@+id/widget_balance_dots"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="● ● ● ● ● ●"
+                android:textColor="@color/widget_text_primary"
+                android:textSize="24sp"
+                android:layout_gravity="center_vertical" />
+        </FrameLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginTop="16dp"
-            android:gravity="center_vertical">
+            android:layout_marginTop="16dp">
 
-            <ImageView
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:src="@drawable/ic_income_arrow"
-                android:background="@drawable/circle_bg_dark"
-                android:padding="6dp" />
-
-            <TextView
-                android:id="@+id/widget_income_summary"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="₹0.00"
-                android:textColor="@color/widget_text_primary"
-                android:textSize="14sp"
-                android:layout_marginStart="8dp" />
-
-            <ImageView
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:src="@drawable/ic_expense_arrow"
-                android:background="@drawable/circle_bg_dark"
-                android:padding="6dp"
-                android:layout_marginStart="16dp" />
-
-            <TextView
-                android:id="@+id/widget_expense_summary"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="₹0.00"
-                android:textColor="@color/widget_text_primary"
-                android:textSize="14sp"
-                android:layout_marginStart="8dp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginTop="12dp"
-            android:background="@drawable/pill_bg_dark"
-            android:paddingHorizontal="10dp"
-            android:paddingVertical="6dp"
-            android:gravity="center_vertical">
-
-            <ImageView
-                android:layout_width="14dp"
-                android:layout_height="14dp"
-                android:src="@drawable/ic_piggy_bank" />
-
-            <TextView
-                android:id="@+id/widget_savings_summary"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Saved ₹0.00 this month"
-                android:textColor="@color/widget_text_primary"
-                android:textSize="12sp"
-                android:layout_marginStart="6dp" />
-        </LinearLayout>
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
+            <!-- Income Column -->
             <LinearLayout
-                android:id="@+id/btn_add_income"
-                android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_weight="1"
-                android:background="@drawable/widget_button_bg"
-                android:gravity="center"
-                android:orientation="horizontal">
-                <ImageView
-                    android:layout_width="16dp"
-                    android:layout_height="16dp"
-                    android:src="@drawable/ic_income_arrow" />
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Income"
+                    android:textColor="@color/widget_text_secondary"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+                <TextView
+                    android:id="@+id/widget_income_summary"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="₹0"
                     android:textColor="@color/widget_text_primary"
-                    android:textSize="15sp"
-                    android:textStyle="bold"
-                    android:layout_marginStart="8dp" />
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
             </LinearLayout>
 
-            <View
-                android:layout_width="12dp"
-                android:layout_height="match_parent" />
-
+            <!-- Expense Column -->
             <LinearLayout
-                android:id="@+id/btn_add_expense"
-                android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_weight="1"
-                android:background="@drawable/widget_button_bg"
-                android:gravity="center"
-                android:orientation="horizontal">
-                <ImageView
-                    android:layout_width="16dp"
-                    android:layout_height="16dp"
-                    android:src="@drawable/ic_expense_arrow" />
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginLeft="24dp">
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Expense"
+                    android:text="Expenses"
+                    android:textColor="@color/widget_text_secondary"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+                <TextView
+                    android:id="@+id/widget_expense_summary"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="₹0"
                     android:textColor="@color/widget_text_primary"
-                    android:textSize="15sp"
-                    android:textStyle="bold"
-                    android:layout_marginStart="8dp" />
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- Savings Column -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginLeft="24dp">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Savings"
+                    android:textColor="@color/accent_lime"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+                <TextView
+                    android:id="@+id/widget_savings_summary"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="₹0"
+                    android:textColor="@color/widget_text_primary"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>
-</RelativeLayout>
+
+    <!-- Right side: Quick Action Buttons -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginLeft="16dp"
+        android:gravity="center">
+
+        <ImageView
+            android:id="@+id/btn_add_transaction"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:src="@drawable/ic_plus"
+            android:padding="18dp"
+            android:background="@drawable/circle_bg"
+            android:backgroundTint="@color/widget_button_background_color"
+            android:tint="@color/widget_text_primary" />
+
+        <ImageView
+            android:id="@+id/btn_view_list"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:src="@drawable/ic_receipt"
+            android:padding="20dp"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/circle_bg"
+            android:backgroundTint="@color/circle_background"
+            android:tint="@color/widget_text_secondary" />
+    </LinearLayout>
+
+</LinearLayout>

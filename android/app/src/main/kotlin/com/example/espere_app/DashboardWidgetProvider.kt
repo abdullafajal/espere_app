@@ -23,14 +23,16 @@ class DashboardWidgetProvider : HomeWidgetProvider() {
                 val balance = widgetData.getString("total_balance", "₹0.00")
                 val income = widgetData.getString("total_income", "₹0")
                 val expense = widgetData.getString("total_expense", "₹0")
-                val savings = widgetData.getString("total_savings", "₹0.00")
+                val savings = widgetData.getString("total_savings", "₹0")
                 val isHidden = widgetData.getBoolean("is_balance_hidden", true)
 
-                // Update Balance Visibility
+                // Update Balance Visibility and Eye Icon
                 if (isHidden) {
+                    setImageViewResource(R.id.btn_hide_balance, R.drawable.ic_eye_hide)
                     setViewVisibility(R.id.widget_balance, View.GONE)
                     setViewVisibility(R.id.widget_balance_dots, View.VISIBLE)
                 } else {
+                    setImageViewResource(R.id.btn_hide_balance, R.drawable.ic_eye_show)
                     setViewVisibility(R.id.widget_balance, View.VISIBLE)
                     setViewVisibility(R.id.widget_balance_dots, View.GONE)
                 }
@@ -38,10 +40,11 @@ class DashboardWidgetProvider : HomeWidgetProvider() {
                 setTextViewText(R.id.widget_balance, balance)
                 setTextViewText(R.id.widget_income_summary, income)
                 setTextViewText(R.id.widget_expense_summary, expense)
-                setTextViewText(R.id.widget_savings_summary, "Saved $savings this month")
+                setTextViewText(R.id.widget_savings_summary, savings)
 
                 // 1. Root click opens the app dashboard
                 val rootIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+                    ?: Intent(context, MainActivity::class.java)
                 val rootPendingIntent = PendingIntent.getActivity(
                     context, 0, rootIntent, 
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -58,27 +61,27 @@ class DashboardWidgetProvider : HomeWidgetProvider() {
                 )
                 setOnClickPendingIntent(R.id.btn_hide_balance, togglePendingIntent)
 
-                // 3. Income Button opens Add Transaction with income type
-                val incomeUri = Uri.parse("https://montra.pythonanywhere.com/transaction/add?type=income")
-                val incomeIntent = Intent(Intent.ACTION_VIEW, incomeUri).apply {
+                // 3. Plus Button opens Add Transaction
+                val plusUri = Uri.parse("https://montra.pythonanywhere.com/transaction/add")
+                val plusIntent = Intent(Intent.ACTION_VIEW, plusUri).apply {
                     setPackage(context.packageName)
                 }
-                val incomePendingIntent = PendingIntent.getActivity(
-                    context, 1, incomeIntent,
+                val plusPendingIntent = PendingIntent.getActivity(
+                    context, 1, plusIntent,
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
-                setOnClickPendingIntent(R.id.btn_add_income, incomePendingIntent)
+                setOnClickPendingIntent(R.id.btn_add_transaction, plusPendingIntent)
 
-                // 4. Expense Button opens Add Transaction with expense type
-                val expenseUri = Uri.parse("https://montra.pythonanywhere.com/transaction/add?type=expense")
-                val expenseIntent = Intent(Intent.ACTION_VIEW, expenseUri).apply {
+                // 4. Receipt Button opens Transaction List
+                val listUri = Uri.parse("https://montra.pythonanywhere.com/transactions")
+                val listIntent = Intent(Intent.ACTION_VIEW, listUri).apply {
                     setPackage(context.packageName)
                 }
-                val expensePendingIntent = PendingIntent.getActivity(
-                    context, 2, expenseIntent,
+                val listPendingIntent = PendingIntent.getActivity(
+                    context, 2, listIntent,
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
-                setOnClickPendingIntent(R.id.btn_add_expense, expensePendingIntent)
+                setOnClickPendingIntent(R.id.btn_view_list, listPendingIntent)
             }
 
             appWidgetManager.updateAppWidget(appWidgetId, views)
@@ -96,7 +99,7 @@ class DashboardWidgetProvider : HomeWidgetProvider() {
             val appWidgetIds = appWidgetManager.getAppWidgetIds(
                 android.content.ComponentName(context, DashboardWidgetProvider::class.java)
             )
-            onUpdate(context, appWidgetManager, appWidgetIds)
+            onUpdate(context, appWidgetManager, appWidgetIds, widgetData)
         } else {
             super.onReceive(context, intent)
         }
