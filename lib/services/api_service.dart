@@ -79,13 +79,67 @@ class ApiService {
 
       final data = jsonDecode(response.body);
       if (response.statusCode == 201) {
-        await AuthService.setToken(data['token']);
+        // Registration successful, token will be received after OTP verification
         return ApiResult(data: data);
       }
       if (data.containsKey('errors')) {
         return ApiResult(errors: data['errors']);
       }
       return ApiResult(error: data['error'] ?? 'Registration failed.');
+    } catch (e) {
+      return ApiResult(error: 'Connection error. Please check your server.');
+    }
+  }
+
+  /// Verify OTP
+  static Future<ApiResult<Map<String, dynamic>>> verifyOtp(String email, String otp) async {
+    try {
+      final url = await _url('/api/auth/verify-otp/');
+      final response = await http.post(
+        Uri.parse(url),
+        headers: await _headers(auth: false),
+        body: jsonEncode({
+          'email': email,
+          'otp': otp,
+        }),
+      );
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        final token = data['token'];
+        if (token != null) {
+          await AuthService.setToken(token);
+        }
+        return ApiResult(data: data);
+      } else {
+        return ApiResult(
+          error: data['error'] ?? 'Verification failed',
+          errors: data['errors'],
+        );
+      }
+    } catch (e) {
+      return ApiResult(error: 'Connection error: $e');
+    }
+  }
+
+  /// Resend OTP
+  static Future<ApiResult<Map<String, dynamic>>> resendOtp(String email) async {
+    try {
+      final url = await _url('/api/auth/resend-otp/');
+      final response = await http.post(
+        Uri.parse(url),
+        headers: await _headers(auth: false),
+        body: jsonEncode({
+          'email': email,
+        }),
+      );
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResult(data: data);
+      } else {
+        return ApiResult(error: data['error'] ?? 'Failed to resend OTP.');
+      }
     } catch (e) {
       return ApiResult(error: 'Connection error. Please check your server.');
     }
@@ -350,13 +404,14 @@ class ApiService {
 
   /// ─── Budgets ─────────────────────────────────────────────────────────
 
-  static Future<ApiResult<Map<String, dynamic>>> getBudgets() async {
+  static Future<ApiResult<Map<String, dynamic>>> getBudgets({String? month}) async {
     try {
-      final url = await _url('/api/budgets/');
-      final response = await http.get(
-        Uri.parse(url),
-        headers: await _headers(),
-      );
+      final params = <String, String>{};
+      if (month != null) params['month'] = month;
+
+      final baseUrl = await _url('/api/budgets/');
+      final uri = Uri.parse(baseUrl).replace(queryParameters: params);
+      final response = await http.get(uri, headers: await _headers());
 
       final data = jsonDecode(response.body);
       if (response.statusCode == 200) {

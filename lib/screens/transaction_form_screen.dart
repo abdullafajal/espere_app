@@ -22,7 +22,37 @@ class TransactionFormScreen extends StatefulWidget {
   /// Pre-set type (from dashboard quick-add): 'income' or 'expense'
   final String? presetType;
 
-  const TransactionFormScreen({super.key, this.transactionId, this.presetType});
+  /// Callback when transaction is saved
+  final VoidCallback? onSaved;
+
+  const TransactionFormScreen({
+    super.key,
+    this.transactionId,
+    this.presetType,
+    this.onSaved,
+  });
+
+  /// Helper to show this form as a bottom sheet
+  static void show(
+    BuildContext context, {
+    int? transactionId,
+    String? presetType,
+    VoidCallback? onSaved,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.card,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => TransactionFormScreen(
+        transactionId: transactionId,
+        presetType: presetType,
+        onSaved: onSaved,
+      ),
+    );
+  }
 
   @override
   State<TransactionFormScreen> createState() => _TransactionFormScreenState();
@@ -367,33 +397,36 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 16, 16, bottomInset + 24),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.9,
+        ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
+            // Drag handle
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            
             // ─── Top Bar ───────────────────────────────────
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
               child: Row(
                 children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: AppColors.card,
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                        boxShadow: AppShadows.soft,
-                      ),
-                      child: const Icon(
-                        Icons.arrow_back,
-                        color: AppColors.text,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 40), // Spacer for balance
+                  const Spacer(),
                   Text(
                     isEdit ? 'Edit Transaction' : 'Add Transaction',
                     style: const TextStyle(
@@ -403,7 +436,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                     ),
                   ),
                   const Spacer(),
-                  // Type badge
+                  // Type badge or placeholder
                   if (widget.presetType != null && !isEdit)
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -435,13 +468,16 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                           ),
                         ],
                       ),
-                    ),
+                    )
+                  else
+                    const SizedBox(width: 40),
                 ],
               ),
             ),
+            const SizedBox(height: 8),
 
             // ─── Form ──────────────────────────────────────
-            Expanded(
+            Flexible(
               child:
                   _isLoading
                       ? const Center(
@@ -489,16 +525,9 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                 ),
                               ),
 
-                            // Form card — mn-card p-5 space-y-4
+                            // Form container without card border
                             Container(
-                              padding: const EdgeInsets.all(20),
-                              decoration: BoxDecoration(
-                                color: AppColors.card,
-                                borderRadius: BorderRadius.circular(
-                                  AppRadius.xxl,
-                                ),
-                                boxShadow: AppShadows.card,
-                              ),
+                              padding: const EdgeInsets.only(top: 8),
                               child: Column(
                                 children: [
                                   // Type selector (if no preset)

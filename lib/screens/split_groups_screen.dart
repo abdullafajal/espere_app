@@ -306,10 +306,8 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
         // Content
         Expanded(
           child:
-              _isLoading
-                  ? Center(
-                    child: CircularProgressIndicator(color: AppColors.accent),
-                  )
+              _isLoading && _groups.isEmpty
+                  ? _buildSkeleton()
                   : _error != null
                   ? Center(
                     child: Text(
@@ -333,6 +331,20 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
     );
   }
 
+  Widget _buildSkeleton() {
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
+      itemCount: 4,
+      itemBuilder: (_, __) => Container(
+        height: 100,
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: AppColors.card.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(20),
+        ),
+      ),
+    );
+  }
 
   Widget _buildEmptyState() => Center(
     child: Column(

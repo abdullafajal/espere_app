@@ -24,6 +24,7 @@ dependencies:
   connectivity_plus: ^6.1.4
   app_links: ^6.3.2
   home_widget: ^0.9.1
+  pinput: ^6.0.2
 
 dev_dependencies:
   flutter_test:

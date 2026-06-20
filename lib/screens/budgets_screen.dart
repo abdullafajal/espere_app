@@ -26,6 +26,7 @@ class BudgetsScreenState extends State<BudgetsScreen> {
   bool _isLoadingCats = true;
   String? _error;
   String _currencySymbol = '₹';
+  DateTime _currentMonth = DateTime.now();
 
   @override
   void initState() {
@@ -62,7 +63,8 @@ class BudgetsScreenState extends State<BudgetsScreen> {
       return;
     }
 
-    final result = await ApiService.getBudgets();
+    final monthStr = DateFormat('yyyy-M').format(_currentMonth);
+    final result = await ApiService.getBudgets(month: monthStr);
     if (!mounted) return;
     setState(() {
       _isLoading = false;
@@ -228,6 +230,20 @@ class BudgetsScreenState extends State<BudgetsScreen> {
     }
   }
 
+  void _prevMonth() {
+    setState(() {
+      _currentMonth = DateTime(_currentMonth.year, _currentMonth.month - 1);
+    });
+    _loadBudgets();
+  }
+
+  void _nextMonth() {
+    setState(() {
+      _currentMonth = DateTime(_currentMonth.year, _currentMonth.month + 1);
+    });
+    _loadBudgets();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -283,6 +299,50 @@ class BudgetsScreenState extends State<BudgetsScreen> {
           ),
         ),
 
+        // Month Navigator
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(color: AppColors.border),
+            boxShadow: AppShadows.soft,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              GestureDetector(
+                onTap: _prevMonth,
+                child: const SizedBox(
+                  width: 32,
+                  height: 32,
+                  child: Icon(Icons.chevron_left, size: 20, color: AppColors.muted),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  DateFormat('MMMM yyyy').format(_currentMonth),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.text,
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onTap: _nextMonth,
+                child: const SizedBox(
+                  width: 32,
+                  height: 32,
+                  child: Icon(Icons.chevron_right, size: 20, color: AppColors.muted),
+                ),
+              ),
+            ],
+          ),
+        ),
+
         // Content
         Expanded(
           child:
@@ -299,31 +359,63 @@ class BudgetsScreenState extends State<BudgetsScreen> {
                   )
                   : _budgets.isEmpty
                   ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.account_balance_wallet_outlined,
-                          size: 64,
-                          color: AppColors.muted.withOpacity(0.3),
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 32, right: 32, bottom: 80),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.account_balance_wallet_rounded,
+                              size: 80,
+                              color: AppColors.muted,
+                            ),
+                            const SizedBox(height: 24),
+                            const Text(
+                              'No Budgets Yet',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.text,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'You have not set any budgets for this month. Create one to start tracking.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: AppColors.muted,
+                                height: 1.5,
+                              ),
+                            ),
+                            const SizedBox(height: 32),
+                            SizedBox(
+                              width: 220,
+                              height: 52,
+                              child: ElevatedButton.icon(
+                                onPressed: () => _showBudgetForm(),
+                                icon: const Icon(Icons.add_rounded, size: 20),
+                                label: const Text(
+                                  'Create Budget',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.accent,
+                                  foregroundColor: AppColors.dark,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(AppRadius.xxl),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'No budgets found.',
-                          style: TextStyle(color: AppColors.muted),
-                        ),
-                        const SizedBox(height: 24),
-                        ElevatedButton(
-                          onPressed: () => _showBudgetForm(),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.accent,
-                            foregroundColor: AppColors.dark,
-                          ),
-                          child: const Text('Create First Budget'),
-                        ),
-                      ],
-                    ),
-                  )
+                      ),
+                    )
                   : RefreshIndicator(
                     onRefresh: _loadBudgets,
                     color: AppColors.accent,

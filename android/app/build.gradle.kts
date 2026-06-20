@@ -43,3 +43,16 @@ android {
 flutter {
     source = "../.."
 }
+
+configurations.all {
+    resolutionStrategy.eachDependency {
+        if (requested.group == "androidx.glance" && requested.name == "glance-appwidget") {
+            useVersion("1.1.0")
+            because("1.3.0-alpha01 requires compileSdk 37")
+        }
+        if (requested.group == "androidx.compose.remote" && requested.name == "remote-creation-android") {
+            useVersion("1.0.0-alpha09")
+            because("alpha11 requires compileSdk 37")
+        }
+    }
+}

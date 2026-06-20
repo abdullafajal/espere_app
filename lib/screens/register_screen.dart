@@ -50,7 +50,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => _isLoading = false);
 
     if (result.isSuccess) {
-      Navigator.pushReplacementNamed(context, '/home');
+      Navigator.pushReplacementNamed(
+        context, 
+        '/verify-otp',
+        arguments: email,
+      );
     } else if (result.errors != null) {
       setState(() => _fieldErrors = result.errors);
     } else {

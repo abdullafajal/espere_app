@@ -9,6 +9,7 @@ import '../services/sync_service.dart';
 import '../services/cache_service.dart';
 import '../widgets/user_avatar.dart';
 import '../widgets/espere_input.dart';
+import '../widgets/icon_color_picker.dart';
 import 'package:share_plus/share_plus.dart';
 
 class SplitGroupDetailScreen extends StatefulWidget {
@@ -351,6 +352,9 @@ class _S extends State<SplitGroupDetailScreen>
   void _editGroup() {
     final nc = TextEditingController(text: widget.groupName);
     bool isSaving = false;
+    String selectedColor = _g?['color'] ?? '#C8E64A';
+    String selectedIcon = _g?['icon'] ?? 'groups';
+
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.background,
@@ -377,6 +381,16 @@ class _S extends State<SplitGroupDetailScreen>
                 style: const TextStyle(fontSize: 15, color: AppColors.text),
                 decoration: _inputDeco('Group name'),
               ),
+              const SizedBox(height: 24),
+              IconColorPicker(
+                currentName: nc.text,
+                initialColor: _g?['color'] ?? '#C8E64A',
+                initialIcon: _g?['icon'] ?? 'groups',
+                onSelected: (color, icon) {
+                  selectedColor = color;
+                  selectedIcon = icon;
+                },
+              ),
               const SizedBox(height: 32),
               SizedBox(
                 width: double.infinity,
@@ -386,7 +400,11 @@ class _S extends State<SplitGroupDetailScreen>
                   onPressed: isSaving ? null : () async {
                     if (nc.text.trim().isEmpty) return;
                     ss(() => isSaving = true);
-                    final r = await ApiService.updateSplitGroup(widget.groupId, {'name': nc.text.trim()});
+                    final r = await ApiService.updateSplitGroup(widget.groupId, {
+                      'name': nc.text.trim(),
+                      'color': selectedColor,
+                      'icon': selectedIcon,
+                    });
                     if (!ctx.mounted) return;
                     Navigator.pop(ctx);
                     if (r.isSuccess) {
@@ -1097,8 +1115,8 @@ class _S extends State<SplitGroupDetailScreen>
               ),
             ),
             Expanded(
-              child: _ld 
-                  ? const Center(child: CircularProgressIndicator(color: AppColors.accent))
+              child: _ld && _g == null
+                  ? _buildSkeleton()
                   : _isPending 
                       ? _buildPendingMask()
                       : _g == null
@@ -1242,6 +1260,21 @@ class _S extends State<SplitGroupDetailScreen>
     ),
   ),
 );
+  }
+
+  Widget _buildSkeleton() {
+    return ListView.builder(
+      padding: const EdgeInsets.all(20),
+      itemCount: 4,
+      itemBuilder: (_, __) => Container(
+        height: 80,
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: AppColors.card.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(20),
+        ),
+      ),
+    );
   }
 
   Widget _buildPendingMask() {

@@ -258,12 +258,64 @@ class SavingsScreenState extends State<SavingsScreen> {
                         ),
                       )
                       : _goals.isEmpty
-                      ? const Center(
-                        child: Text(
-                          'No savings goals found.',
-                          style: TextStyle(color: AppColors.muted),
-                        ),
-                      )
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 32, right: 32, bottom: 80),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.savings_rounded,
+                                  size: 80,
+                                  color: AppColors.muted,
+                                ),
+                                const SizedBox(height: 24),
+                                const Text(
+                                  'No Savings Goals Yet',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.text,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'You have not created any savings goals. Create one to start saving for your future.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: AppColors.muted,
+                                    height: 1.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 32),
+                                SizedBox(
+                                  width: 220,
+                                  height: 52,
+                                  child: ElevatedButton.icon(
+                                    onPressed: () => _showGoalForm(),
+                                    icon: const Icon(Icons.add_rounded, size: 20),
+                                    label: const Text(
+                                      'Create Goal',
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.accent,
+                                      foregroundColor: AppColors.dark,
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(AppRadius.xxl),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
                       : RefreshIndicator(
                         onRefresh: _loadSavings,
                         color: AppColors.accent,

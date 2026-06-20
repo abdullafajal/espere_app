@@ -26,6 +26,7 @@ import '../services/connectivity_service.dart';
 import 'reports_screen.dart';
 import '../services/sync_service.dart';
 import '../services/widget_service.dart';
+import 'transaction_form_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final Function(int)? onTabChange;
@@ -226,21 +227,19 @@ class DashboardScreenState extends State<DashboardScreen> {
               monthlyExpenses: d.monthlyExpenses,
               monthlySavings: d.monthlySavings,
               currencySymbol: d.currencySymbol,
-              onAddIncome: () async {
-                await Navigator.pushNamed(
+              onAddIncome: () {
+                TransactionFormScreen.show(
                   context,
-                  '/transaction/add',
-                  arguments: 'income',
+                  presetType: 'income',
+                  onSaved: _loadDashboard,
                 );
-                _loadDashboard();
               },
-              onAddExpense: () async {
-                await Navigator.pushNamed(
+              onAddExpense: () {
+                TransactionFormScreen.show(
                   context,
-                  '/transaction/add',
-                  arguments: 'expense',
+                  presetType: 'expense',
+                  onSaved: _loadDashboard,
                 );
-                _loadDashboard();
               },
             ),
 
@@ -765,10 +764,12 @@ class DashboardScreenState extends State<DashboardScreen> {
                   child: TransactionTile(
                     transaction: txn,
                     currencySymbol: d.currencySymbol,
-                    onTap: () async {
-                      await Navigator.pushNamed(context, '/transaction/edit',
-                          arguments: txn.id);
-                      _loadDashboard();
+                    onTap: () {
+                      TransactionFormScreen.show(
+                        context,
+                        transactionId: txn.id,
+                        onSaved: _loadDashboard,
+                      );
                     },
                   ),
                 ),
