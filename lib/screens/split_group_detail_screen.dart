@@ -11,6 +11,7 @@ import '../widgets/user_avatar.dart';
 import '../widgets/espere_input.dart';
 import '../widgets/icon_color_picker.dart';
 import 'package:share_plus/share_plus.dart';
+import '../widgets/full_offline_alert.dart';
 
 class SplitGroupDetailScreen extends StatefulWidget {
   final int groupId;
@@ -1018,22 +1019,14 @@ class _S extends State<SplitGroupDetailScreen>
                             'amount': ac.text.trim(),
                           };
 
-                          if (ConnectivityService.isOnline) {
-                            final r = await ApiService.settleDebt(widget.groupId, body);
-                            if (!ctx.mounted) return;
-                            Navigator.pop(ctx);
-                            if (r.isSuccess) {
-                              HapticFeedback.heavyImpact();
-                              _load();
-                            } else {
-                              _showTopMessage(r.error ?? 'Error', isError: true);
-                            }
-                          } else {
-                            await SyncService.queueOperation(action: 'create', entity: 'split_settle', data: body, entityId: widget.groupId);
-                            if (!ctx.mounted) return;
-                            Navigator.pop(ctx);
+                          final r = await ApiService.settleDebt(widget.groupId, body);
+                          if (!ctx.mounted) return;
+                          Navigator.pop(ctx);
+                          if (r.isSuccess) {
                             HapticFeedback.heavyImpact();
-                            _showTopMessage('Settlement queued offline.');
+                            _load();
+                          } else {
+                            _showTopMessage(r.error ?? 'Error', isError: true);
                           }
                         },
                   child: isSaving
@@ -1052,8 +1045,9 @@ class _S extends State<SplitGroupDetailScreen>
   @override
   Widget build(BuildContext context) {
     final bal = double.tryParse(_g?['my_net_balance'] ?? '0') ?? 0;
-    return Scaffold(
-      backgroundColor: AppColors.background,
+    return FullOfflineAlert(
+      child: Scaffold(
+        backgroundColor: AppColors.background,
       body: SafeArea(
         child: Column(
           children: [
@@ -1259,7 +1253,7 @@ class _S extends State<SplitGroupDetailScreen>
       ],
     ),
   ),
-);
+));
   }
 
   Widget _buildSkeleton() {

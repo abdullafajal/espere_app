@@ -23,6 +23,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   List<CategoryModel> _categories = [];
   bool _isLoading = true;
   String? _error;
+  String _typeFilter = 'all';
 
   @override
   void initState() {
@@ -47,36 +48,14 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
               });
         _isLoading = false;
       });
-    }
-
-    // 2. Fetch fresh from API ONLY if online
-    if (!ConnectivityService.isOnline) {
+    } else {
       if (mounted) setState(() => _isLoading = false);
-      return;
     }
+  }
 
-    final result = await ApiService.getCategories();
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-        if (result.isSuccess) {
-          _categories = (result.data!['categories'] as List<CategoryModel>)
-            ..sort((a, b) {
-              int cmp = a.name.compareTo(b.name);
-              if (cmp != 0) return cmp;
-              return b.id.compareTo(a.id);
-            });
-          _error = null;
-          // Cache
-          CacheService.cacheCategories({
-            'categories': _categories.map((c) => c.toJson()).toList(),
-            'currency_symbol': '₹',
-          });
-        } else if (_categories.isEmpty) {
-          _error = result.error;
-        }
-      });
-    }
+  Future<void> _handleRefresh() async {
+    await SyncService.syncAll();
+    await _loadCategories();
   }
 
   Future<void> _deleteCategory(CategoryModel cat) async {
@@ -104,37 +83,30 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     );
 
     if (confirm == true) {
-      if (ConnectivityService.isOnline) {
-        final result = await ApiService.deleteCategory(cat.id);
-        if (!mounted) return;
-        if (result.isSuccess) {
-          _loadCategories();
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(result.error ?? 'Failed to delete.')),
-          );
-        }
-      } else {
-        // Offline mode: queue deletion
-        await SyncService.queueOperation(
-          action: 'delete',
-          entity: 'category',
-          entityId: cat.id,
-        );
-        
-        // Remove from cache
-        final cached = await CacheService.getCachedCategories();
-        if (cached != null) {
-          final list = List<Map<String, dynamic>>.from(cached['categories'] ?? []);
-          list.removeWhere((c) => c['id'] == cat.id);
-          await CacheService.cacheCategories({
-            'categories': list,
-          });
-        }
-        
-        setState(() {
-          _categories.removeWhere((c) => c.id == cat.id);
+      // Offline mode: queue deletion
+      await SyncService.queueOperation(
+        action: 'delete',
+        entity: 'category',
+        entityId: cat.id,
+      );
+      
+      // Remove from cache
+      final cached = await CacheService.getCachedCategories();
+      if (cached != null) {
+        final list = List<Map<String, dynamic>>.from(cached['categories'] ?? []);
+        list.removeWhere((c) => c['id'] == cat.id);
+        await CacheService.cacheCategories({
+          'categories': list,
         });
+      }
+      
+      setState(() {
+        _categories.removeWhere((c) => c.id == cat.id);
+      });
+
+      // Trigger sync if online
+      if (ConnectivityService.isOnline) {
+        SyncService.syncAll();
       }
     }
   }
@@ -157,10 +129,28 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     );
   }
 
+  Widget _buildFilterChip(String label, String value) {
+    final isSelected = _typeFilter == value;
+    return ChoiceChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (selected) {
+        if (selected) setState(() => _typeFilter = value);
+      },
+      selectedColor: AppColors.accent,
+      checkmarkColor: AppColors.dark,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final systemCats = _categories.where((c) => c.isSystem).toList();
-    final userCats = _categories.where((c) => !c.isSystem).toList();
+    final filteredCats = _categories.where((c) {
+      if (_typeFilter == 'all') return true;
+      return c.type == _typeFilter;
+    }).toList();
+
+    final systemCats = filteredCats.where((c) => c.isSystem).toList();
+    final userCats = filteredCats.where((c) => !c.isSystem).toList();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -214,6 +204,20 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
               ),
             ),
 
+            // ─── Filter Bar ─────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              child: Row(
+                children: [
+                  _buildFilterChip('All', 'all'),
+                  const SizedBox(width: 8),
+                  _buildFilterChip('Expense', 'expense'),
+                  const SizedBox(width: 8),
+                  _buildFilterChip('Income', 'income'),
+                ],
+              ),
+            ),
+
             // ─── Content ────────────────────────────────────
             Expanded(
               child: _isLoading
@@ -226,7 +230,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                               style:
                                   const TextStyle(color: AppColors.muted)))
                       : RefreshIndicator(
-                          onRefresh: _loadCategories,
+                          onRefresh: _handleRefresh,
                           color: AppColors.accent,
                           child: ListView(
                             padding: const EdgeInsets.fromLTRB(
@@ -474,6 +478,7 @@ class _CategoryFormSheetState extends State<_CategoryFormSheet> {
   late TextEditingController _nameController;
   late String _selectedIcon;
   late String _selectedColor;
+  late String _selectedType;
   bool _isSaving = false;
   String? _error;
 
@@ -483,6 +488,7 @@ class _CategoryFormSheetState extends State<_CategoryFormSheet> {
     _nameController = TextEditingController(text: widget.category?.name ?? '');
     _selectedIcon = widget.category?.icon ?? 'category';
     _selectedColor = widget.category?.color ?? '#C8E64A';
+    _selectedType = widget.category?.type ?? 'expense';
   }
 
   Future<void> _save() async {
@@ -502,49 +508,56 @@ class _CategoryFormSheetState extends State<_CategoryFormSheet> {
       'name': name,
       'icon': _selectedIcon,
       'color': _selectedColor,
+      'type': _selectedType,
     };
 
-    ApiResult<CategoryModel> result;
-    if (ConnectivityService.isOnline) {
-      if (widget.category != null) {
-        result = await ApiService.updateCategory(widget.category!.id, catData);
-      } else {
-        result = await ApiService.createCategory(catData);
-      }
-    } else {
-      // Offline mode: queue operation
-      final tempId = DateTime.now().millisecondsSinceEpoch;
-      await SyncService.queueOperation(
-        action: widget.category != null ? 'update' : 'create',
-        entity: 'category',
-        data: catData,
-        entityId: widget.category?.id ?? tempId,
-      );
+    // Always queue operation
+    final tempId = DateTime.now().millisecondsSinceEpoch;
+    await SyncService.queueOperation(
+      action: widget.category != null ? 'update' : 'create',
+      entity: 'category',
+      data: catData,
+      entityId: widget.category?.id ?? tempId,
+    );
 
-      // ─── Optimistic Update ──────────────────────────────────────────
-      if (widget.category == null) {
-        final newCatJson = {
-          'id': tempId,
-          'name': name,
-          'icon': _selectedIcon,
-          'color': _selectedColor,
-          'is_system': false,
-        };
-        await CacheService.addCategoryToCache(newCatJson);
+    // ─── Optimistic Update ──────────────────────────────────────────
+    if (widget.category == null) {
+      final newCatJson = {
+        'id': tempId,
+        'name': name,
+        'icon': _selectedIcon,
+        'color': _selectedColor,
+        'is_system': false,
+        'type': _selectedType,
+      };
+      await CacheService.addCategoryToCache(newCatJson);
+    } else {
+      final cached = await CacheService.getCachedCategories();
+      if (cached != null) {
+        final list = List<Map<String, dynamic>>.from(cached['categories'] ?? []);
+        final idx = list.indexWhere((c) => c['id'] == widget.category!.id);
+        if (idx != -1) {
+          list[idx]['name'] = name;
+          list[idx]['icon'] = _selectedIcon;
+          list[idx]['color'] = _selectedColor;
+          list[idx]['type'] = _selectedType;
+          await CacheService.cacheCategories({
+            'categories': list,
+          });
+        }
       }
-      // ───────────────────────────────────────────────────────────────
-      
-      result = ApiResult(data: null);
+    }
+    // ───────────────────────────────────────────────────────────────
+    
+    // Trigger sync if online
+    if (ConnectivityService.isOnline) {
+      SyncService.syncAll();
     }
 
     if (!mounted) return;
     setState(() => _isSaving = false);
 
-    if (result.isSuccess) {
-      widget.onSaved();
-    } else {
-      setState(() => _error = result.error ?? 'Failed to save.');
-    }
+    widget.onSaved();
   }
 
   @override
@@ -603,6 +616,67 @@ class _CategoryFormSheetState extends State<_CategoryFormSheet> {
                     style: const TextStyle(
                         fontSize: 13, color: AppColors.error)),
               ),
+
+            // Type field
+            const Text('Type',
+                style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.text)),
+            const SizedBox(height: 6),
+            GestureDetector(
+              onTap: () {
+                showModalBottomSheet(
+                  context: context,
+                  backgroundColor: AppColors.card,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                  ),
+                  builder: (ctx) => _CategoryTypePickerSheet(
+                    selectedType: _selectedType,
+                    onSelected: (type) {
+                      setState(() => _selectedType = type);
+                      Navigator.pop(ctx);
+                    },
+                  ),
+                );
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                  border: Border.all(color: AppColors.border, width: 1.5),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: AppColors.accent,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        _selectedType == 'income' ? Icons.arrow_upward : Icons.arrow_downward,
+                        size: 18,
+                        color: AppColors.dark,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _selectedType == 'income' ? 'Income' : 'Expense',
+                        style: const TextStyle(fontSize: 14, color: AppColors.text),
+                      ),
+                    ),
+                    const Icon(Icons.arrow_drop_down, color: AppColors.muted),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
 
             // Name field
             const Text('Name',
@@ -783,6 +857,111 @@ class _CategoryFormSheetState extends State<_CategoryFormSheet> {
                     : Text(widget.category != null ? 'Update Category' : 'Create Category'),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Bottom sheet for picking category type.
+class _CategoryTypePickerSheet extends StatelessWidget {
+  final String selectedType;
+  final ValueChanged<String> onSelected;
+
+  const _CategoryTypePickerSheet({
+    required this.selectedType,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppColors.border,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Select Type',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppColors.text,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildItem(
+            context,
+            'income',
+            'Income',
+            Icons.arrow_upward,
+          ),
+          _buildItem(
+            context,
+            'expense',
+            'Expense',
+            Icons.arrow_downward,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildItem(
+    BuildContext context,
+    String value,
+    String label,
+    IconData icon,
+  ) {
+    final isSelected = selectedType == value;
+    return GestureDetector(
+      onTap: () => onSelected(value),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppColors.accent.withValues(alpha: 0.15)
+              : AppColors.surface,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(
+            color: isSelected ? AppColors.accent : AppColors.border,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: AppColors.accent,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, size: 20, color: AppColors.dark),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: AppColors.text,
+              ),
+            ),
+            if (isSelected) ...[
+              const Spacer(),
+              const Icon(Icons.check_circle, color: AppColors.accent),
+            ],
           ],
         ),
       ),

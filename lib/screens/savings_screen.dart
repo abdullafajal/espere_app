@@ -53,33 +53,14 @@ class SavingsScreenState extends State<SavingsScreen> {
         _currencySymbol = (cached['currency_symbol'] as String?) ?? '₹';
         _isLoading = false;
       });
-    }
-
-    // 2. Fetch fresh from API ONLY if online
-    if (!ConnectivityService.isOnline) {
+    } else {
       if (mounted) setState(() => _isLoading = false);
-      return;
     }
+  }
 
-    final result = await ApiService.getSavings();
-    if (!mounted) return;
-    setState(() {
-      _isLoading = false;
-      if (result.isSuccess) {
-        final Map<String, dynamic> data = result.data!;
-        _goals = List<Map<String, dynamic>>.from(
-          data['goals'] as Iterable? ?? [],
-        )..sort((a, b) {
-            int cmp = (a['name'] ?? '').compareTo(b['name'] ?? '');
-            if (cmp != 0) return cmp;
-            return (b['id'] ?? 0).compareTo(a['id'] ?? 0);
-          });
-        _currencySymbol = (data['currency_symbol'] as String?) ?? '₹';
-        CacheService.cacheSavings(data);
-      } else if (_goals.isEmpty) {
-        _error = result.error;
-      }
-    });
+  Future<void> _handleRefresh() async {
+    await SyncService.syncAll();
+    await _loadSavings();
   }
 
   void _showAddMoney(Map<String, dynamic> goal) {
@@ -127,34 +108,30 @@ class SavingsScreenState extends State<SavingsScreen> {
     );
 
     if (confirm == true) {
-      if (ConnectivityService.isOnline) {
-        final res = await ApiService.deleteSavingGoal(goal['id']);
-        if (res.isSuccess) {
-          HapticFeedback.heavyImpact();
-          _loadSavings();
-        }
-      } else {
-        // Offline mode: queue deletion
-        await SyncService.queueOperation(
-          action: 'delete',
-          entity: 'saving',
-          entityId: goal['id'],
-        );
-        
-        // Remove from cache
-        final cached = await CacheService.getCachedSavings();
-        if (cached != null) {
-          final list = List<Map<String, dynamic>>.from(cached['goals'] ?? []);
-          list.removeWhere((g) => g['id'] == goal['id']);
-          await CacheService.cacheSavings({
-            'goals': list,
-            'currency_symbol': cached['currency_symbol'],
-          });
-        }
-        
-        setState(() {
-          _goals.removeWhere((g) => g['id'] == goal['id']);
+      // Offline mode: queue deletion
+      await SyncService.queueOperation(
+        action: 'delete',
+        entity: 'saving',
+        entityId: goal['id'],
+      );
+      
+      // Remove from cache
+      final cached = await CacheService.getCachedSavings();
+      if (cached != null) {
+        final list = List<Map<String, dynamic>>.from(cached['goals'] ?? []);
+        list.removeWhere((g) => g['id'] == goal['id']);
+        await CacheService.cacheSavings({
+          'goals': list,
+          'currency_symbol': cached['currency_symbol'],
         });
+      }
+      
+      setState(() {
+        _goals.removeWhere((g) => g['id'] == goal['id']);
+      });
+
+      if (ConnectivityService.isOnline) {
+        SyncService.syncAll();
       }
     }
   }
@@ -317,7 +294,7 @@ class SavingsScreenState extends State<SavingsScreen> {
                           ),
                         )
                       : RefreshIndicator(
-                        onRefresh: _loadSavings,
+                        onRefresh: _handleRefresh,
                         color: AppColors.accent,
                           child: ListView.builder(
                             padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
@@ -866,60 +843,49 @@ class _GoalFormSheetState extends State<_GoalFormSheet> {
       if (_deadline != null)
         'deadline': DateFormat('yyyy-MM-dd').format(_deadline!),
     };
-    ApiResult result;
-    if (ConnectivityService.isOnline) {
-      result = widget.goal == null
-          ? await ApiService.createSavingGoal(data)
-          : await ApiService.updateSavingGoal(widget.goal!['id'], data);
-    } else {
-      // Offline mode: queue operation
-      int? tempId;
-      if (widget.goal == null) {
-        tempId = DateTime.now().millisecondsSinceEpoch;
-      }
-      
-      await SyncService.queueOperation(
-        action: widget.goal == null ? 'create' : 'update',
-        entity: 'saving',
-        data: data,
-        entityId: widget.goal == null ? tempId : widget.goal!['id'],
-      );
+    // Always queue operation
+    int? tempId;
+    if (widget.goal == null) {
+      tempId = DateTime.now().millisecondsSinceEpoch;
+    }
+    
+    await SyncService.queueOperation(
+      action: widget.goal == null ? 'create' : 'update',
+      entity: 'saving',
+      data: data,
+      entityId: widget.goal == null ? tempId : widget.goal!['id'],
+    );
 
-      // ─── Optimistic Update ──────────────────────────────────────────
-      if (widget.goal == null) {
-        final newGoalJson = {
-          'id': tempId,
-          'name': name,
-          'target_amount': target,
-          'current_amount': current,
-          'deadline': data['deadline'],
-          'saved_percentage': (current / target * 100).clamp(0, 100),
-          'history': [],
-        };
-        await CacheService.addSavingToCache(newGoalJson);
-      } else {
-        await CacheService.updateSavingInCache(widget.goal!['id'], {
-          'name': name,
-          'target_amount': target,
-          'current_amount': current,
-          'deadline': data['deadline'],
-        });
-      }
-      // ───────────────────────────────────────────────────────────────
-      
-      result = ApiResult(data: null);
+    // ─── Optimistic Update ──────────────────────────────────────────
+    if (widget.goal == null) {
+      final newGoalJson = {
+        'id': tempId,
+        'name': name,
+        'target_amount': target,
+        'current_amount': current,
+        'deadline': data['deadline'],
+        'saved_percentage': target > 0 ? (current / target * 100).clamp(0, 100) : 0,
+        'history': [],
+      };
+      await CacheService.addSavingToCache(newGoalJson);
+    } else {
+      await CacheService.updateSavingInCache(widget.goal!['id'], {
+        'name': name,
+        'target_amount': target,
+        'current_amount': current,
+        'deadline': data['deadline'],
+      });
+    }
+    // ───────────────────────────────────────────────────────────────
+
+    if (ConnectivityService.isOnline) {
+      SyncService.syncAll();
     }
 
     if (mounted) {
       setState(() => _isSaving = false);
-      if (result.isSuccess) {
-        HapticFeedback.mediumImpact();
-        widget.onSaved();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result.error ?? 'Error saving goal')),
-        );
-      }
+      HapticFeedback.mediumImpact();
+      widget.onSaved();
     }
   }
 }
@@ -1011,58 +977,48 @@ class _AddMoneySheetState extends State<_AddMoneySheet> {
                       }
 
                       setState(() => _isSaving = true);
-                      ApiResult res;
-                      if (ConnectivityService.isOnline) {
-                        res = await ApiService.addMoneyToSavingGoal(
-                          widget.goal['id'],
-                          amount,
-                          notes: _noteController.text.trim(),
-                        );
-                      } else {
-                        // Offline mode: queue "add money" operation
-                        await SyncService.queueOperation(
-                          action: 'add_money',
-                          entity: 'saving_add_money',
-                          data: {
-                            'amount': amount,
-                            'notes': _noteController.text.trim(),
-                          },
-                          entityId: widget.goal['id'],
-                        );
-                        // ─── Optimistic Update ──────────────────────────────────────────
-                        // Update dashboard totals
-                        await CacheService.updateDashboardOptimistically(
-                          'savings', 
-                          amount, 
-                          {
-                            'id': DateTime.now().millisecondsSinceEpoch,
-                            'amount': amount.toString(),
-                            'type': 'expense', // Savings count as expense from balance
-                            'category': {'name': 'Savings', 'icon': 'savings', 'color': '#C8E64A'},
-                            'date': DateTime.now().toIso8601String(),
-                            'notes': _noteController.text.trim(),
-                            'payment_method_display': 'Internal',
-                          }
-                        );
-                        // Update saving goal progress
-                        await CacheService.addMoneyToSavingInCache(
-                          widget.goal['id'], 
-                          amount, 
-                          notes: _noteController.text.trim()
-                        );
-                        // ───────────────────────────────────────────────────────────────
+                      // Always queue "add money" operation
+                      await SyncService.queueOperation(
+                        action: 'add_money',
+                        entity: 'saving_add_money',
+                        data: {
+                          'amount': amount,
+                          'notes': _noteController.text.trim(),
+                        },
+                        entityId: widget.goal['id'],
+                      );
+                      // ─── Optimistic Update ──────────────────────────────────────────
+                      // Update dashboard totals
+                      await CacheService.updateDashboardOptimistically(
+                        'savings', 
+                        amount, 
+                        {
+                          'id': DateTime.now().millisecondsSinceEpoch,
+                          'amount': amount.toString(),
+                          'type': 'expense', // Savings count as expense from balance
+                          'category': {'name': 'Savings', 'icon': 'savings', 'color': '#C8E64A'},
+                          'date': DateTime.now().toIso8601String(),
+                          'notes': _noteController.text.trim(),
+                          'payment_method_display': 'Internal',
+                        }
+                      );
+                      // Update saving goal progress
+                      await CacheService.addMoneyToSavingInCache(
+                        widget.goal['id'], 
+                        amount, 
+                        notes: _noteController.text.trim()
+                      );
+                      // ───────────────────────────────────────────────────────────────
 
-                        res = ApiResult(data: null);
+                      if (ConnectivityService.isOnline) {
+                        SyncService.syncAll();
                       }
                       
                       setState(() => _isSaving = false);
 
-                      if (res.isSuccess) {
-                        HapticFeedback.mediumImpact();
-                        if (!mounted) return;
-                        Navigator.pop(context);
-                        widget.onSuccess();
-                      }
+                      if (!mounted) return;
+                      Navigator.pop(context);
+                      widget.onSuccess();
                     },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.accent,

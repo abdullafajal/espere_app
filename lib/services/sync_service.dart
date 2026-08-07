@@ -5,6 +5,7 @@ import 'cache_service.dart';
 import 'connectivity_service.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
+import '../models/user.dart';
 
 import 'dart:async';
 
@@ -13,6 +14,97 @@ class SyncService {
 
   /// Stream that emits when a sync cycle finishes (queue processed).
   static Stream<void> get onSyncComplete => _syncController.stream;
+
+  /// Process all pending operations and then pull fresh data
+  static Future<void> syncAll() async {
+    if (!ConnectivityService.isOnline) return;
+    await processSyncQueue();
+    await pullData();
+  }
+
+  /// Pull all necessary offline data from APIs and update cache
+  static Future<void> pullData() async {
+    if (!ConnectivityService.isOnline) return;
+    debugPrint('[SyncService] Pulling fresh data from APIs...');
+
+    try {
+      // Run API fetches concurrently where possible
+      await Future.wait([
+        _pullProfile(),
+        _pullDashboard(),
+        _pullCategories(),
+        _pullTransactions(),
+        _pullBudgets(),
+        _pullSavings(),
+        _pullReports(),
+      ]);
+      debugPrint('[SyncService] Successfully pulled all data.');
+    } catch (e) {
+      debugPrint('[SyncService] Error pulling data: $e');
+    }
+    
+    // Notify UI that cache has been updated
+    _syncController.add(null);
+  }
+
+  static Future<void> _pullProfile() async {
+    final res = await ApiService.getProfile();
+    if (res.isSuccess && res.data != null) {
+      await CacheService.cacheUser(res.data!.toJson());
+    }
+  }
+
+  static Future<void> _pullDashboard() async {
+    final res = await ApiService.getDashboard();
+    if (res.isSuccess && res.data != null) {
+      await CacheService.cacheDashboard(res.data!.toJson());
+    }
+  }
+
+  static Future<void> _pullCategories() async {
+    final res = await ApiService.getCategories();
+    if (res.isSuccess && res.data != null) {
+      final catsJson = (res.data!['categories'] as List).map((c) => (c as CategoryModel).toJson()).toList();
+      await CacheService.cacheCategories({
+        'categories': catsJson,
+        'currency_symbol': res.data!['currency_symbol'],
+      });
+    }
+  }
+
+  static Future<void> _pullTransactions() async {
+    final res = await ApiService.getTransactions(showAll: true);
+    if (res.isSuccess && res.data != null) {
+      final txnsJson = (res.data!['transactions'] as List).map((t) => (t as TransactionModel).toJson()).toList();
+      await CacheService.cacheTransactions({
+        'transactions': txnsJson,
+        'currency_symbol': res.data!['currency_symbol'],
+        'total': res.data!['total'],
+        'has_next': res.data!['has_next'],
+      });
+    }
+  }
+
+  static Future<void> _pullBudgets() async {
+    final res = await ApiService.getBudgets();
+    if (res.isSuccess && res.data != null) {
+      await CacheService.cacheBudgets(res.data!);
+    }
+  }
+
+  static Future<void> _pullSavings() async {
+    final res = await ApiService.getSavings();
+    if (res.isSuccess && res.data != null) {
+      await CacheService.cacheSavings(res.data!);
+    }
+  }
+
+  static Future<void> _pullReports() async {
+    final res = await ApiService.getReports();
+    if (res.isSuccess && res.data != null) {
+      await CacheService.cacheReports(res.data!);
+    }
+  }
 
   /// Process all pending operations in the sync queue.
   /// Called when device comes back online.
@@ -204,8 +296,9 @@ class SyncService {
         debugPrint('[SyncService] Error processing op: $e');
       }
     }
-    // Notify listeners that sync is done
-    _syncController.add(null);
+    // We don't notify here anymore if we are using syncAll() which will notify after pullData.
+    // But in case processSyncQueue is called alone, we still might want to notify.
+    // _syncController.add(null);
   }
 
   /// Replace temporary category IDs with real IDs in the sync queue.

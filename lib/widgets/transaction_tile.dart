@@ -3,12 +3,13 @@
 /// Matches the Django template:
 ///   mn-card p-4 with icon badge, category name, date, amount
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../models/transaction.dart';
 import '../utils/icon_mapper.dart';
 
-class TransactionTile extends StatelessWidget {
+class TransactionTile extends StatefulWidget {
   final TransactionModel transaction;
   final String currencySymbol;
   final VoidCallback? onTap;
@@ -27,31 +28,37 @@ class TransactionTile extends StatelessWidget {
   });
 
   @override
+  State<TransactionTile> createState() => _TransactionTileState();
+}
+
+class _TransactionTileState extends State<TransactionTile> {
+  double _swipeProgress = 0.0;
+
+  @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('MMM d');
     final timeFormat = DateFormat('h:mm a');
 
-    return GestureDetector(
-      onTap: onTap,
+    final catColorStr = widget.transaction.category.color.replaceFirst('#', '');
+    final catColor = Color(int.parse('FF$catColorStr', radix: 16));
+
+    Widget content = GestureDetector(
+      onTap: widget.onTap,
       child: Container(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.card,
-          borderRadius: BorderRadius.circular(AppRadius.xxl),
-          boxShadow: AppShadows.card,
-        ),
+        color: AppColors.card,
         child: Row(
           children: [
-            // Category icon badge — w-11 h-11 bg-mn-accent rounded-xl
+            // Category icon badge
             Container(
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: AppColors.accent,
+                color: catColor,
                 borderRadius: BorderRadius.circular(AppRadius.md),
               ),
               child: Icon(
-                IconMapper.map(transaction.category.icon),
+                IconMapper.map(widget.transaction.category.icon),
                 size: 22,
                 color: AppColors.dark,
               ),
@@ -64,7 +71,7 @@ class TransactionTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    transaction.category.name,
+                    widget.transaction.category.name,
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -75,7 +82,7 @@ class TransactionTile extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${dateFormat.format(transaction.date.toLocal())} · ${timeFormat.format(transaction.date.toLocal())}',
+                    '${dateFormat.format(widget.transaction.date.toLocal())} · ${timeFormat.format(widget.transaction.date.toLocal())}',
                     style: const TextStyle(
                       fontSize: 12,
                       color: AppColors.muted,
@@ -83,17 +90,17 @@ class TransactionTile extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    transaction.paymentMethodDisplay,
+                    widget.transaction.paymentMethodDisplay,
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
                       color: AppColors.muted,
                     ),
                   ),
-                  if (transaction.notes.isNotEmpty) ...[
+                  if (widget.transaction.notes.isNotEmpty) ...[
                     const SizedBox(height: 2),
                     Text(
-                      transaction.notes,
+                      widget.transaction.notes,
                       style: TextStyle(
                         fontSize: 11,
                         color: AppColors.muted.withValues(alpha: 0.7),
@@ -111,56 +118,81 @@ class TransactionTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  transaction.formattedAmount(currencySymbol),
+                  widget.transaction.formattedAmount(widget.currencySymbol),
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: transaction.isIncome
+                    color: widget.transaction.isIncome
                         ? const Color(0xFFA7C431)
                         : AppColors.text,
                   ),
                 ),
               ],
             ),
-
-            // Edit/Delete actions (for transaction list)
-            if (showActions) ...[
-              const SizedBox(width: 4),
-              Column(
-                children: [
-                  _IconBtn(
-                    icon: Icons.edit,
-                    onTap: onEdit,
-                  ),
-                  _IconBtn(
-                    icon: Icons.delete,
-                    onTap: onDelete,
-                  ),
-                ],
-              ),
-            ],
           ],
         ),
       ),
     );
-  }
-}
 
-class _IconBtn extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback? onTap;
+    if (widget.showActions) {
+      final catColorStr = widget.transaction.category.color.replaceFirst('#', '');
+      final catColor = Color(int.parse('FF$catColorStr', radix: 16));
 
-  const _IconBtn({required this.icon, this.onTap});
+      // Calculate dynamic scale based on swipe progress.
+      // Starts at 0.8, reaches 1.8 scale.
+      final double iconScale = (_swipeProgress * 4.0).clamp(0.8, 1.8);
 
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 32,
-        height: 32,
-        decoration: const BoxDecoration(shape: BoxShape.circle),
-        child: Icon(icon, size: 18, color: AppColors.muted),
+      content = Dismissible(
+        key: ValueKey(widget.transaction.id),
+        direction: DismissDirection.horizontal,
+        confirmDismiss: (direction) async {
+          if (direction == DismissDirection.startToEnd) {
+            if (widget.onDelete != null) widget.onDelete!();
+            return false;
+          } else if (direction == DismissDirection.endToStart) {
+            if (widget.onEdit != null) widget.onEdit!();
+            return false;
+          }
+          return false;
+        },
+        onUpdate: (details) {
+          if (details.reached && !details.previousReached) {
+            HapticFeedback.vibrate();
+          }
+          setState(() {
+            _swipeProgress = details.progress;
+          });
+        },
+        background: Container(
+          alignment: Alignment.centerLeft,
+          padding: const EdgeInsets.only(left: 20),
+          color: AppColors.dark,
+          child: Transform.scale(
+            scale: iconScale,
+            child: Icon(Icons.delete, color: catColor),
+          ),
+        ),
+        secondaryBackground: Container(
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.only(right: 20),
+          color: catColor,
+          child: Transform.scale(
+            scale: iconScale,
+            child: const Icon(Icons.edit, color: AppColors.dark),
+          ),
+        ),
+        child: content,
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppRadius.xxl),
+        boxShadow: AppShadows.card,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppRadius.xxl),
+        child: content,
       ),
     );
   }

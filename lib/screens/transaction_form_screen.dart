@@ -107,26 +107,6 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
         _currencySymbol = cachedCats['currency_symbol'] as String? ?? '₹';
         _isLoading = false; // HIDE LOADER IMMEDIATELY
       });
-    }
-
-    // 2. Fetch fresh categories from API ONLY IF ONLINE
-    if (ConnectivityService.isOnline) {
-      ApiService.getCategories().then((catResult) {
-        if (catResult.isSuccess && catResult.data != null && mounted) {
-          setState(() {
-            _categories = catResult.data!['categories'] as List<CategoryModel>;
-            _currencySymbol =
-                catResult.data!['currency_symbol'] as String? ?? '₹';
-            _isLoading = false;
-          });
-
-          // Update cache
-          CacheService.cacheCategories({
-            'categories': _categories.map((c) => c.toJson()).toList(),
-            'currency_symbol': _currencySymbol,
-          });
-        }
-      });
     } else {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -184,51 +164,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
           _isLoading = false;
         });
       }
-
-      // Then try API in background if online
-      if (ConnectivityService.isOnline) {
-        _getBaseUrl().then((baseUrl) {
-          _fetchTransaction(baseUrl).then((response) {
-            if (response != null && mounted) {
-              setState(() {
-                _amountController.text = response.amount;
-                _notesController.text = response.notes;
-                _type = response.type;
-                _categoryId = response.category.id;
-                _date = response.date;
-                _paymentMethod = response.paymentMethod;
-
-                _oldAmount = response.amount;
-                _oldType = response.type;
-                _oldCategoryId = response.category.id;
-
-                _isLoading = false;
-              });
-            }
-          });
-        });
-      }
     }
-  }
-
-  Future<String> _getBaseUrl() async {
-    return await (await _loadAuthService()).toString();
-  }
-
-  // Simplified: use API service directly
-  Future<TransactionModel?> _fetchTransaction(String _) async {
-    // Re-fetch via getTransactions with all=1
-    final result = await ApiService.getTransactions(showAll: true);
-    if (result.isSuccess) {
-      final list = result.data!['transactions'] as List<TransactionModel>;
-      return list.where((t) => t.id == widget.transactionId).firstOrNull;
-    }
-    return null;
-  }
-
-  Future<dynamic> _loadAuthService() async {
-    final service = await ApiService.getCategories();
-    return service;
   }
 
   Future<void> _save() async {
@@ -321,41 +257,25 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       }
     }
 
-    ApiResult result;
+    // Always queue the operation for background sync
+    await SyncService.queueOperation(
+      action: isEdit ? 'update' : 'create',
+      entity: 'transaction',
+      data: txnData,
+      entityId: isEdit ? widget.transactionId : tempId,
+    );
+    
+    // Trigger sync if online
     if (ConnectivityService.isOnline) {
-      result = isEdit
-          ? await ApiService.updateTransaction(widget.transactionId!, txnData)
-          : await ApiService.createTransaction(txnData);
-
-      if (result.isSuccess && !isEdit && result.data != null) {
-        // Replace tempId with real server ID immediately to avoid duplicates
-        final realTxn = result.data as TransactionModel;
-        await CacheService.updateTransactionInCache(realTxn.id, realTxn.toJson(),
-            oldId: tempId);
-        await CacheService.updateTransactionInDashboardCache(
-            realTxn.id, realTxn.toJson(),
-            oldId: tempId);
-      }
-    } else {
-      // Offline mode: queue the operation for later sync
-      await SyncService.queueOperation(
-        action: isEdit ? 'update' : 'create',
-        entity: 'transaction',
-        data: txnData,
-        entityId: isEdit ? widget.transactionId : tempId,
-      );
-      result = ApiResult(data: null);
+      SyncService.syncAll();
     }
 
     if (!mounted) return;
     setState(() => _isSaving = false);
 
-    if (result.isSuccess) {
-      HapticFeedback.mediumImpact();
-      Navigator.pop(context, true);
-    } else {
-      setState(() => _error = result.error ?? 'Failed to save.');
-    }
+    HapticFeedback.mediumImpact();
+    widget.onSaved?.call();
+    Navigator.pop(context, true);
   }
 
   /// Opens a searchable bottom sheet to pick a category.
@@ -369,7 +289,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       ),
       builder: (ctx) {
         return _CategoryPickerSheet(
-          categories: _categories,
+          categories: _categories.where((c) => c.type == _type).toList(),
           selectedId: _categoryId,
           onSelected: (cat) {
             setState(() => _categoryId = cat.id);
@@ -564,9 +484,12 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                                       _TransactionTypePickerSheet(
                                                         selectedType: _type,
                                                         onSelected: (type) {
-                                                          setState(
-                                                            () => _type = type,
-                                                          );
+                                                          setState(() {
+                                                            if (_type != type) {
+                                                              _categoryId = null;
+                                                            }
+                                                            _type = type;
+                                                          });
                                                           Navigator.pop(ctx);
                                                         },
                                                       ),

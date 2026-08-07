@@ -10,6 +10,7 @@ import 'split_group_detail_screen.dart';
 import 'friends_screen.dart';
 import '../widgets/icon_color_picker.dart';
 import '../utils/icon_mapper.dart';
+import '../widgets/full_offline_alert.dart';
 
 class SplitGroupsScreen extends StatefulWidget {
   final VoidCallback? onBack;
@@ -176,25 +177,14 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
                       if (nameCtrl.text.trim().isEmpty) return;
                       ss(() => isSaving = true);
                       final body = {'name': nameCtrl.text.trim(), 'members': selectedIds, 'color': selectedColor, 'icon': selectedIcon};
-                      if (ConnectivityService.isOnline) {
-                        final r = await ApiService.createSplitGroup(body);
-                        if (!ctx.mounted) return;
-                        Navigator.pop(ctx);
-                        if (r.isSuccess) {
-                          HapticFeedback.heavyImpact();
-                          _loadGroups();
-                        } else {
-                          _showTopMessage(r.error ?? 'Error', isError: true);
-                        }
-                      } else {
-                        await SyncService.queueOperation(action: 'create', entity: 'split_group', data: body);
-                        final optGroup = {'id': DateTime.now().millisecondsSinceEpoch, 'name': body['name'], 'net_balance': '0.00', 'total_members': selectedIds.length + 1, 'created_at': DateTime.now().toIso8601String(), 'color': selectedColor, 'icon': selectedIcon, 'is_temp': true};
-                        await CacheService.addSplitGroupToCache(optGroup);
-                        if (!ctx.mounted) return;
-                        Navigator.pop(ctx);
-                        HapticFeedback.mediumImpact();
+                      final r = await ApiService.createSplitGroup(body);
+                      if (!ctx.mounted) return;
+                      Navigator.pop(ctx);
+                      if (r.isSuccess) {
+                        HapticFeedback.heavyImpact();
                         _loadGroups();
-                        _showTopMessage('Group created offline.');
+                      } else {
+                        _showTopMessage(r.error ?? 'Error', isError: true);
                       }
                     },
                     child: isSaving 
@@ -232,20 +222,24 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-          child: Row(
+    return FullOfflineAlert(
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          child: Column(
             children: [
-              GestureDetector(
-                onTap: () {
-                  if (widget.onBack != null) {
-                    widget.onBack?.call();
-                  } else {
-                    Navigator.maybePop(context);
-                  }
-                },
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+                child: Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () {
+                        if (widget.onBack != null) {
+                          widget.onBack?.call();
+                        } else {
+                          Navigator.maybePop(context);
+                        }
+                      },
                 child: Container(
                   width: 40,
                   height: 40,
@@ -326,10 +320,13 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
                       itemBuilder: (_, i) => _buildGroupCard(i),
                     ),
                   ),
+            ),
+          ],
         ),
-      ],
-    );
-  }
+      ),
+    ),
+  );
+}
 
   Widget _buildSkeleton() {
     return ListView.builder(

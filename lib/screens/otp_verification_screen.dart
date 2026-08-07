@@ -3,6 +3,7 @@ import 'dart:async';
 import '../theme/app_theme.dart';
 import '../widgets/espere_input.dart';
 import '../services/api_service.dart';
+import '../services/sync_service.dart';
 import 'package:pinput/pinput.dart';
 
 class OtpVerificationScreen extends StatefulWidget {
@@ -67,12 +68,17 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     final result = await ApiService.verifyOtp(_email!, otp);
 
     if (!mounted) return;
-    setState(() => _isLoading = false);
 
     if (result.isSuccess) {
+      await SyncService.syncAll();
+      if (!mounted) return;
+      setState(() => _isLoading = false);
       Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
     } else {
-      setState(() => _error = result.error);
+      setState(() {
+        _isLoading = false;
+        _error = result.error;
+      });
       _otpController.clear();
     }
   }

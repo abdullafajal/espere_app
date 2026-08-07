@@ -38,7 +38,7 @@ class TransactionListScreenState extends State<TransactionListScreen> {
   String _typeFilter = '';
   int? _categoryFilter;
   DateTime _currentMonth = DateTime.now();
-  bool _showAll = true;
+  bool _showAll = false;
 
   final _searchController = TextEditingController();
 
@@ -76,27 +76,15 @@ class TransactionListScreenState extends State<TransactionListScreen> {
           _currencySymbol =
               (cachedTxns['currency_symbol'] as String?) ?? _currencySymbol;
         }
-        _isLoading = false;
       });
     }
 
-    // 2. Fetch fresh data from API ONLY if online
-    if (ConnectivityService.isOnline) {
-      final catResult = await ApiService.getCategories();
-      if (catResult.isSuccess) {
-        _categories = catResult.data!['categories'] as List<CategoryModel>;
-        // Cache categories
-        CacheService.cacheCategories({
-          'categories': _categories.map((c) => c.toJson()).toList(),
-          'currency_symbol': catResult.data!['currency_symbol'],
-        });
-        if (mounted) setState(() {});
-      }
-      
-      _loadTransactions();
-    } else {
-      if (mounted) setState(() => _isLoading = false);
-    }
+    _loadTransactions();
+  }
+
+  Future<void> _handleRefresh() async {
+    await SyncService.syncAll();
+    await _loadTransactions();
   }
 
   Future<void> _loadTransactions() async {
@@ -154,63 +142,11 @@ class TransactionListScreenState extends State<TransactionListScreen> {
       setState(() {
         _transactions = list;
         _currencySymbol = (cached['currency_symbol'] as String?) ?? '₹';
+        _isLoading = false;
       });
-    }
-
-    // 2. Fetch fresh from API ONLY if online
-    if (!ConnectivityService.isOnline) {
+    } else {
       if (mounted) setState(() => _isLoading = false);
-      return;
     }
-
-    final monthStr = DateFormat('yyyy-M').format(_currentMonth);
-    final result = await ApiService.getTransactions(
-      query: _searchQuery.isNotEmpty ? _searchQuery : null,
-      type: _typeFilter.isNotEmpty ? _typeFilter : null,
-      categoryId: _categoryFilter,
-      month: _showAll ? null : monthStr,
-      showAll: _showAll,
-    );
-
-    if (!mounted) return;
-    setState(() {
-      _isLoading = false;
-      if (result.isSuccess) {
-        final rawTransactions = result.data!['transactions'] as List<TransactionModel>;
-        
-        // API-level De-duplication:
-        // Handles cases where an item just synced but is still being processed in the queue
-        final seenKeys = <String>{};
-        final uniqueList = <TransactionModel>[];
-        for (var t in rawTransactions) {
-          final amt = double.tryParse(t.amount.toString()) ?? 0;
-          final key = "${amt.toStringAsFixed(2)}_${t.category.name}_${t.date.toUtc().toIso8601String().substring(0, 16)}";
-          if (!seenKeys.contains(key)) {
-            seenKeys.add(key);
-            uniqueList.add(t);
-          }
-        }
-        _transactions = uniqueList;
-        
-        // Also sort API response just to be consistent
-        _transactions.sort((a, b) {
-          int cmp = b.date.compareTo(a.date);
-          if (cmp != 0) return cmp;
-          return b.id.compareTo(a.id);
-        });
-        
-        _currencySymbol = result.data!['currency_symbol'] as String? ?? '₹';
-        // Cache transactions
-        CacheService.cacheTransactions({
-          'transactions':
-              _transactions.map((t) => t.toJson()).toList(),
-          'currency_symbol': _currencySymbol,
-        });
-        _error = null;
-      } else if (_transactions.isEmpty) {
-        _error = result.error;
-      }
-    });
   }
 
   void _prevMonth() {
@@ -275,24 +211,18 @@ class TransactionListScreenState extends State<TransactionListScreen> {
 
     if (confirm == true) {
       HapticFeedback.heavyImpact();
+      
+      // Offline mode: queue deletion
+      await SyncService.queueOperation(
+        action: 'delete',
+        entity: 'transaction',
+        entityId: id,
+      );
+
+      // Trigger sync if online
       if (ConnectivityService.isOnline) {
-        final result = await ApiService.deleteTransaction(id);
-        if (result.isSuccess) {
-          _loadTransactions();
-        } else {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(result.error ?? 'Failed to delete')),
-            );
-          }
-        }
-      } else {
-        // Offline mode: queue deletion
-        await SyncService.queueOperation(
-          action: 'delete',
-          entity: 'transaction',
-          entityId: id,
-        );
+        SyncService.syncAll();
+      }
 
         // ─── Optimistic Update ──────────────────────────────────────────
         final txn = _transactions.firstWhere((t) => t.id == id);
@@ -322,11 +252,10 @@ class TransactionListScreenState extends State<TransactionListScreen> {
         }
         // ───────────────────────────────────────────────────────────────
 
-        // Update local UI immediately
-        setState(() {
-          _transactions.removeWhere((t) => t.id == id);
-        });
-      }
+      // Update local UI immediately
+      setState(() {
+        _transactions.removeWhere((t) => t.id == id);
+      });
     }
   }
 
@@ -591,7 +520,7 @@ class TransactionListScreenState extends State<TransactionListScreen> {
                   : _transactions.isEmpty
                   ? _buildEmpty()
                   : RefreshIndicator(
-                    onRefresh: _loadTransactions,
+                    onRefresh: _handleRefresh,
                     color: AppColors.accent,
                     child: ListView.builder(
                       padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),

@@ -4,6 +4,7 @@
 ///         → insights → charts → recent transactions → quick links
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'dart:math' as math;
@@ -64,51 +65,30 @@ class DashboardScreenState extends State<DashboardScreen> {
   void reload() => _loadDashboard();
 
   Future<void> _loadDashboard() async {
-    // 1. Always check cache first to show optimistic updates
     final cached = await CacheService.getCachedDashboard();
     if (cached != null && mounted) {
+      final d = DashboardData.fromJson(cached);
       setState(() {
-        _data = DashboardData.fromJson(cached);
+        _data = d;
         _isLoading = false;
+        _error = null;
       });
-    }
 
-    // 2. Fetch fresh data from API in background ONLY if online
-    if (!ConnectivityService.isOnline) {
-      if (mounted) setState(() => _isLoading = false);
-      return;
-    }
-
-    final result = await ApiService.getDashboard();
-    if (!mounted) return;
-    
-    if (result.isSuccess) {
-      final mergedData = await CacheService.cacheDashboard(result.data!.toJson());
-      if (mounted) {
-        final d = DashboardData.fromJson(mergedData);
-        setState(() {
-          _isLoading = false;
-          _data = d;
-        });
-
-        // Update home screen widget
-        WidgetService.updateDashboard(
-          totalBalance: double.tryParse(d.totalBalance.replaceAll(',', '')) ?? 0,
-          totalIncome: double.tryParse(d.monthlyIncome.replaceAll(',', '')) ?? 0,
-          totalExpense: double.tryParse(d.monthlyExpenses.replaceAll(',', '')) ?? 0,
-          currencySymbol: d.currencySymbol,
-        );
-      }
+      // Update home screen widget
+      WidgetService.updateDashboard(
+        totalBalance: double.tryParse(d.totalBalance.replaceAll(',', '')) ?? 0,
+        totalIncome: double.tryParse(d.monthlyIncome.replaceAll(',', '')) ?? 0,
+        totalExpense: double.tryParse(d.monthlyExpenses.replaceAll(',', '')) ?? 0,
+        currencySymbol: d.currencySymbol,
+      );
     } else {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          if (_data == null) {
-            _error = result.error;
-          }
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _handleRefresh() async {
+    await SyncService.syncAll();
+    await _loadDashboard();
   }
 
   Color _parseColor(String? hex) {
@@ -144,6 +124,84 @@ class DashboardScreenState extends State<DashboardScreen> {
     return (math.max(max, 1.0) / interval).ceil() * interval;
   }
 
+  Future<void> _deleteTransaction(int id) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder:
+          (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadius.xxl),
+            ),
+            title: const Text('Delete Transaction'),
+            content: const Text(
+              'Are you sure you want to delete this transaction?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text(
+                  'Cancel',
+                  style: TextStyle(color: AppColors.muted),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(color: AppColors.error),
+                ),
+              ),
+            ],
+          ),
+    );
+
+    if (confirm == true) {
+      HapticFeedback.heavyImpact();
+      
+      // Offline mode: queue deletion
+      await SyncService.queueOperation(
+        action: 'delete',
+        entity: 'transaction',
+        entityId: id,
+      );
+
+      // Trigger sync if online
+      if (ConnectivityService.isOnline) {
+        SyncService.syncAll();
+      }
+
+      // Optimistic Update
+      if (_data != null) {
+        final txn = _data!.recentTransactions.firstWhere((t) => t.id == id);
+        await CacheService.reverseDashboardImpact(
+          txn.type, 
+          double.tryParse(txn.amount) ?? 0.0, 
+          id,
+          categoryName: txn.category.name,
+        );
+        if (txn.type == 'expense') {
+          await CacheService.updateBudgetOptimistically(
+            txn.category.id, 
+            double.tryParse(txn.amount) ?? 0.0, 
+            isDelete: true
+          );
+        }
+        final cachedTxns = await CacheService.getCachedTransactions();
+        if (cachedTxns != null) {
+          final list = List<Map<String, dynamic>>.from(cachedTxns['transactions'] ?? []);
+          list.removeWhere((t) => t['id'] == id);
+          await CacheService.cacheTransactions({
+            'transactions': list,
+            'currency_symbol': cachedTxns['currency_symbol'],
+          });
+        }
+      }
+
+      // Reload dashboard data
+      await _loadDashboard();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) return _buildSkeleton();
@@ -153,7 +211,7 @@ class DashboardScreenState extends State<DashboardScreen> {
     final d = _data!;
 
     return RefreshIndicator(
-      onRefresh: _loadDashboard,
+      onRefresh: _handleRefresh,
       color: AppColors.accent,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -764,6 +822,7 @@ class DashboardScreenState extends State<DashboardScreen> {
                   child: TransactionTile(
                     transaction: txn,
                     currencySymbol: d.currencySymbol,
+                    showActions: true,
                     onTap: () {
                       TransactionFormScreen.show(
                         context,
@@ -771,6 +830,14 @@ class DashboardScreenState extends State<DashboardScreen> {
                         onSaved: _loadDashboard,
                       );
                     },
+                    onEdit: () {
+                      TransactionFormScreen.show(
+                        context,
+                        transactionId: txn.id,
+                        onSaved: _loadDashboard,
+                      );
+                    },
+                    onDelete: () => _deleteTransaction(txn.id),
                   ),
                 ),
               ),

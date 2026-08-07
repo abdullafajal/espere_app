@@ -38,13 +38,13 @@ void main() async {
 
   // Initial sync if online
   if (ConnectivityService.isOnline) {
-    SyncService.processSyncQueue();
+    SyncService.syncAll();
   }
 
   // Auto-sync when device comes back online
   ConnectivityService.onReconnect.listen((_) {
-    debugPrint('[Sync] Device reconnected — syncing pending operations...');
-    SyncService.processSyncQueue();
+    debugPrint('[Sync] Device reconnected — syncing pending operations and pulling data...');
+    SyncService.syncAll();
   });
 
   // Set status bar style to match the app design
@@ -69,7 +69,7 @@ class EspereApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.system,
+      themeMode: ThemeMode.light,
 
       // ─── Named Routes ────────────────────────────────────────
       initialRoute: '/',

@@ -7,6 +7,7 @@ import '../models/user.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
 import '../services/connectivity_service.dart';
+import '../services/sync_service.dart';
 import '../widgets/espere_input.dart';
 import '../utils/app_toast.dart';
 
@@ -66,31 +67,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _emailReminders = _user!.emailReminders;
         _isLoading = false;
       });
-    }
-
-    // 2. Fetch fresh from API ONLY IF ONLINE
-    if (ConnectivityService.isOnline) {
-      ApiService.getProfile().then((result) {
-        if (result.isSuccess && mounted) {
-          setState(() {
-            _isLoading = false;
-            _user = result.data;
-            _firstNameController.text = _user!.firstName;
-            _lastNameController.text = _user!.lastName;
-            _emailController.text = _user!.email;
-            _currency = _user!.currency;
-            _theme = _user!.theme;
-            _emailReminders = _user!.emailReminders;
-          });
-          // Update cache
-          CacheService.cacheUser(_user!.toJson());
-        } else if (_user == null && mounted) {
-          setState(() {
-            _isLoading = false;
-            _error = result.error;
-          });
-        }
-      });
     } else {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -102,21 +78,52 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _error = null;
     });
 
-    final result = await ApiService.updateProfile({
+    final data = {
       'first_name': _firstNameController.text.trim(),
       'last_name': _lastNameController.text.trim(),
       'email': _emailController.text.trim(),
       'currency': _currency,
       'theme': _theme,
       'email_reminders': _emailReminders,
-    });
+    };
+
+    ApiResult result;
+    if (ConnectivityService.isOnline) {
+      result = await ApiService.updateProfile(data);
+    } else {
+      // Offline mode: queue operation
+      await SyncService.queueOperation(
+        action: 'update',
+        entity: 'profile',
+        data: data,
+        entityId: _user?.id ?? 0,
+      );
+
+      // Optimistic Update
+      if (_user != null) {
+        final newUserJson = _user!.toJson();
+        newUserJson['first_name'] = data['first_name'];
+        newUserJson['last_name'] = data['last_name'];
+        newUserJson['email'] = data['email'];
+        newUserJson['currency'] = data['currency'];
+        newUserJson['theme'] = data['theme'];
+        newUserJson['email_reminders'] = data['email_reminders'];
+        
+        await CacheService.cacheUser(newUserJson);
+        result = ApiResult(data: UserModel.fromJson(newUserJson));
+      } else {
+        result = ApiResult(data: null);
+      }
+    }
 
     if (!mounted) return;
     setState(() {
       _isSaving = false;
-      if (result.isSuccess) {
+      if (result.isSuccess && result.data != null) {
         _user = result.data;
         AppToast.success(context, 'Profile updated successfully.');
+      } else if (!ConnectivityService.isOnline) {
+        AppToast.success(context, 'Profile update queued.');
       } else {
         _error = result.error;
       }

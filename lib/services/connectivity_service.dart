@@ -7,12 +7,16 @@ class ConnectivityService {
   static StreamSubscription<List<ConnectivityResult>>? _subscription;
   static bool _isOnline = true;
   static final _onReconnect = StreamController<void>.broadcast();
+  static final _onConnectivityChanged = StreamController<bool>.broadcast();
 
   /// Whether the device currently has network connectivity.
   static bool get isOnline => _isOnline;
 
   /// Stream that emits when device comes back online.
   static Stream<void> get onReconnect => _onReconnect.stream;
+
+  /// Stream that emits the current connectivity status whenever it changes.
+  static Stream<bool> get onConnectivityChanged => _onConnectivityChanged.stream;
 
   /// Initialize connectivity monitoring.
   static Future<void> init() async {
@@ -29,6 +33,8 @@ class ConnectivityService {
         // Device just came back online — trigger sync
         _onReconnect.add(null);
       }
+      
+      _onConnectivityChanged.add(_isOnline);
     });
   }
 
@@ -36,5 +42,6 @@ class ConnectivityService {
   static void dispose() {
     _subscription?.cancel();
     _onReconnect.close();
+    _onConnectivityChanged.close();
   }
 }

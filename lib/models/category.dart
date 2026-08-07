@@ -7,6 +7,7 @@ class CategoryModel {
   final String icon;
   final String color;
   final bool isSystem;
+  final String type;
 
   CategoryModel({
     required this.id,
@@ -14,6 +15,7 @@ class CategoryModel {
     this.icon = 'category',
     this.color = '#C8E64A',
     this.isSystem = false,
+    this.type = 'expense',
   });
 
   /// Parse hex color string into Flutter Color
@@ -29,6 +31,7 @@ class CategoryModel {
       icon: json['icon'] ?? 'category',
       color: json['color'] ?? '#C8E64A',
       isSystem: json['is_system'] ?? false,
+      type: json['type'] ?? 'expense',
     );
   }
 
@@ -38,5 +41,6 @@ class CategoryModel {
         'icon': icon,
         'color': color,
         'is_system': isSystem,
+        'type': type,
       };
 }

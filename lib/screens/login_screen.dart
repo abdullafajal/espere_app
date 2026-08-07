@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../widgets/espere_input.dart';
 import '../services/api_service.dart';
+import '../services/sync_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -42,12 +43,18 @@ class _LoginScreenState extends State<LoginScreen> {
     final result = await ApiService.login(username, password);
 
     if (!mounted) return;
-    setState(() => _isLoading = false);
 
     if (result.isSuccess) {
+      // Pull initial data before navigating so dashboard isn't empty
+      await SyncService.syncAll();
+      if (!mounted) return;
+      setState(() => _isLoading = false);
       Navigator.pushReplacementNamed(context, '/home');
     } else {
-      setState(() => _error = result.error);
+      setState(() {
+        _isLoading = false;
+        _error = result.error;
+      });
     }
   }
 

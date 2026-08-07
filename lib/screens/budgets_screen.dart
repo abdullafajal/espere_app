@@ -55,34 +55,14 @@ class BudgetsScreenState extends State<BudgetsScreen> {
         _currencySymbol = (cached['currency_symbol'] as String?) ?? '₹';
         _isLoading = false;
       });
-    }
-
-    // 2. Fetch fresh from API ONLY if online
-    if (!ConnectivityService.isOnline) {
+    } else {
       if (mounted) setState(() => _isLoading = false);
-      return;
     }
+  }
 
-    final monthStr = DateFormat('yyyy-M').format(_currentMonth);
-    final result = await ApiService.getBudgets(month: monthStr);
-    if (!mounted) return;
-    setState(() {
-      _isLoading = false;
-      if (result.isSuccess) {
-        final Map<String, dynamic> data = result.data!;
-        _budgets = List<Map<String, dynamic>>.from(
-          data['budgets'] as Iterable? ?? [],
-        )..sort((a, b) {
-            int cmp = (a['name'] ?? '').compareTo(b['name'] ?? '');
-            if (cmp != 0) return cmp;
-            return (b['id'] ?? 0).compareTo(a['id'] ?? 0);
-          });
-        _currencySymbol = (data['currency_symbol'] as String?) ?? '₹';
-        CacheService.cacheBudgets(data);
-      } else if (_budgets.isEmpty) {
-        _error = result.error;
-      }
-    });
+  Future<void> _handleRefresh() async {
+    await SyncService.syncAll();
+    await _loadBudgets();
   }
 
   Future<void> _loadCategories() async {
@@ -97,39 +77,8 @@ class BudgetsScreenState extends State<BudgetsScreen> {
                 .toList();
         _isLoadingCats = false;
       });
-    }
-
-    // 2. Fetch fresh from API ONLY if online
-    if (!ConnectivityService.isOnline) {
+    } else {
       if (mounted) setState(() => _isLoadingCats = false);
-      return;
-    }
-
-    final result = await ApiService.getCategories();
-    if (mounted) {
-      setState(() {
-        _isLoadingCats = false;
-        if (result.isSuccess && result.data != null) {
-          final cats = result.data!['categories'] as List<CategoryModel>;
-          _categories =
-              cats
-                  .map<Map<String, dynamic>>(
-                    (c) => {
-                      'id': c.id,
-                      'name': c.name,
-                      'icon': c.icon,
-                      'color': c.color,
-                    },
-                  )
-                  .toList();
-
-          // Update cache
-          CacheService.cacheCategories({
-            'categories': _categories,
-            'currency_symbol': result.data!['currency_symbol'],
-          });
-        }
-      });
     }
   }
 
@@ -182,39 +131,33 @@ class BudgetsScreenState extends State<BudgetsScreen> {
     );
 
     if (confirm == true) {
-      if (ConnectivityService.isOnline) {
-        final result = await ApiService.deleteBudget(id);
-        if (mounted) {
-          if (result.isSuccess) {
-            HapticFeedback.heavyImpact();
-            AppToast.success(context, 'Budget deleted.');
-            _loadBudgets();
-          } else {
-            AppToast.error(context, result.error ?? 'Failed to delete.');
-          }
-        }
-      } else {
-        // Offline mode: queue deletion
-        await SyncService.queueOperation(
-          action: 'delete',
-          entity: 'budget',
-          entityId: id,
-        );
+      // Offline mode: queue deletion
+      await SyncService.queueOperation(
+        action: 'delete',
+        entity: 'budget',
+        entityId: id,
+      );
 
-        // Remove from cache
-        final cached = await CacheService.getCachedBudgets();
-        if (cached != null) {
-          final list = List<Map<String, dynamic>>.from(cached['budgets'] ?? []);
-          list.removeWhere((b) => b['id'] == id);
-          await CacheService.cacheBudgets({
-            'budgets': list,
-            'currency_symbol': cached['currency_symbol'],
-          });
-        }
-
-        setState(() {
-          _budgets.removeWhere((b) => b['id'] == id);
+      // Remove from cache
+      final cached = await CacheService.getCachedBudgets();
+      if (cached != null) {
+        final list = List<Map<String, dynamic>>.from(cached['budgets'] ?? []);
+        list.removeWhere((b) => b['id'] == id);
+        await CacheService.cacheBudgets({
+          'budgets': list,
+          'currency_symbol': cached['currency_symbol'],
         });
+      }
+
+      setState(() {
+        _budgets.removeWhere((b) => b['id'] == id);
+      });
+
+      HapticFeedback.heavyImpact();
+      AppToast.success(context, 'Budget deleted.');
+
+      if (ConnectivityService.isOnline) {
+        SyncService.syncAll();
       }
     }
   }
@@ -417,7 +360,7 @@ class BudgetsScreenState extends State<BudgetsScreen> {
                       ),
                     )
                   : RefreshIndicator(
-                    onRefresh: _loadBudgets,
+                    onRefresh: _handleRefresh,
                     color: AppColors.accent,
                     child: ListView.builder(
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
@@ -708,95 +651,88 @@ class _BudgetFormSheetState extends State<_BudgetFormSheet> {
       'month': DateFormat('yyyy-MM-dd').format(DateTime.now()),
     };
 
-    ApiResult result;
-    if (ConnectivityService.isOnline) {
-      result = await ApiService.createBudget(data);
-    } else {
-      // Offline mode: queue creation/update
-      final isUpdate = widget.budget != null;
-      int? tempId;
-      if (!isUpdate) {
-        tempId = DateTime.now().millisecondsSinceEpoch;
-      }
-      
-      await SyncService.queueOperation(
-        action: 'create', // backend handles upsert on POST
-        entity: 'budget',
-        data: data,
-        entityId: isUpdate ? widget.budget!['id'] : tempId,
-      );
+    // Always queue creation/update
+    final isUpdate = widget.budget != null;
+    int? tempId;
+    if (!isUpdate) {
+      tempId = DateTime.now().millisecondsSinceEpoch;
+    }
+    
+    await SyncService.queueOperation(
+      action: 'create', // backend handles upsert on POST
+      entity: 'budget',
+      data: data,
+      entityId: isUpdate ? widget.budget!['id'] : tempId,
+    );
 
-      // ─── Optimistic Update ──────────────────────────────────────────
-      final cat = widget.categories.firstWhere(
-        (c) => c['id'].toString() == _selectedCategoryId.toString(),
-        orElse: () => {},
-      );
-      
-      double computedSpent = 0.0;
-      if (!isUpdate) {
-        final cachedTxns = await CacheService.getCachedTransactions();
-        if (cachedTxns != null && cachedTxns['transactions'] != null) {
-          final now = DateTime.now();
-          for (final t in cachedTxns['transactions']) {
-            if (t['type'] == 'expense' && 
-                t['category']?['id']?.toString() == _selectedCategoryId.toString()) {
-              final dateStr = t['date']?.toString();
-              if (dateStr != null) {
-                final d = DateTime.tryParse(dateStr);
-                if (d != null && d.year == now.year && d.month == now.month) {
-                  computedSpent += double.tryParse(t['amount'].toString()) ?? 0.0;
-                }
+    // ─── Optimistic Update ──────────────────────────────────────────
+    final cat = widget.categories.firstWhere(
+      (c) => c['id'].toString() == _selectedCategoryId.toString(),
+      orElse: () => {},
+    );
+    
+    double computedSpent = 0.0;
+    if (!isUpdate) {
+      final cachedTxns = await CacheService.getCachedTransactions();
+      if (cachedTxns != null && cachedTxns['transactions'] != null) {
+        final now = DateTime.now();
+        for (final t in cachedTxns['transactions']) {
+          if (t['type'] == 'expense' && 
+              t['category']?['id']?.toString() == _selectedCategoryId.toString()) {
+            final dateStr = t['date']?.toString();
+            if (dateStr != null) {
+              final d = DateTime.tryParse(dateStr);
+              if (d != null && d.year == now.year && d.month == now.month) {
+                computedSpent += double.tryParse(t['amount'].toString()) ?? 0.0;
               }
             }
           }
         }
       }
-      
-      final budgetAmount = double.tryParse(_amountController.text) ?? 0.0;
-      final spentAmount = isUpdate ? (double.tryParse(widget.budget!['spent'].toString()) ?? 0.0) : computedSpent;
-      final remainingAmount = budgetAmount - spentAmount;
-      final percentage = budgetAmount > 0 ? (spentAmount / budgetAmount * 100).clamp(0.0, 100.0) : 0.0;
-      final isExceeded = spentAmount > budgetAmount;
+    }
+    
+    final budgetAmount = double.tryParse(_amountController.text) ?? 0.0;
+    final spentAmount = isUpdate ? (double.tryParse(widget.budget!['spent'].toString()) ?? 0.0) : computedSpent;
+    final remainingAmount = budgetAmount - spentAmount;
+    final percentage = budgetAmount > 0 ? (spentAmount / budgetAmount * 100).clamp(0.0, 100.0) : 0.0;
+    final isExceeded = spentAmount > budgetAmount;
 
-      final newBudgetJson = {
-        'id': isUpdate ? widget.budget!['id'] : tempId,
-        'category': {
-          'id': _selectedCategoryId,
-          'name': cat['name'] ?? 'Other',
-          'icon': cat['icon'] ?? 'category',
-          'color': cat['color'] ?? '#C8E64A',
-        },
-        'amount': _amountController.text,
-        'spent': double.parse(spentAmount.toStringAsFixed(2)),
-        'remaining': double.parse(remainingAmount.toStringAsFixed(2)),
-        'percentage': double.parse(percentage.toStringAsFixed(2)),
-        'month': data['month'],
-        'is_exceeded': isExceeded,
-      };
-      
-      if (isUpdate) {
-        await CacheService.updateBudgetInCache(widget.budget!['id'], newBudgetJson);
-      } else {
-        await CacheService.addBudgetToCache(newBudgetJson);
-      }
-      // ───────────────────────────────────────────────────────────────
+    final newBudgetJson = {
+      'id': isUpdate ? widget.budget!['id'] : tempId,
+      'category': {
+        'id': _selectedCategoryId,
+        'name': cat['name'] ?? 'Other',
+        'icon': cat['icon'] ?? 'category',
+        'color': cat['color'] ?? '#C8E64A',
+      },
+      'amount': _amountController.text,
+      'spent': double.parse(spentAmount.toStringAsFixed(2)),
+      'remaining': double.parse(remainingAmount.toStringAsFixed(2)),
+      'percentage': double.parse(percentage.toStringAsFixed(2)),
+      'month': data['month'],
+      'is_exceeded': isExceeded,
+    };
+    
+    if (isUpdate) {
+      await CacheService.updateBudgetInCache(widget.budget!['id'], newBudgetJson);
+    } else {
+      await CacheService.addBudgetToCache(newBudgetJson);
+    }
+    // ───────────────────────────────────────────────────────────────
 
-      result = ApiResult(data: null);
+    if (ConnectivityService.isOnline) {
+      SyncService.syncAll();
     }
 
     if (mounted) {
       setState(() => _isSaving = false);
-      if (result.isSuccess) {
-        HapticFeedback.mediumImpact();
-        AppToast.success(
-          context,
-          widget.budget == null ? 'Budget created.' : 'Budget updated.',
-        );
-        widget.onSuccess();
-        Navigator.pop(context);
-      } else {
-        AppToast.error(context, result.error ?? 'Failed to save budget.');
-      }
+      HapticFeedback.mediumImpact();
+      AppToast.success(
+        context,
+        widget.budget == null ? 'Budget created.' : 'Budget updated.',
+      );
+      widget.onSuccess();
+      Navigator.pop(context);
     }
   }
 
