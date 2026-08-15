@@ -25,6 +25,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
   bool _isLoading = true;
   String? _error;
   int? _myId;
+  String _currencySymbol = '₹';
 
   @override
   void initState() {
@@ -35,6 +36,14 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
   void reload() => _loadGroups();
 
   Future<void> _loadGroups() async {
+    final cachedUser = await CacheService.getCachedUser();
+    if (cachedUser != null && mounted) {
+      setState(() {
+        _myId = cachedUser['id'];
+        _currencySymbol = cachedUser['currency_symbol'] as String? ?? '₹';
+      });
+    }
+
     // 1. Always check cache first
     final cached = await CacheService.getCachedSplitGroups();
     if (cached != null && mounted) {
@@ -262,25 +271,6 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
               ),
               const Spacer(),
               GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const FriendsScreen()),
-                  );
-                },
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  margin: const EdgeInsets.only(right: 8),
-                  decoration: BoxDecoration(
-                    color: AppColors.dark,
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                    boxShadow: AppShadows.soft,
-                  ),
-                  child: const Icon(Icons.person, color: AppColors.accent),
-                ),
-              ),
-              GestureDetector(
                 onTap: _showCreateGroupSheet,
                 child: Container(
                   width: 40,
@@ -380,165 +370,143 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
     final memberCount = group['total_members'] ?? 0;
     final groupColor = Color(int.parse((group['color'] ?? '#C8E64A').replaceFirst('#', '0xFF')));
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: AppShadows.card,
-        border: Border.all(color: AppColors.border.withOpacity(0.1)),
-      ),
-      child: InkWell(
-        onTap: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => SplitGroupDetailScreen(
-                groupId: group['id'] as int,
-                groupName: group['name'] as String,
-              ),
+    final canEditDelete = group['is_accepted'] == true && group['created_by_id'] == _myId;
+
+    return _GroupTile(
+      group: group,
+      canEditDelete: canEditDelete,
+      onTap: () async {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => SplitGroupDetailScreen(
+              groupId: group['id'] as int,
+              groupName: group['name'] as String,
             ),
-          );
-          _loadGroups();
-        },
-        borderRadius: BorderRadius.circular(24),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: groupColor,
-                      borderRadius: BorderRadius.circular(16),
+          ),
+        );
+        _loadGroups();
+      },
+      onEdit: () => _editGroupSheet(group),
+      onDelete: () => _deleteGroup(group),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: groupColor,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Center(
+                    child: Icon(
+                      _getIconData(group['icon'] ?? 'groups'),
+                      color: AppColors.dark,
+                      size: 28,
                     ),
-                    child: Center(
-                      child: Icon(
-                        _getIconData(group['icon'] ?? 'groups'),
-                        color: AppColors.dark,
-                        size: 28,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        group['name'] ?? 'Group',
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.text),
                       ),
-                    ),
+                      const SizedBox(height: 6),
+                      if (group['is_accepted'] == false)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.muted.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text('Invitation Pending', style: TextStyle(fontSize: 10, color: AppColors.muted, fontWeight: FontWeight.bold)),
+                        )
+                      else
+                        _buildBalanceText(netBalance),
+                    ],
                   ),
-                  const SizedBox(width: 16),
+                ),
+              ],
+            ),
+          ),
+          if (group['is_accepted'] == false)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.muted.withOpacity(0.05),
+                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
+              ),
+              child: Row(
+                children: [
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          group['name'] ?? 'Group',
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.text),
-                        ),
-                        const SizedBox(height: 6),
-                        if (group['is_accepted'] == false)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: AppColors.muted.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Text('Invitation Pending', style: TextStyle(fontSize: 10, color: AppColors.muted, fontWeight: FontWeight.bold)),
-                          )
-                        else
-                          _buildBalanceText(netBalance),
-                      ],
+                    child: TextButton(
+                      onPressed: () => _handleCardAction(group['id'], 'reject'),
+                      style: TextButton.styleFrom(foregroundColor: AppColors.muted),
+                      child: const Text('Decline', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                     ),
                   ),
-                  if (group['is_accepted'] == true && group['created_by_id'] == _myId)
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          onPressed: () => _editGroupSheet(group),
-                          icon: const Icon(Icons.edit_outlined, size: 20, color: AppColors.muted),
-                          constraints: const BoxConstraints(),
-                          padding: const EdgeInsets.all(4),
-                        ),
-                        IconButton(
-                          onPressed: () => _deleteGroup(group),
-                          icon: const Icon(Icons.delete_outline, size: 20, color: AppColors.muted),
-                          constraints: const BoxConstraints(),
-                          padding: const EdgeInsets.all(4),
-                        ),
-                      ],
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => _handleCardAction(group['id'], 'accept'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.dark,
+                        foregroundColor: AppColors.accent,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('Accept', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                     ),
+                  ),
+                ],
+              ),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
+                border: Border(top: BorderSide(color: AppColors.border.withOpacity(0.1))),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Created ${group['created_at'].toString().split('T')[0]}',
+                    style: const TextStyle(fontSize: 11, color: AppColors.muted, fontWeight: FontWeight.w600),
+                  ),
+                  Row(
+                    children: [
+                      const Text(
+                        'View Details',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.muted),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.arrow_forward_ios, size: 10, color: AppColors.muted),
+                    ],
+                  ),
                 ],
               ),
             ),
-            if (group['is_accepted'] == false)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: AppColors.muted.withOpacity(0.05),
-                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextButton(
-                        onPressed: () => _handleCardAction(group['id'], 'reject'),
-                        style: TextButton.styleFrom(foregroundColor: AppColors.muted),
-                        child: const Text('Decline', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () => _handleCardAction(group['id'], 'accept'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.dark,
-                          foregroundColor: AppColors.accent,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        child: const Text('Accept', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            else
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
-                  border: Border(top: BorderSide(color: AppColors.border.withOpacity(0.1))),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Created ${group['created_at'].toString().split('T')[0]}',
-                      style: const TextStyle(fontSize: 11, color: AppColors.muted, fontWeight: FontWeight.w600),
-                    ),
-                    Row(
-                      children: [
-                        const Text(
-                          'View Details',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.muted),
-                        ),
-                        const SizedBox(width: 4),
-                        const Icon(Icons.arrow_forward_ios, size: 10, color: AppColors.muted),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        ),
+        ],
       ),
     );
   }
 
   Widget _buildBalanceText(double balance) {
     String label;
-    String amount = '₹${balance.abs().toStringAsFixed(0)}';
+    String amount = '$_currencySymbol${balance.abs().toStringAsFixed(0)}';
 
     if (balance > 0) {
       label = 'Gets back $amount';
@@ -732,4 +700,102 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
   }
 
   IconData _getIconData(String name) => IconMapper.map(name);
+}
+
+class _GroupTile extends StatefulWidget {
+  final Map<String, dynamic> group;
+  final bool canEditDelete;
+  final VoidCallback onTap;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  final Widget child;
+
+  const _GroupTile({
+    required this.group,
+    required this.canEditDelete,
+    required this.onTap,
+    required this.onEdit,
+    required this.onDelete,
+    required this.child,
+  });
+
+  @override
+  State<_GroupTile> createState() => _GroupTileState();
+}
+
+class _GroupTileState extends State<_GroupTile> {
+  double _swipeProgress = 0.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final double iconScale = (_swipeProgress * 4.0).clamp(0.8, 1.8);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: AppShadows.card,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Dismissible(
+          key: ValueKey('group_${widget.group['id']}'),
+          direction: DismissDirection.horizontal,
+          onUpdate: (details) {
+            if (details.reached && !details.previousReached) {
+              HapticFeedback.vibrate();
+            }
+            setState(() {
+              _swipeProgress = details.progress;
+            });
+          },
+          background: Container( // Swipe right (startToEnd) -> Delete
+            alignment: Alignment.centerLeft,
+            padding: const EdgeInsets.only(left: 20),
+            color: AppColors.dark,
+            child: Transform.scale(
+              scale: iconScale,
+              child: const Icon(Icons.delete, color: AppColors.accent),
+            ),
+          ),
+          secondaryBackground: Container( // Swipe left (endToStart) -> Edit
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.only(right: 20),
+            color: AppColors.accent,
+            child: Transform.scale(
+              scale: iconScale,
+              child: const Icon(Icons.edit, color: AppColors.dark),
+            ),
+          ),
+          confirmDismiss: (direction) async {
+            if (!widget.canEditDelete) {
+              HapticFeedback.vibrate();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Only the group creator can edit or delete the group.')),
+              );
+              return false;
+            }
+            if (direction == DismissDirection.startToEnd) {
+              widget.onDelete();
+              return false; // we handle deletion through the callback
+            } else if (direction == DismissDirection.endToStart) {
+              widget.onEdit();
+              return false;
+            }
+            return false;
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              border: Border.all(color: AppColors.border.withOpacity(0.1)),
+            ),
+            child: InkWell(
+              onTap: widget.onTap,
+              child: widget.child,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

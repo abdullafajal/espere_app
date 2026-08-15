@@ -172,6 +172,9 @@ class TransactionListScreenState extends State<TransactionListScreen> {
   void _toggleAll() {
     setState(() {
       _showAll = !_showAll;
+      if (!_showAll) {
+        _currentMonth = DateTime.now();
+      }
       _isLoading = true;
       _transactions = [];
     });

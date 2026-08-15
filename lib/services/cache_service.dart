@@ -289,7 +289,27 @@ class CacheService {
       }).toList();
 
       for (var item in unsynced) {
-        if (!newList.any((b) => b['id'] == item['id'])) {
+        bool exists = newList.any((b) {
+          if (b['id'].toString() == item['id'].toString()) return true;
+          
+          double amt1 = double.tryParse(b['amount'].toString()) ?? 0;
+          double amt2 = double.tryParse(item['amount'].toString()) ?? 0;
+          bool amountMatch = (amt1 - amt2).abs() < 0.01;
+          
+          bool categoryMatch = b['category']?['id'] == item['category']?['id'];
+          bool monthMatch = false;
+          final d1 = DateTime.tryParse(b['month'].toString());
+          final d2 = DateTime.tryParse(item['month'].toString());
+          if (d1 != null && d2 != null) {
+            monthMatch = d1.year == d2.year && d1.month == d2.month;
+          } else {
+            monthMatch = b['month'] == item['month'];
+          }
+          
+          return amountMatch && categoryMatch && monthMatch;
+        });
+
+        if (!exists) {
           newList.insert(0, item);
         }
       }
@@ -444,6 +464,16 @@ class CacheService {
       'budgets': list,
       'currency_symbol': cached['currency_symbol'],
     });
+  }
+
+  /// Remove a budget from the local cache immediately without merging
+  static Future<void> removeBudgetFromCache(int id) async {
+    final cached = await getCachedBudgets();
+    if (cached == null) return;
+    final list = List<Map<String, dynamic>>.from(cached['budgets'] ?? []);
+    list.removeWhere((b) => b['id'] == id);
+    cached['budgets'] = list;
+    await _write(_budgetsKey, cached);
   }
 
   /// Update an existing budget in the local cache immediately

@@ -32,6 +32,7 @@ class _S extends State<SplitGroupDetailScreen>
   bool _isPending = false;
   late TabController _tc;
   int? _myId;
+  String _currencySymbol = '₹';
 
   @override
   void initState() {
@@ -47,11 +48,36 @@ class _S extends State<SplitGroupDetailScreen>
   }
 
   Future<void> _load() async {
-    setState(() => _ld = true);
+    final cached = await CacheService.getCachedUser();
+    if (cached != null) {
+      _myId = cached['id'];
+      _currencySymbol = cached['currency_symbol'] as String? ?? '₹';
+    }
+
+    if (_g == null) {
+      final cachedGroups = await CacheService.getCachedSplitGroups();
+      if (cachedGroups != null) {
+        final group = cachedGroups.firstWhere((g) => g['id'] == widget.groupId, orElse: () => <String, dynamic>{});
+        if (group.isNotEmpty) {
+          setState(() {
+            _g = Map<String, dynamic>.from(group);
+            _g!['recent_expenses'] ??= [];
+            _g!['balances'] ??= [];
+            _g!['settlement_history'] ??= [];
+            _g!['members'] ??= [];
+            _ld = false;
+          });
+        }
+      }
+    }
+
+    if (_g == null) {
+      setState(() => _ld = true);
+    }
     
-    // Fetch profile to know who "I" am
+    // Fetch profile silently
     final pr = await ApiService.getProfile();
-    if (pr.isSuccess) {
+    if (pr.isSuccess && mounted) {
       _myId = pr.data?.id;
     }
 
@@ -433,19 +459,10 @@ class _S extends State<SplitGroupDetailScreen>
     );
   }
 
-  void _showExpenseDetail(Map<String, dynamic> e) async {
-    _showLoading(context);
-    final r = await ApiService.getSplitExpenseDetail(widget.groupId, e['id']);
-    if (!mounted) return;
-    Navigator.pop(context); // Close loading
-
-    if (!r.isSuccess) {
-      _showTopMessage(r.error ?? 'Failed to load details', isError: true);
-      return;
-    }
-
-    final detail = r.data!;
-    final splits = List<Map<String, dynamic>>.from(detail['splits'] ?? []);
+  void _showExpenseDetail(Map<String, dynamic> e) {
+    bool isLoading = true;
+    Map<String, dynamic>? detail;
+    bool fetchStarted = false;
 
     showModalBottomSheet(
       context: context,
@@ -454,113 +471,161 @@ class _S extends State<SplitGroupDetailScreen>
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
       ),
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.muted.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Row(
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, ss) {
+          
+          void fetchDetail() async {
+            final r = await ApiService.getSplitExpenseDetail(widget.groupId, e['id']);
+            if (mounted && ctx.mounted) {
+              ss(() {
+                isLoading = false;
+                if (r.isSuccess) {
+                  detail = r.data;
+                }
+              });
+            }
+          }
+          
+          if (!fetchStarted) {
+            fetchStarted = true;
+            fetchDetail();
+          }
+          
+          final displayDesc = detail?['description'] ?? e['description'] ?? '';
+          final displayAmount = detail?['amount'] ?? e['amount'] ?? '';
+          final displayDate = detail?['date'] ?? e['date'] ?? '';
+          
+          var paidBy = <String, dynamic>{};
+          if (detail?['paid_by'] is Map) {
+            paidBy = detail!['paid_by'];
+          } else if (e['paid_by'] is Map) {
+            paidBy = e['paid_by'];
+          }
+
+          final splits = List<Map<String, dynamic>>.from(detail?['splits'] ?? []);
+          final creatorId = detail?['created_by_id'] ?? e['created_by_id'];
+
+          return Container(
+            padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          detail['description'] ?? '',
-                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.text),
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppColors.muted.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      UserAvatar(
+                        initial: paidBy['display_name'] ?? paidBy['username'] ?? '?',
+                        avatarUrl: paidBy['avatar_url'],
+                        size: 48,
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              displayDesc,
+                              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.text),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Paid by ${paidBy['display_name'] ?? paidBy['username']} • ${displayDate != '' ? DateFormat('MMM d, yyyy').format(DateTime.parse(displayDate).toLocal()) : ''}',
+                              style: const TextStyle(fontSize: 12, color: AppColors.muted),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Paid by ${detail['paid_by']['display_name']} • ${DateFormat('MMM d, yyyy').format(DateTime.parse(detail['date']).toLocal())}',
-                          style: const TextStyle(fontSize: 12, color: AppColors.muted),
+                      ),
+                      Text(
+                        '${_currencySymbol}$displayAmount',
+                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.text),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 32),
+                  const Text(
+                    'Splits',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.muted),
+                  ),
+                  const SizedBox(height: 16),
+                  if (isLoading)
+                    const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator(color: AppColors.accent)))
+                  else if (splits.isEmpty)
+                    const Text('No splits found', style: TextStyle(color: AppColors.muted))
+                  else
+                    ...splits.map((s) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Row(
+                        children: [
+                           UserAvatar(
+                             initial: s['display_name'] ?? '?',
+                             avatarUrl: s['avatar_url'],
+                             size: 28,
+                             borderRadius: 8,
+                           ),
+                           const SizedBox(width: 12),
+                           Expanded(
+                             child: Text(s['display_name'] ?? '', style: const TextStyle(fontSize: 14, color: AppColors.text)),
+                           ),
+                           Text('${_currencySymbol}${s['amount']}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.text)),
+                        ],
+                      ),
+                    )).toList(),
+                  if (!isLoading && _myId == creatorId) ...[
+                    const SizedBox(height: 32),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.text,
+                              foregroundColor: AppColors.accent,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              _addExpense(editData: detail);
+                            },
+                            child: const Text('Edit', style: TextStyle(fontWeight: FontWeight.w700)),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.accent,
+                              foregroundColor: AppColors.dark,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            ),
+                            onPressed: () => _confirmDeleteExpense(detail!['id']),
+                            child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.w700)),
+                          ),
                         ),
                       ],
                     ),
-                  ),
-                  Text(
-                    '₹${detail['amount']}',
-                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.text),
-                  ),
+                  ],
                 ],
               ),
-              const SizedBox(height: 32),
-              const Text(
-                'Splits',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.muted),
-              ),
-              const SizedBox(height: 16),
-              ...splits.map((s) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Row(
-                  children: [
-                     UserAvatar(
-                       initial: s['display_name'],
-                       size: 28,
-                       borderRadius: 8,
-                     ),
-                     const SizedBox(width: 12),
-                     Expanded(
-                       child: Text(s['display_name'], style: const TextStyle(fontSize: 14, color: AppColors.text)),
-                     ),
-                     Text('₹${s['amount']}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.text)),
-                  ],
-                ),
-              )).toList(),
-              if (_myId == detail['created_by_id']) ...[
-                const SizedBox(height: 32),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.text,
-                          foregroundColor: AppColors.accent,
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          _addExpense(editData: detail);
-                        },
-                        child: const Text('Edit', style: TextStyle(fontWeight: FontWeight.w700)),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.accent,
-                          foregroundColor: AppColors.dark,
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        ),
-                        onPressed: () => _confirmDeleteExpense(detail['id']),
-                        child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.w700)),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -658,7 +723,7 @@ class _S extends State<SplitGroupDetailScreen>
                   label: 'Amount',
                   hint: '0.00',
                   controller: ac,
-                  prefixText: '₹',
+                  prefixText: '${_currencySymbol}',
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   autofocus: editData == null,
                   errorText: amountErr,
@@ -736,7 +801,7 @@ class _S extends State<SplitGroupDetailScreen>
                 else
                   ...members.map((m) {
                     final uid = m['id'] as int;
-                    final label = splitType == 'percentage' ? '%' : '₹';
+                    final label = splitType == 'percentage' ? '%' : '${_currencySymbol}';
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: Container(
@@ -837,7 +902,7 @@ class _S extends State<SplitGroupDetailScreen>
                           sum += val;
                         }
                         if ((sum - totalAmount).abs() > 0.01) {
-                          ss(() => splitErr = 'Total split (₹${sum.toStringAsFixed(2)}) must match expense (₹${totalAmount.toStringAsFixed(2)})');
+                          ss(() => splitErr = 'Total split (${_currencySymbol}${sum.toStringAsFixed(2)}) must match expense (${_currencySymbol}${totalAmount.toStringAsFixed(2)})');
                           return;
                         }
                       } else if (splitType == 'percentage') {
@@ -966,7 +1031,7 @@ class _S extends State<SplitGroupDetailScreen>
                       ),
                     ),
                     Text(
-                      '₹${d['amount']}',
+                      '${_currencySymbol}${d['amount']}',
                       style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.text),
                     ),
                   ],
@@ -977,7 +1042,7 @@ class _S extends State<SplitGroupDetailScreen>
                 label: 'Amount Paid',
                 hint: '0.00',
                 controller: ac,
-                prefixText: '₹',
+                prefixText: '${_currencySymbol}',
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
               ),
               const SizedBox(height: 20),
@@ -1016,6 +1081,7 @@ class _S extends State<SplitGroupDetailScreen>
                           ss(() => isSaving = true);
                           final body = {
                             'paid_to_id': d['to_user_id'],
+                            'paid_by_id': d['from_user_id'],
                             'amount': ac.text.trim(),
                           };
 
@@ -1151,15 +1217,15 @@ class _S extends State<SplitGroupDetailScreen>
                                     const Text('Your Net Balance', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0x99FFFFFF))),
                                     const SizedBox(height: 4),
                                     Text(
-                                      '${bal > 0 ? "+" : ""}₹${bal.abs().toStringAsFixed(2)}',
+                                      '${bal > 0 ? "+" : ""}${_currencySymbol}${bal.abs().toStringAsFixed(2)}',
                                       style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.accent),
                                     ),
                                     const SizedBox(height: 12),
                                     Row(
                                       children: [
-                                        _sc(Icons.arrow_upward, 'Paid: ₹0'),
+                                        _sc(Icons.arrow_upward, 'Paid: ${_currencySymbol}0'),
                                         const SizedBox(width: 12),
-                                        _sc(Icons.pie_chart, 'Share: ₹0'),
+                                        _sc(Icons.pie_chart, 'Share: ${_currencySymbol}0'),
                                       ],
                                     ),
                                     const SizedBox(height: 16),
@@ -1354,7 +1420,7 @@ class _S extends State<SplitGroupDetailScreen>
 
   Widget _expTab() {
     final l = List<Map<String, dynamic>>.from(_g!['recent_expenses'] ?? []);
-    if (l.isEmpty)
+    if (l.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -1368,6 +1434,7 @@ class _S extends State<SplitGroupDetailScreen>
           ],
         ),
       );
+    }
     return RefreshIndicator(
       onRefresh: _load,
       color: AppColors.accent,
@@ -1378,7 +1445,10 @@ class _S extends State<SplitGroupDetailScreen>
           final e = l[i];
           final dt = DateTime.tryParse(e['date'] ?? '');
           final f = dt != null ? DateFormat('MMM d').format(dt.toLocal()) : '';
-          return GestureDetector(
+          final creatorId = e['created_by_id'];
+          final canEdit = _myId != null && creatorId == _myId;
+          
+          Widget card = GestureDetector(
             onTap: () => _showExpenseDetail(e),
             child: Container(
               margin: const EdgeInsets.only(bottom: 8),
@@ -1388,67 +1458,105 @@ class _S extends State<SplitGroupDetailScreen>
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: AppShadows.card,
               ),
-            child: Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: AppColors.accent,
-                    borderRadius: BorderRadius.circular(12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: AppColors.accent,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.receipt_long,
+                      size: 22,
+                      color: AppColors.dark,
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.receipt_long,
-                    size: 22,
-                    color: AppColors.dark,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        e['description'] ?? '',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.text,
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          e['description'] ?? '',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.text,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        f,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.muted,
+                        Text(
+                          f,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.muted,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                Text(
-                  '₹${e['amount']}',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.text,
+                  Text(
+                    '${_currencySymbol}${e['amount']}',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.text,
+                    ),
                   ),
-                ),
-                const Icon(
-                  Icons.chevron_right,
-                  size: 18,
-                  color: AppColors.muted,
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  const Icon(
+                    Icons.chevron_right,
+                    size: 18,
+                    color: AppColors.muted,
+                  ),
+                ],
+              ),
             ),
-          ),
-        );
-      },
-    ),
-  );
-}
+          );
+
+          if (canEdit) {
+            return _SwipeableTile(
+              dismissKey: ValueKey('exp_${e['id']}'),
+              direction: DismissDirection.horizontal,
+              confirmDismiss: (direction) async {
+                if (direction == DismissDirection.startToEnd) {
+                  // Delete
+                  _confirmDeleteExpense(e['id']);
+                  return false;
+                } else if (direction == DismissDirection.endToStart) {
+                  // Edit
+                  _showLoading(context);
+                  final r = await ApiService.getSplitExpenseDetail(widget.groupId, e['id']);
+                  if (!mounted) return false;
+                  Navigator.pop(context); // Close loading
+                  if (r.isSuccess) {
+                    _addExpense(editData: r.data);
+                  } else {
+                    _showTopMessage(r.error ?? 'Failed to load expense details', isError: true);
+                  }
+                  return false;
+                }
+                return false;
+              },
+              bgIcon: Icons.delete,
+              bgColor: AppColors.dark,
+              bgIconColor: AppColors.accent,
+              bgAlignment: Alignment.centerLeft,
+              secBgIcon: Icons.edit,
+              secBgColor: AppColors.accent,
+              secBgIconColor: AppColors.dark,
+              secBgAlignment: Alignment.centerRight,
+              child: card,
+            );
+          }
+          return card;
+        },
+      ),
+    );
+  }
 
   Widget _balTab() {
     final m = List<Map<String, dynamic>>.from(_g!['members'] ?? []);
@@ -1486,7 +1594,7 @@ class _S extends State<SplitGroupDetailScreen>
             final isSelf = _myId != null && _myId == x['id'];
             final canRemove = isSettled && (isOwner || isSelf);
 
-            return Container(
+            Widget memberCard = Container(
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
@@ -1516,7 +1624,7 @@ class _S extends State<SplitGroupDetailScreen>
                         ),
                         if (b > 0)
                           Text(
-                            'Gets back ₹${b.toStringAsFixed(2)}',
+                            'Gets back ${_currencySymbol}${b.toStringAsFixed(2)}',
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w500,
@@ -1525,7 +1633,7 @@ class _S extends State<SplitGroupDetailScreen>
                           )
                         else if (b < 0)
                           Text(
-                            'To pay ₹${b.abs().toStringAsFixed(2)}',
+                            'To pay ${_currencySymbol}${b.abs().toStringAsFixed(2)}',
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w500,
@@ -1543,17 +1651,8 @@ class _S extends State<SplitGroupDetailScreen>
                       ],
                     ),
                   ),
-                  // Member specific actions
-                  if (canRemove)
-                    IconButton(
-                      onPressed: () => _removeMember(x),
-                      icon: const Icon(
-                        Icons.person_remove_outlined,
-                        size: 18,
-                        color: AppColors.muted,
-                      ),
-                    )
-                  else if (!isSettled)
+                  // Lock icon if can't be removed
+                  if (!isSettled)
                      Icon(
                       Icons.lock_outline,
                       size: 16,
@@ -1562,6 +1661,24 @@ class _S extends State<SplitGroupDetailScreen>
                 ],
               ),
             );
+
+            if (canRemove) {
+              return _SwipeableTile(
+                dismissKey: ValueKey('member_${x['id']}'),
+                direction: DismissDirection.endToStart,
+                confirmDismiss: (direction) async {
+                  _removeMember(x);
+                  return false;
+                },
+                bgIcon: Icons.person_remove,
+                bgColor: AppColors.dark,
+                bgIconColor: AppColors.accent,
+                bgAlignment: Alignment.centerRight,
+                child: memberCard,
+              );
+            }
+            
+            return memberCard;
           }),
         ],
       ),
@@ -1733,7 +1850,7 @@ class _S extends State<SplitGroupDetailScreen>
                           ),
                         ),
                         Text(
-                          '₹${x['amount']}',
+                          '${_currencySymbol}${x['amount']}',
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w900,
@@ -1752,7 +1869,7 @@ class _S extends State<SplitGroupDetailScreen>
                             child: ElevatedButton(
                               onPressed: () async {
                                 final msg =
-                                    "Hi ${x['from_user']},\n\nJust a quick reminder regarding your balance of ₹${x['amount']} in '${widget.groupName}'.\n\nPlease settle up when you can!";
+                                    "Hi ${x['from_user']},\n\nJust a quick reminder regarding your balance of ${_currencySymbol}${x['amount']} in '${widget.groupName}'.\n\nPlease settle up when you can!";
                                 await Share.share(
                                   msg,
                                   subject:
@@ -1869,13 +1986,13 @@ class _S extends State<SplitGroupDetailScreen>
                       width: 36,
                       height: 36,
                       decoration: const BoxDecoration(
-                        color: AppColors.successLight,
+                        color: AppColors.accent,
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
                         Icons.handshake,
                         size: 18,
-                        color: AppColors.success,
+                        color: AppColors.dark,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -1902,11 +2019,11 @@ class _S extends State<SplitGroupDetailScreen>
                       ),
                     ),
                     Text(
-                      '₹${x['amount']}',
+                      '${_currencySymbol}${x['amount']}',
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.success,
+                        color: AppColors.text,
                       ),
                     ),
                   ],
@@ -1937,4 +2054,97 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(_SliverAppBarDelegate oldDelegate) => false;
+}
+
+class _SwipeableTile extends StatefulWidget {
+  final Key dismissKey;
+  final DismissDirection direction;
+  final Future<bool?> Function(DismissDirection) confirmDismiss;
+  final Widget child;
+  
+  final IconData? bgIcon;
+  final Color? bgColor;
+  final Color? bgIconColor;
+  final Alignment? bgAlignment;
+  
+  final IconData? secBgIcon;
+  final Color? secBgColor;
+  final Color? secBgIconColor;
+  final Alignment? secBgAlignment;
+
+  const _SwipeableTile({
+    required this.dismissKey,
+    required this.direction,
+    required this.confirmDismiss,
+    required this.child,
+    this.bgIcon,
+    this.bgColor,
+    this.bgIconColor,
+    this.bgAlignment,
+    this.secBgIcon,
+    this.secBgColor,
+    this.secBgIconColor,
+    this.secBgAlignment,
+  });
+
+  @override
+  State<_SwipeableTile> createState() => _SwipeableTileState();
+}
+
+class _SwipeableTileState extends State<_SwipeableTile> {
+  double _swipeProgress = 0.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final double iconScale = (_swipeProgress * 4.0).clamp(0.8, 1.8);
+
+    Widget? bg;
+    if (widget.bgIcon != null) {
+      bg = Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: widget.bgColor,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        alignment: widget.bgAlignment ?? Alignment.centerLeft,
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Transform.scale(
+          scale: iconScale,
+          child: Icon(widget.bgIcon, color: widget.bgIconColor),
+        ),
+      );
+    }
+
+    Widget? secBg;
+    if (widget.secBgIcon != null) {
+      secBg = Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: widget.secBgColor,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        alignment: widget.secBgAlignment ?? Alignment.centerRight,
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Transform.scale(
+          scale: iconScale,
+          child: Icon(widget.secBgIcon, color: widget.secBgIconColor),
+        ),
+      );
+    }
+
+    return Dismissible(
+      key: widget.dismissKey,
+      direction: widget.direction,
+      onUpdate: (details) {
+        if (details.reached && !details.previousReached) {
+          HapticFeedback.vibrate();
+        }
+        setState(() => _swipeProgress = details.progress);
+      },
+      confirmDismiss: widget.confirmDismiss,
+      background: bg,
+      secondaryBackground: secBg,
+      child: widget.child,
+    );
+  }
 }

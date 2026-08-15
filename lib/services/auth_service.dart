@@ -34,7 +34,7 @@ class AuthService {
     final prefs = await SharedPreferences.getInstance();
     // Default to local Django dev server
     // Change this to your production URL (e.g., https://espere.in)
-    return prefs.getString(_baseUrlKey) ?? 'http://10.0.2.2:8000';
+    return prefs.getString(_baseUrlKey) ?? 'https://montra.pythonanywhere.com';
   }
 
   /// Set base URL for API

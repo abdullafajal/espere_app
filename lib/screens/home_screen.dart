@@ -8,7 +8,7 @@ import '../widgets/bottom_nav_bar.dart';
 import 'dashboard_screen.dart';
 import 'transaction_list_screen.dart';
 import 'budgets_screen.dart';
-import 'savings_screen.dart';
+import 'friends_screen.dart';
 import 'split_groups_screen.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
@@ -28,7 +28,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final _dashboardKey = GlobalKey<DashboardScreenState>();
   final _transactionListKey = GlobalKey<TransactionListScreenState>();
   final _budgetsKey = GlobalKey<BudgetsScreenState>();
-  final _savingsKey = GlobalKey<SavingsScreenState>();
+  final _friendsKey = GlobalKey<FriendsScreenState>();
   final _splitGroupsKey = GlobalKey<SplitGroupsScreenState>();
 
   late final List<Widget> _screens;
@@ -56,8 +56,8 @@ class _HomeScreenState extends State<HomeScreen> {
         key: _budgetsKey,
         onBack: () => setState(() => _currentIndex = 0)
       ),
-      SavingsScreen(
-        key: _savingsKey,
+      FriendsScreen(
+        key: _friendsKey,
         onBack: () => setState(() => _currentIndex = 0),
       ),
       SplitGroupsScreen(
@@ -87,7 +87,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _budgetsKey.currentState?.reload();
         break;
       case 3:
-        _savingsKey.currentState?.reload();
+        _friendsKey.currentState?.reload();
         break;
       case 4:
         _splitGroupsKey.currentState?.reload();

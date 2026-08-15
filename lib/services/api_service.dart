@@ -185,6 +185,55 @@ class ApiService {
     }
   }
 
+  /// Change user password
+  static Future<ApiResult> changePassword(String oldPassword, String newPassword) async {
+    try {
+      final url = await _url('/api/auth/password/change/');
+      final response = await http.post(
+        Uri.parse(url),
+        headers: await _headers(),
+        body: jsonEncode({
+          'old_password': oldPassword,
+          'new_password': newPassword,
+        }),
+      );
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResult(data: data['message']);
+      }
+      return ApiResult(error: data['error'] ?? 'Failed to change password.');
+    } catch (e) {
+      return ApiResult(error: 'Connection error.');
+    }
+  }
+
+  /// Upload Avatar
+  static Future<ApiResult<UserModel>> uploadAvatar(String imagePath) async {
+    try {
+      final url = await _url('/api/auth/profile/avatar/');
+      final token = await AuthService.getToken();
+      
+      var request = http.MultipartRequest('POST', Uri.parse(url));
+      if (token != null) {
+        request.headers['Authorization'] = 'Bearer $token';
+      }
+      
+      request.files.add(await http.MultipartFile.fromPath('image', imagePath));
+      
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+      
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResult(data: UserModel.fromJson(data['user']));
+      }
+      return ApiResult(error: data['error'] ?? 'Failed to upload avatar.');
+    } catch (e) {
+      return ApiResult(error: 'Connection error.');
+    }
+  }
+
   /// ─── Dashboard ─────────────────────────────────────────────────────────
 
   static Future<ApiResult<DashboardData>> getDashboard() async {
@@ -445,7 +494,7 @@ class ApiService {
     try {
       final url = await _url('/api/budgets/$id/');
       final response = await http.delete(Uri.parse(url), headers: await _headers());
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 || response.statusCode == 404) {
         return ApiResult(data: null);
       }
       final data = jsonDecode(response.body);
@@ -867,13 +916,32 @@ class ApiService {
   }
 
   /// Take action on a friend request
-  static Future<ApiResult<void>> handleFriendRequest(int requestId, String action) async {
+  static Future<ApiResult<void>> handleFriendRequest(dynamic requestId, String action) async {
     try {
       final url = await _url('/api/split/friends/action/');
       final response = await http.post(
         Uri.parse(url),
         headers: await _headers(),
         body: jsonEncode({'request_id': requestId, 'action': action}),
+      );
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResult(data: null);
+      }
+      return ApiResult(error: data['error'] ?? 'Failed to process request.');
+    } catch (e) {
+      return ApiResult(error: 'Connection error.');
+    }
+  }
+
+  /// Remove a friend
+  static Future<ApiResult<void>> removeFriend(int friendId) async {
+    try {
+      final url = await _url('/api/split/friends/action/');
+      final response = await http.post(
+        Uri.parse(url),
+        headers: await _headers(),
+        body: jsonEncode({'action': 'remove', 'friend_id': friendId}),
       );
       final data = jsonDecode(response.body);
       if (response.statusCode == 200) {

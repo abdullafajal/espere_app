@@ -31,7 +31,7 @@ class UserModel {
   }
 
   /// First character for avatar initials
-  String get initials => username.isNotEmpty ? username[0].toUpperCase() : '?';
+  String get initials => displayName.isNotEmpty ? displayName[0].toUpperCase() : '?';
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(

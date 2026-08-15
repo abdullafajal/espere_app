@@ -10,6 +10,7 @@ import '../widgets/espere_input.dart';
 import '../utils/app_toast.dart';
 import '../utils/icon_mapper.dart';
 import '../models/category.dart';
+import '../widgets/budget_tile.dart';
 
 class BudgetsScreen extends StatefulWidget {
   final VoidCallback? onBack;
@@ -41,12 +42,15 @@ class BudgetsScreenState extends State<BudgetsScreen> {
   }
 
   Future<void> _loadBudgets() async {
-    // 1. Always check cache first to show optimistic updates
     final cached = await CacheService.getCachedBudgets();
     if (cached != null && mounted) {
       final List list = cached['budgets'] ?? [];
+      final currentMonthStr = "${_currentMonth.year}-${_currentMonth.month.toString().padLeft(2, '0')}";
       setState(() {
-        _budgets = List<Map<String, dynamic>>.from(list)
+        _budgets = List<Map<String, dynamic>>.from(list).where((b) {
+          if (b['month'] == null) return true;
+          return b['month'].toString().startsWith(currentMonthStr);
+        }).toList()
           ..sort((a, b) {
             int cmp = (a['name'] ?? '').compareTo(b['name'] ?? '');
             if (cmp != 0) return cmp;
@@ -92,6 +96,7 @@ class BudgetsScreenState extends State<BudgetsScreen> {
             budget: budget,
             currencySymbol: _currencySymbol,
             categories: _categories,
+            currentMonth: _currentMonth,
             onSuccess: _loadBudgets,
           ),
     );
@@ -139,15 +144,7 @@ class BudgetsScreenState extends State<BudgetsScreen> {
       );
 
       // Remove from cache
-      final cached = await CacheService.getCachedBudgets();
-      if (cached != null) {
-        final list = List<Map<String, dynamic>>.from(cached['budgets'] ?? []);
-        list.removeWhere((b) => b['id'] == id);
-        await CacheService.cacheBudgets({
-          'budgets': list,
-          'currency_symbol': cached['currency_symbol'],
-        });
-      }
+      await CacheService.removeBudgetFromCache(id);
 
       setState(() {
         _budgets.removeWhere((b) => b['id'] == id);
@@ -253,7 +250,7 @@ class BudgetsScreenState extends State<BudgetsScreen> {
             boxShadow: AppShadows.soft,
           ),
           child: Row(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               GestureDetector(
                 onTap: _prevMonth,
@@ -367,189 +364,11 @@ class BudgetsScreenState extends State<BudgetsScreen> {
                       itemCount: _budgets.length,
                       itemBuilder: (context, index) {
                         final budget = _budgets[index];
-                        final isExceeded = budget['is_exceeded'] == true;
-                        final pct =
-                            double.tryParse(budget['percentage'].toString()) ??
-                            0;
-                        final category = budget['category'];
-                        final categoryColor = _parseColor(category['color']);
-
-                        return AnimatedContainer(
-                          duration: const Duration(milliseconds: 150),
-                          margin: const EdgeInsets.only(bottom: 16),
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: AppColors.card,
-                            borderRadius: BorderRadius.circular(AppRadius.xxl),
-                            boxShadow: AppShadows.card,
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Header row
-                              Row(
-                                children: [
-                                  Container(
-                                    width: 44,
-                                    height: 44,
-                                    decoration: BoxDecoration(
-                                      color: categoryColor,
-                                      borderRadius: BorderRadius.circular(
-                                        AppRadius.md,
-                                      ),
-                                    ),
-                                    child: Icon(
-                                      IconMapper.map(category['icon']),
-                                      color: AppColors.dark,
-                                      size: 24,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          category['name'] ?? 'Category',
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 14,
-                                            color: AppColors.text,
-                                          ),
-                                        ),
-                                        Text(
-                                          DateFormat('MMMM yyyy').format(
-                                            DateTime.parse(budget['month']),
-                                          ),
-                                          style: const TextStyle(
-                                            color: AppColors.muted,
-                                            fontSize: 11,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Row(
-                                    children: [
-                                      GestureDetector(
-                                        onTap: () => _showBudgetForm(budget),
-                                        child: const Icon(
-                                          Icons.edit_outlined,
-                                          size: 18,
-                                          color: AppColors.muted,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      GestureDetector(
-                                        onTap:
-                                            () => _deleteBudget(budget['id']),
-                                        child: const Icon(
-                                          Icons.delete_outline,
-                                          size: 18,
-                                          color: AppColors.muted,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-
-                              // Progress info
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    '$_currencySymbol${budget['spent']} spent',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  Text(
-                                    '${pct.toStringAsFixed(0)}%',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12,
-                                      color:
-                                          isExceeded
-                                              ? categoryColor
-                                              : AppColors.text,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 10),
-                              LinearProgressIndicator(
-                                value: (pct / 100).clamp(0.0, 1.0),
-                                backgroundColor: AppColors.surface,
-                                color:
-                                    isExceeded
-                                        ? categoryColor
-                                        : AppColors.accent,
-                                minHeight: 10,
-                                borderRadius: BorderRadius.circular(5),
-                              ),
-                              const SizedBox(height: 10),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text(
-                                    'Spent so far',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: AppColors.muted,
-                                    ),
-                                  ),
-                                  Text(
-                                    'Limit: $_currencySymbol${budget['amount']}',
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      color: AppColors.muted,
-                                    ),
-                                  ),
-                                ],
-                              ),
-
-                              // Warning message
-                              if (isExceeded) ...[
-                                const SizedBox(height: 16),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 8,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.dark,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.warning_amber_rounded,
-                                        size: 16,
-                                        color: categoryColor,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          "You've exceeded your budget limit!",
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                            color: categoryColor,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
+                        return BudgetTile(
+                          budget: budget,
+                          currencySymbol: _currencySymbol,
+                          onEdit: () => _showBudgetForm(budget),
+                          onDelete: () => _deleteBudget(budget['id']),
                         );
                       },
                     ),
@@ -564,12 +383,14 @@ class _BudgetFormSheet extends StatefulWidget {
   final Map<String, dynamic>? budget;
   final String currencySymbol;
   final List<Map<String, dynamic>> categories;
+  final DateTime currentMonth;
   final VoidCallback onSuccess;
 
   const _BudgetFormSheet({
     this.budget,
     required this.currencySymbol,
     required this.categories,
+    required this.currentMonth,
     required this.onSuccess,
   });
 
@@ -648,7 +469,7 @@ class _BudgetFormSheetState extends State<_BudgetFormSheet> {
     final data = {
       'category_id': _selectedCategoryId,
       'amount': _amountController.text,
-      'month': DateFormat('yyyy-MM-dd').format(DateTime.now()),
+      'month': DateFormat('yyyy-MM-dd').format(DateTime(widget.currentMonth.year, widget.currentMonth.month, 1)),
     };
 
     // Always queue creation/update

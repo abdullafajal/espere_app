@@ -24,7 +24,7 @@ class EspereBottomNav extends StatelessWidget {
     _NavItem(Icons.home_outlined, Icons.home_outlined, 'Home'),
     _NavItem(Icons.swap_horiz, Icons.swap_horiz, 'Activity'),
     _NavItem(Icons.wallet_outlined, Icons.wallet, 'Budgets'),
-    _NavItem(Icons.track_changes, Icons.track_changes, 'Savings'),
+    _NavItem(Icons.group_outlined, Icons.group, 'Friends'),
     _NavItem(Icons.call_split, Icons.call_split, 'Split'),
   ];
 

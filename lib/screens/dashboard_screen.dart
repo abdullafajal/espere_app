@@ -66,7 +66,12 @@ class DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _loadDashboard() async {
     final cached = await CacheService.getCachedDashboard();
+    final cachedUser = await CacheService.getCachedUser();
+    
     if (cached != null && mounted) {
+      if (cachedUser != null) {
+        cached['user'] = cachedUser;
+      }
       final d = DashboardData.fromJson(cached);
       setState(() {
         _data = d;
@@ -258,7 +263,10 @@ class DashboardScreenState extends State<DashboardScreen> {
                     ],
                   ),
                   GestureDetector(
-                    onTap: () => Navigator.pushNamed(context, '/profile'),
+                    onTap: () async {
+                      await Navigator.pushNamed(context, '/profile');
+                      if (mounted) _loadDashboard();
+                    },
                     child: Container(
                       width: 48,
                       height: 48,

@@ -8,15 +8,18 @@ import '../services/sync_service.dart';
 import '../widgets/user_avatar.dart';
 import 'split_group_detail_screen.dart';
 import '../widgets/icon_color_picker.dart';
+import 'package:share_plus/share_plus.dart';
 
 class FriendsScreen extends StatefulWidget {
-  const FriendsScreen({super.key});
+  final VoidCallback? onBack;
+
+  const FriendsScreen({super.key, this.onBack});
 
   @override
-  State<FriendsScreen> createState() => _FriendsScreenState();
+  State<FriendsScreen> createState() => FriendsScreenState();
 }
 
-class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderStateMixin {
+class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool _isLoading = true;
   List<Map<String, dynamic>> _friends = [];
@@ -57,6 +60,24 @@ class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProvider
         _groupInvitations = invitationsResult.data!;
       }
     });
+  }
+
+  void reload() => _loadData();
+
+  Future<void> _removeFriend(int friendId, String name) async {
+    final res = await ApiService.removeFriend(friendId);
+    if (!mounted) return;
+    
+    if (res.isSuccess) {
+      setState(() {
+        _friends.removeWhere((f) => f['id'] == friendId);
+        _selectedFriendIds.remove(friendId);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$name removed from friends.')));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res.error ?? 'Failed to remove friend.')));
+      _loadData(); // Refresh to restore UI
+    }
   }
 
   void _inviteFriend() {
@@ -109,6 +130,43 @@ class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProvider
                   }
                 },
                 child: const Text('Send Request'),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(child: Container(height: 1, color: AppColors.border)),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Text('OR', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.bold, fontSize: 12)),
+                ),
+                Expanded(child: Container(height: 1, color: AppColors.border)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.share, size: 20),
+                onPressed: () async {
+                  final cachedUser = await CacheService.getCachedUser();
+                  String inviteText = 'Hey! Let\'s split expenses on Espere. Download the app and add me as a friend!';
+                  if (cachedUser != null) {
+                    final username = cachedUser['username'] ?? '';
+                    if (username.isNotEmpty) {
+                      inviteText = 'Hey! Let\'s split expenses on Espere. Add me as a friend: @$username';
+                    }
+                  }
+                  Share.share(inviteText);
+                  if (ctx.mounted) Navigator.pop(ctx);
+                },
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.text,
+                  side: const BorderSide(color: AppColors.border),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                label: const Text('Share Invite Link'),
               ),
             ),
           ],
@@ -265,7 +323,7 @@ class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProvider
     );
   }
 
-  Future<void> _handleFriendAction(int id, String action) async {
+  Future<void> _handleFriendAction(dynamic id, String action) async {
     final r = await ApiService.handleFriendRequest(id, action);
     if (r.isSuccess) {
       HapticFeedback.lightImpact();
@@ -295,25 +353,16 @@ class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProvider
             _buildHeader(),
             _buildTabs(),
             Expanded(
-              child: _isLoading 
-                ? const Center(child: CircularProgressIndicator(color: AppColors.accent))
-                : TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _buildFriendsTab(),
-                      _buildRequestsTab(),
-                    ],
-                  ),
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildFriendsTab(),
+                  _buildRequestsTab(),
+                ],
+              ),
             ),
           ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _inviteFriend,
-        backgroundColor: AppColors.accent,
-        foregroundColor: AppColors.dark,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: const Icon(Icons.person_add_alt_1),
       ),
     );
   }
@@ -324,7 +373,13 @@ class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProvider
       child: Row(
         children: [
           GestureDetector(
-            onTap: () => Navigator.pop(context),
+            onTap: () {
+              if (widget.onBack != null) {
+                widget.onBack!();
+              } else {
+                Navigator.pop(context);
+              }
+            },
             child: Container(
               width: 40,
               height: 40,
@@ -335,12 +390,12 @@ class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProvider
           const SizedBox(width: 12),
           const Expanded(child: Text('Friends', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.text))),
           GestureDetector(
-            onTap: _loadData,
+            onTap: _inviteFriend,
             child: Container(
               width: 40,
               height: 40,
-              decoration: BoxDecoration(color: AppColors.card, borderRadius: BorderRadius.circular(12), boxShadow: AppShadows.soft),
-              child: const Icon(Icons.refresh, color: AppColors.text, size: 18),
+              decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(12), boxShadow: AppShadows.soft),
+              child: const Icon(Icons.add, color: AppColors.dark, size: 20),
             ),
           ),
         ],
@@ -420,54 +475,18 @@ class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProvider
               final f = _friends[i];
               final fid = f['id'] as int;
               final isSelected = _selectedFriendIds.contains(fid);
-              return GestureDetector(
-                onTap: () {
+              return _FriendTile(
+                friendData: f,
+                isSelected: isSelected,
+                onSelectChanged: (selected) {
                   setState(() {
-                    if (isSelected) _selectedFriendIds.remove(fid);
-                    else _selectedFriendIds.add(fid);
+                    if (selected) _selectedFriendIds.add(fid);
+                    else _selectedFriendIds.remove(fid);
                   });
                 },
-                child: Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.card, 
-                    borderRadius: BorderRadius.circular(20), 
-                    boxShadow: AppShadows.card,
-                    border: Border.all(color: isSelected ? AppColors.accent : Colors.transparent, width: 2),
-                  ),
-                  child: Row(
-                    children: [
-                      UserAvatar(
-                        initial: f['initial'] ?? '?', 
-                        avatarUrl: f['avatar_url'],
-                        size: 48,
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(f['display_name'] ?? f['username'] ?? '', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.text)),
-                            Text(f['email'] ?? '', style: const TextStyle(fontSize: 12, color: AppColors.muted)),
-                          ],
-                        ),
-                      ),
-                      Checkbox(
-                        value: isSelected,
-                        onChanged: (v) {
-                          setState(() {
-                            if (v!) _selectedFriendIds.add(fid);
-                            else _selectedFriendIds.remove(fid);
-                          });
-                        },
-                        activeColor: AppColors.accent,
-                        checkColor: AppColors.dark,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                      ),
-                    ],
-                  ),
-                ),
+                onRemove: () {
+                  _removeFriend(fid, f['display_name'] ?? f['username'] ?? 'Friend');
+                },
               );
             },
           ),
@@ -581,6 +600,120 @@ class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProvider
           ] else
             TextButton(onPressed: () => _handleFriendAction(req['id'], 'cancel'), child: const Text('Cancel', style: TextStyle(color: AppColors.muted, fontSize: 12))),
         ],
+      ),
+    );
+  }
+}
+
+class _FriendTile extends StatefulWidget {
+  final Map<String, dynamic> friendData;
+  final bool isSelected;
+  final ValueChanged<bool> onSelectChanged;
+  final VoidCallback onRemove;
+
+  const _FriendTile({
+    required this.friendData,
+    required this.isSelected,
+    required this.onSelectChanged,
+    required this.onRemove,
+  });
+
+  @override
+  State<_FriendTile> createState() => _FriendTileState();
+}
+
+class _FriendTileState extends State<_FriendTile> {
+  double _swipeProgress = 0.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final f = widget.friendData;
+    final fid = f['id'] as int;
+    final double iconScale = (_swipeProgress * 4.0).clamp(0.8, 1.8);
+
+    return Dismissible(
+      key: ValueKey('friend_$fid'),
+      direction: DismissDirection.startToEnd,
+      onUpdate: (details) {
+        if (details.reached && !details.previousReached) {
+          HapticFeedback.vibrate();
+        }
+        setState(() {
+          _swipeProgress = details.progress;
+        });
+      },
+      background: Container(
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.only(left: 20),
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: AppColors.dark,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Transform.scale(
+          scale: iconScale,
+          child: const Icon(Icons.delete, color: AppColors.accent),
+        ),
+      ),
+      confirmDismiss: (direction) async {
+        return await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Text('Remove Friend'),
+            content: Text('Are you sure you want to remove ${f['display_name'] ?? f['username']} from your friends?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel', style: TextStyle(color: AppColors.muted)),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Remove', style: TextStyle(color: AppColors.error)),
+              ),
+            ],
+          ),
+        ) ?? false;
+      },
+      onDismissed: (direction) => widget.onRemove(),
+      child: GestureDetector(
+        onTap: () => widget.onSelectChanged(!widget.isSelected),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.card, 
+            borderRadius: BorderRadius.circular(20), 
+            boxShadow: AppShadows.card,
+            border: Border.all(color: widget.isSelected ? AppColors.accent : Colors.transparent, width: 2),
+          ),
+          child: Row(
+            children: [
+              UserAvatar(
+                initial: f['initial'] ?? '?', 
+                avatarUrl: f['avatar_url'],
+                size: 48,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(f['display_name'] ?? f['username'] ?? '', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.text)),
+                    Text(f['email'] ?? '', style: const TextStyle(fontSize: 12, color: AppColors.muted)),
+                  ],
+                ),
+              ),
+              Checkbox(
+                value: widget.isSelected,
+                onChanged: (v) => widget.onSelectChanged(v ?? false),
+                activeColor: AppColors.accent,
+                checkColor: AppColors.dark,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
