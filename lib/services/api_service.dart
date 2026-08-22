@@ -1081,7 +1081,44 @@ class ApiService {
       final data = jsonDecode(response.body);
       return ApiResult(error: data['error'] ?? 'Failed to handle invitation.');
     } catch (e) {
-      return ApiResult(error: 'Connection error.');
+      return ApiResult(error: 'Network error.');
+    }
+  }
+
+  /// Validate a token-based invitation
+  static Future<ApiResult<Map<String, dynamic>>> validateTokenInvite(String token) async {
+    try {
+      final url = await _url('/api/split/invite/$token/');
+      final response = await http.get(
+        Uri.parse(url),
+        headers: await _headers(auth: false),
+      );
+      final data = jsonDecode(response.body);
+      if (data.containsKey('valid') && data['valid'] == true) {
+        return ApiResult(data: data);
+      }
+      return ApiResult(error: data['error'] ?? 'Invalid or expired invitation link.');
+    } catch (e) {
+      return ApiResult(error: 'Network error.');
+    }
+  }
+
+  /// Accept a token-based invitation
+  static Future<ApiResult<Map<String, dynamic>>> acceptTokenInvite(String token) async {
+    try {
+      final url = await _url('/api/split/invite/$token/');
+      final response = await http.post(
+        Uri.parse(url),
+        headers: await _headers(),
+        body: jsonEncode({}),
+      );
+      final data = jsonDecode(response.body);
+      if (!data.containsKey('error')) {
+        return ApiResult(data: data);
+      }
+      return ApiResult(error: data['error'] ?? 'Failed to accept invitation.');
+    } catch (e) {
+      return ApiResult(error: 'Network error.');
     }
   }
 }

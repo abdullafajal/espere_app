@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
@@ -97,94 +98,167 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
 
   void _inviteFriend() {
     final emailController = TextEditingController();
+    bool isInviting = false;
+    bool isSearching = false;
+    List<dynamic> searchResults = [];
+    Timer? debounce;
+
+    void onSearchChanged(String query, void Function(void Function()) setState) {
+      if (debounce?.isActive ?? false) debounce!.cancel();
+      debounce = Timer(const Duration(milliseconds: 500), () async {
+        if (query.trim().isEmpty) {
+          setState(() { searchResults = []; isSearching = false; });
+          return;
+        }
+        setState(() => isSearching = true);
+        final r = await ApiService.searchUsers(query.trim());
+        if (r.isSuccess && mounted) {
+          setState(() {
+            searchResults = r.data!;
+            isSearching = false;
+          });
+        } else {
+          setState(() {
+            searchResults = [];
+            isSearching = false;
+          });
+        }
+      });
+    }
+
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.card,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.fromLTRB(24, 16, 24, MediaQuery.of(ctx).viewInsets.bottom + 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)))),
-            const SizedBox(height: 16),
-            const Center(child: Text('Invite Friend', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.text))),
-            const SizedBox(height: 20),
-            const Text('Email or Username', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.text)),
-            const SizedBox(height: 6),
-            TextField(
-              controller: emailController,
-              decoration: InputDecoration(
-                hintText: 'Enter email or username...',
-                filled: true,
-                fillColor: AppColors.surface,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
-              ),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: ElevatedButton(
-                onPressed: () async {
-                  final email = emailController.text.trim();
-                  if (email.isEmpty) return;
-                  
-                  final r = await ApiService.inviteFriend(email);
-                  if (!ctx.mounted) return;
-                  Navigator.pop(ctx);
-                  
-                  if (r.isSuccess) {
-                    HapticFeedback.mediumImpact();
-                    _loadData();
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Friend request sent!')));
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r.error ?? 'Error')));
-                  }
-                },
-                child: const Text('Send Request'),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(child: Container(height: 1, color: AppColors.border)),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: Text('OR', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.bold, fontSize: 12)),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, ss) => Padding(
+          padding: EdgeInsets.fromLTRB(24, 16, 24, MediaQuery.of(ctx).viewInsets.bottom + 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)))),
+              const SizedBox(height: 16),
+              const Center(child: Text('Invite Friend', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.text))),
+              const SizedBox(height: 20),
+              const Text('Email or Username', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.text)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: emailController,
+                onChanged: (val) => onSearchChanged(val, ss),
+                decoration: InputDecoration(
+                  hintText: 'Enter email or username...',
+                  filled: true,
+                  fillColor: AppColors.surface,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
                 ),
-                Expanded(child: Container(height: 1, color: AppColors.border)),
-              ],
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.share, size: 20),
-                onPressed: () async {
-                  final cachedUser = await CacheService.getCachedUser();
-                  String inviteText = 'Hey! Let\'s split expenses on Espere. Download the app and add me as a friend!';
-                  if (cachedUser != null) {
-                    final username = cachedUser['username'] ?? '';
-                    if (username.isNotEmpty) {
-                      inviteText = 'Hey! Let\'s split expenses on Espere. Add me as a friend: @$username';
+              ),
+              if (isSearching)
+                const Padding(padding: EdgeInsets.all(12.0), child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent))))
+              else if (searchResults.isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.only(top: 8),
+                  constraints: const BoxConstraints(maxHeight: 180),
+                  decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.border)),
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: searchResults.length,
+                    itemBuilder: (context, index) {
+                      final user = searchResults[index];
+                      return ListTile(
+                        leading: UserAvatar(initial: user['initial'] ?? '?', size: 32),
+                        title: Text(user['username'] ?? '', style: const TextStyle(color: AppColors.text, fontSize: 14)),
+                        subtitle: Text(user['email'] ?? '', style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+                        onTap: () {
+                          emailController.text = user['email'] ?? user['username'];
+                          ss(() { searchResults = []; });
+                        },
+                      );
+                    },
+                  ),
+                ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: isInviting ? null : () async {
+                    final email = emailController.text.trim();
+                    if (email.isEmpty) return;
+                    
+                    ss(() => isInviting = true);
+                    final r = await ApiService.inviteFriend(email);
+                    if (!ctx.mounted) return;
+                    ss(() => isInviting = false);
+                    Navigator.pop(ctx);
+                    
+                    if (r.isSuccess) {
+                      HapticFeedback.mediumImpact();
+                      _loadData();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Text('Friend request sent!', style: TextStyle(color: AppColors.dark)),
+                          behavior: SnackBarBehavior.floating,
+                          margin: EdgeInsets.only(bottom: MediaQuery.of(context).size.height - 150, left: 16, right: 16),
+                          backgroundColor: AppColors.accent,
+                        )
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(r.error ?? 'Error', style: const TextStyle(color: AppColors.accent)),
+                          behavior: SnackBarBehavior.floating,
+                          margin: EdgeInsets.only(bottom: MediaQuery.of(context).size.height - 150, left: 16, right: 16),
+                          backgroundColor: AppColors.dark,
+                        )
+                      );
                     }
-                  }
-                  Share.share(inviteText);
-                  if (ctx.mounted) Navigator.pop(ctx);
-                },
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.text,
-                  side: const BorderSide(color: AppColors.border),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  },
+                  child: isInviting
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.dark))
+                      : const Text('Send Request'),
                 ),
-                label: const Text('Share Invite Link'),
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(child: Container(height: 1, color: AppColors.border)),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    child: Text('OR', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.bold, fontSize: 12)),
+                  ),
+                  Expanded(child: Container(height: 1, color: AppColors.border)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.share, size: 20),
+                  onPressed: () async {
+                    final cachedUser = await CacheService.getCachedUser();
+                    String inviteText = 'Hey! Let\'s split expenses on Espere, a modern expense and split tracker!\n\nBy joining Espere, you can easily split bills with friends, track your monthly budgets, and keep your finances in check.\n\nDownload the app to get started: https://espere.in';
+                    if (cachedUser != null) {
+                      final username = cachedUser['username'] ?? '';
+                      if (username.isNotEmpty) {
+                        inviteText = '$username has invited you to join them on Espere, a modern expense and split tracker!\n\nBy joining Espere, you can easily split bills with friends, track your monthly budgets, and keep your finances in check.\n\nDownload the app to get started: https://espere.in/add_friend/$username';
+                      }
+                    }
+                    Share.share(inviteText);
+                    if (ctx.mounted) Navigator.pop(ctx);
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.text,
+                    side: const BorderSide(color: AppColors.border),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  label: const Text('Share Invite Link'),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

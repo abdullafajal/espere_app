@@ -47,11 +47,13 @@
                 <data
                     android:scheme="https"/>
                 <data
-                    android:host="montra.pythonanywhere.com"/>
+                    android:host="espere.in"/>
                 <data
                     android:pathPrefix="/accounts/verify/"/>
                 <data
-                    android:pathPrefix="/split/invite/"/>
+                    android:pathPrefix="/accounts/register/"/>
+                <data
+                    android:pathPrefix="/invite/"/>
                 <data
                     android:pathPrefix="/split/invitations"/>
                 <data

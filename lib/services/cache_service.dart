@@ -15,6 +15,7 @@ class CacheService {
   static const _reportsKey = 'cache_reports';
   static const _friendsKey = 'cache_friends';
   static const _syncQueueKey = 'sync_queue';
+  static const _pendingFriendInviteKey = 'cache_pending_friend_invite';
 
   // ─── Generic Helpers ─────────────────────────────────────────────────
 
@@ -892,5 +893,20 @@ class CacheService {
     await prefs.remove(_savingsKey);
     await prefs.remove(_splitGroupsKey);
     await prefs.remove(_syncQueueKey);
+  }
+
+  static Future<void> savePendingFriendInvite(String username) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_pendingFriendInviteKey, username);
+  }
+
+  static Future<String?> getPendingFriendInvite() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_pendingFriendInviteKey);
+  }
+
+  static Future<void> clearPendingFriendInvite() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_pendingFriendInviteKey);
   }
 }

@@ -11,6 +11,7 @@ import 'screens/home_screen.dart';
 import 'screens/transaction_form_screen.dart';
 import 'screens/categories_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/invite_screen.dart';
 import 'services/notification_service.dart';
 import 'services/connectivity_service.dart';
 import 'services/sync_service.dart';
@@ -96,6 +97,12 @@ class EspereApp extends StatelessWidget {
             final id = settings.arguments as int;
             return MaterialPageRoute(
               builder: (_) => TransactionFormScreen(transactionId: id),
+            );
+
+          case '/invite':
+            final token = settings.arguments as String;
+            return MaterialPageRoute(
+              builder: (_) => InviteScreen(token: token),
             );
 
           default:
