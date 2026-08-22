@@ -1,8 +1,10 @@
-import 'package:intl/intl.dart';
-
 void main() {
-  final d = DateTime.parse('2026-06-20T21:40:00Z');
-  print('Original: $d');
-  print('Local: ${d.toLocal()}');
-  print('Formatted: ${DateFormat('yyyy-MM').format(d)}');
+  var now = DateTime.now();
+  var parsed = DateTime.tryParse("2026-08-15T20:00:00+05:30") ?? DateTime.now();
+  var d = parsed.toLocal();
+  print("now: ${now}");
+  print("parsed: ${parsed}");
+  print("d: ${d}");
+  print("parsed.isUtc: ${parsed.isUtc}");
+  print("d.year == now.year && d.month == now.month && d.day == now.day: ${d.year == now.year && d.month == now.month && d.day == now.day}");
 }

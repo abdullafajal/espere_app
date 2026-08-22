@@ -291,6 +291,10 @@ class ApiService {
           'currency_symbol': data['currency_symbol'] ?? '₹',
           'total': data['total'],
           'has_next': data['has_next'],
+          'total_spend': data['total_spend'] ?? '0.00',
+          'total_income': data['total_income'] ?? '0.00',
+          'today_spend': data['today_spend'] ?? '0.00',
+          'avg_daily': data['avg_daily'] ?? '0.00',
         });
       }
       return ApiResult(error: data['error'] ?? 'Failed to load transactions.');

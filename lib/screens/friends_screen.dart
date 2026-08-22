@@ -42,8 +42,20 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
   }
 
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
+    // 1. Load from cache immediately
+    final cached = await CacheService.getCachedFriends();
+    if (cached != null && mounted) {
+      setState(() {
+        _friends = List<Map<String, dynamic>>.from(cached['friends'] ?? []);
+        _pendingReceived = List<Map<String, dynamic>>.from(cached['pending_received'] ?? []);
+        _pendingSent = List<Map<String, dynamic>>.from(cached['pending_sent'] ?? []);
+        _isLoading = false;
+      });
+    } else {
+      setState(() => _isLoading = true);
+    }
     
+    // 2. Fetch from network
     final friendsResult = await ApiService.getFriends();
     final invitationsResult = await ApiService.getGroupInvitations();
     
@@ -55,6 +67,9 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
         _friends = List<Map<String, dynamic>>.from(friendsResult.data!['friends']);
         _pendingReceived = List<Map<String, dynamic>>.from(friendsResult.data!['pending_received']);
         _pendingSent = List<Map<String, dynamic>>.from(friendsResult.data!['pending_sent']);
+        
+        // Save to cache
+        CacheService.cacheFriends(friendsResult.data!);
       }
       if (invitationsResult.isSuccess) {
         _groupInvitations = invitationsResult.data!;
@@ -631,9 +646,13 @@ class _FriendTileState extends State<_FriendTile> {
     final fid = f['id'] as int;
     final double iconScale = (_swipeProgress * 4.0).clamp(0.8, 1.8);
 
-    return Dismissible(
-      key: ValueKey('friend_$fid'),
-      direction: DismissDirection.startToEnd,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Dismissible(
+          key: ValueKey('friend_$fid'),
+          direction: DismissDirection.startToEnd,
       onUpdate: (details) {
         if (details.reached && !details.previousReached) {
           HapticFeedback.vibrate();
@@ -645,10 +664,8 @@ class _FriendTileState extends State<_FriendTile> {
       background: Container(
         alignment: Alignment.centerLeft,
         padding: const EdgeInsets.only(left: 20),
-        margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
           color: AppColors.dark,
-          borderRadius: BorderRadius.circular(20),
         ),
         child: Transform.scale(
           scale: iconScale,
@@ -679,11 +696,9 @@ class _FriendTileState extends State<_FriendTile> {
       child: GestureDetector(
         onTap: () => widget.onSelectChanged(!widget.isSelected),
         child: Container(
-          margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: AppColors.card, 
-            borderRadius: BorderRadius.circular(20), 
             boxShadow: AppShadows.card,
             border: Border.all(color: widget.isSelected ? AppColors.accent : Colors.transparent, width: 2),
           ),
@@ -713,6 +728,8 @@ class _FriendTileState extends State<_FriendTile> {
               ),
             ],
           ),
+        ),
+      ),
         ),
       ),
     );

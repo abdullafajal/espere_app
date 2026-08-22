@@ -393,6 +393,101 @@ class DashboardScreenState extends State<DashboardScreen> {
             ),
             const SizedBox(height: 16),
 
+            // ─── Overall Monthly Budget ─────────────────────────────
+            if (d.monthlyBudgetLimit > 0)
+              Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  borderRadius: BorderRadius.circular(AppRadius.xxl),
+                  boxShadow: AppShadows.card,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: AppColors.accent.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.track_changes,
+                            size: 18,
+                            color: AppColors.accent,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Text(
+                            'Current Month Budget',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.text,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '${d.currencySymbol}${d.monthlyBudgetSpent.toStringAsFixed(0)} spent',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.text,
+                          ),
+                        ),
+                        Text(
+                          '${((d.monthlyBudgetSpent / d.monthlyBudgetLimit) * 100).toStringAsFixed(0)}%',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            color: d.monthlyBudgetSpent > d.monthlyBudgetLimit ? AppColors.error : AppColors.text,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    LinearProgressIndicator(
+                      value: (d.monthlyBudgetLimit > 0 ? (d.monthlyBudgetSpent / d.monthlyBudgetLimit) : 0.0).clamp(0.0, 1.0),
+                      backgroundColor: AppColors.surface,
+                      color: d.monthlyBudgetSpent > d.monthlyBudgetLimit ? AppColors.error : AppColors.accent,
+                      minHeight: 8,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Spent so far',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.muted,
+                          ),
+                        ),
+                        Text(
+                          'Limit: ${d.currencySymbol}${d.monthlyBudgetLimit.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.muted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
             // ─── Budget Warnings ────────────────────────────────
             if (d.budgetWarnings.isNotEmpty)
               ...d.budgetWarnings.map((w) {
@@ -488,10 +583,25 @@ class DashboardScreenState extends State<DashboardScreen> {
                       child: RotatedBox(
                         quarterTurns: 1,
                         child: BarChart(
+                          duration: const Duration(milliseconds: 800),
+                          curve: Curves.easeOutQuart,
                           BarChartData(
                             maxY: chartMax,
                             alignment: BarChartAlignment.spaceAround,
-                            barTouchData: BarTouchData(enabled: false),
+                            barTouchData: BarTouchData(
+                              enabled: true,
+                              touchTooltipData: BarTouchTooltipData(
+                                getTooltipColor: (_) => AppColors.dark,
+                                tooltipPadding: const EdgeInsets.all(8),
+                                tooltipMargin: 8,
+                                getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                                  return BarTooltipItem(
+                                    '${d.pieLabels[group.x.toInt()]}\n${d.currencySymbol}${rod.toY.toStringAsFixed(0)}',
+                                    const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                                  );
+                                },
+                              ),
+                            ),
                             titlesData: FlTitlesData(
                               show: true,
                               bottomTitles: AxisTitles(
@@ -602,10 +712,27 @@ class DashboardScreenState extends State<DashboardScreen> {
                         SizedBox(
                           height: 200,
                           child: BarChart(
+                            duration: const Duration(milliseconds: 800),
+                            curve: Curves.easeOutQuart,
                             BarChartData(
                               maxY: chartMax,
                               alignment: BarChartAlignment.spaceAround,
-                              barTouchData: BarTouchData(enabled: false),
+                              barTouchData: BarTouchData(
+                                enabled: true,
+                                touchTooltipData: BarTouchTooltipData(
+                                  getTooltipColor: (_) => AppColors.dark,
+                                  tooltipPadding: const EdgeInsets.all(8),
+                                  tooltipMargin: 8,
+                                  getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                                    final isIncome = rodIndex == 0;
+                                    final label = isIncome ? 'Income' : 'Expense';
+                                    return BarTooltipItem(
+                                      '$label\n${d.currencySymbol}${rod.toY.toStringAsFixed(0)}',
+                                      const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                                    );
+                                  },
+                                ),
+                              ),
                               titlesData: FlTitlesData(
                                 show: true,
                                 bottomTitles: AxisTitles(
@@ -710,16 +837,34 @@ class DashboardScreenState extends State<DashboardScreen> {
                     child: SizedBox(
                       height: 160,
                       child: LineChart(
+                        duration: const Duration(milliseconds: 800),
+                        curve: Curves.easeOutQuart,
                         LineChartData(
                           maxY: chartMax,
-                          lineTouchData: const LineTouchData(enabled: false),
+                          lineTouchData: LineTouchData(
+                            enabled: true,
+                            handleBuiltInTouches: true,
+                            touchTooltipData: LineTouchTooltipData(
+                              getTooltipColor: (_) => AppColors.dark,
+                              tooltipPadding: const EdgeInsets.all(8),
+                              getTooltipItems: (touchedSpots) {
+                                return touchedSpots.map((spot) {
+                                  return LineTooltipItem(
+                                    '${d.lineLabels[spot.x.toInt()]}\n${d.currencySymbol}${spot.y.toStringAsFixed(0)}',
+                                    const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                                  );
+                                }).toList();
+                              },
+                            ),
+                          ),
                           gridData: FlGridData(
                             show: true,
                             drawVerticalLine: false,
                             horizontalInterval: interval,
                             getDrawingHorizontalLine: (_) => FlLine(
-                              color: Colors.black.withValues(alpha: 0.04),
+                              color: Colors.black.withValues(alpha: 0.1),
                               strokeWidth: 1,
+                              dashArray: [4, 4],
                             ),
                           ),
                           titlesData: FlTitlesData(
@@ -771,7 +916,9 @@ class DashboardScreenState extends State<DashboardScreen> {
                                 d.lineValues.length,
                                 (i) => FlSpot(i.toDouble(), d.lineValues[i]),
                               ),
-                              isCurved: true,
+                              isCurved: false,
+                              isStepLineChart: true,
+                              lineChartStepData: const LineChartStepData(stepDirection: 0),
                               color: AppColors.accent,
                               barWidth: 2.5,
                               dotData: const FlDotData(show: false),

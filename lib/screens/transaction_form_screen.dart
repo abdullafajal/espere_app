@@ -184,7 +184,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       'amount': amount,
       'type': _type,
       'category_id': _categoryId,
-      'date': _date.toIso8601String(),
+      'date': _date.toUtc().toIso8601String(),
       'payment_method': _paymentMethod,
       'notes': _notesController.text.trim(),
     };
@@ -200,7 +200,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       'amount': (double.tryParse(amount) ?? 0.0).toStringAsFixed(2),
       'type': _type,
       'category': selectedCat?.toJson() ?? {'name': 'Other', 'icon': 'category'},
-      'date': _date.toIso8601String(),
+      'date': _date.toUtc().toIso8601String(),
       'payment_method': _paymentMethod,
       'payment_method_display': _paymentMethods.firstWhere((m) => m.$1 == _paymentMethod).$2,
       'notes': _notesController.text.trim(),

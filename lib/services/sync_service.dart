@@ -81,6 +81,10 @@ class SyncService {
         'currency_symbol': res.data!['currency_symbol'],
         'total': res.data!['total'],
         'has_next': res.data!['has_next'],
+        'total_spend': res.data!['total_spend'],
+        'total_income': res.data!['total_income'],
+        'today_spend': res.data!['today_spend'],
+        'avg_daily': res.data!['avg_daily'],
       });
     }
   }

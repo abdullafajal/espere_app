@@ -854,67 +854,96 @@ class TransactionListScreenState extends State<TransactionListScreen> {
 
   Widget _buildTopCard() {
     if (_transactions.isEmpty) return const SizedBox.shrink();
+
+    final expenses = _transactions.where((t) => t.type == 'expense');
+    final incomes = _transactions.where((t) => t.type == 'income');
+    
+    final totalSpend = expenses.fold(0.0, (sum, t) => sum + (double.tryParse(t.amount.toString()) ?? 0));
+    final totalIncome = incomes.fold(0.0, (sum, t) => sum + (double.tryParse(t.amount.toString()) ?? 0));
+    
+    final now = DateTime.now();
+    
+    final todaySpend = expenses.where((t) {
+      final d = t.date.toLocal();
+      return d.year == now.year && d.month == now.month && d.day == now.day;
+    }).fold(0.0, (sum, t) => sum + (double.tryParse(t.amount.toString()) ?? 0));
+    
+    double avgDaily = 0;
+    if (_showAll) {
+      if (expenses.isNotEmpty) {
+        final dates = expenses.map((e) => e.date.toLocal()).toList();
+        dates.sort();
+        final earliest = dates.first;
+        final days = now.difference(earliest).inDays + 1;
+        avgDaily = days > 0 ? totalSpend / days : totalSpend;
+      }
+    } else {
+      if (_currentMonth.year == now.year && _currentMonth.month == now.month) {
+        avgDaily = totalSpend / (now.day > 0 ? now.day : 1);
+      } else {
+        final daysInMonth = DateTime(_currentMonth.year, _currentMonth.month + 1, 0).day;
+        avgDaily = totalSpend / daysInMonth;
+      }
+    }
+
+    Widget statWidget(String title, double amount, IconData icon, Color color) {
+      return Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: color.withOpacity(0.15),
+            ),
+            child: Icon(icon, size: 18, color: color),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(color: AppColors.muted, fontSize: 11)),
+                const SizedBox(height: 2),
+                Text(
+                  '$_currencySymbol${amount.toStringAsFixed(2)}',
+                  style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 15),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
         decoration: BoxDecoration(
           color: AppColors.dark,
           borderRadius: BorderRadius.circular(AppRadius.xl),
           boxShadow: AppShadows.soft,
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
+        child: Column(
           children: [
             Row(
               children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppColors.accent.withValues(alpha: 0.2),
-                  ),
-                  child: const Icon(Icons.arrow_downward_rounded, size: 20, color: AppColors.accent),
-                ),
-                const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Total Income', style: TextStyle(color: AppColors.muted, fontSize: 12)),
-                    const SizedBox(height: 4),
-                    Text(
-                      '$_currencySymbol${_transactions.where((t) => t.type == 'income').fold(0.0, (sum, t) => sum + (double.tryParse(t.amount.toString()) ?? 0)).toStringAsFixed(2)}',
-                      style: const TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
-                  ],
-                ),
+                Expanded(child: statWidget('Total Spend', totalSpend, Icons.arrow_upward_rounded, AppColors.accent)),
+                const SizedBox(width: 16),
+                Expanded(child: statWidget('Total Income', totalIncome, Icons.arrow_downward_rounded, AppColors.accent)),
               ],
             ),
-            Container(width: 1, height: 50, color: AppColors.borderDark),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Divider(color: AppColors.borderDark, height: 1),
+            ),
             Row(
               children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppColors.accent.withValues(alpha: 0.2),
-                  ),
-                  child: const Icon(Icons.arrow_upward_rounded, size: 20, color: AppColors.accent),
-                ),
-                const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Total Spend', style: TextStyle(color: AppColors.muted, fontSize: 12)),
-                    const SizedBox(height: 4),
-                    Text(
-                      '$_currencySymbol${_transactions.where((t) => t.type == 'expense').fold(0.0, (sum, t) => sum + (double.tryParse(t.amount.toString()) ?? 0)).toStringAsFixed(2)}',
-                      style: const TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
-                  ],
-                ),
+                Expanded(child: statWidget('Today\'s Spend', todaySpend, Icons.today_rounded, AppColors.accent)),
+                const SizedBox(width: 16),
+                Expanded(child: statWidget('Avg Daily', avgDaily, Icons.analytics_outlined, AppColors.accent)),
               ],
             ),
           ],

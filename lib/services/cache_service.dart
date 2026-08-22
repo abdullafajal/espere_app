@@ -13,6 +13,7 @@ class CacheService {
   static const _splitGroupsKey = 'cache_split_groups';
   static const _userKey = 'cache_user';
   static const _reportsKey = 'cache_reports';
+  static const _friendsKey = 'cache_friends';
   static const _syncQueueKey = 'sync_queue';
 
   // ─── Generic Helpers ─────────────────────────────────────────────────
@@ -361,11 +362,20 @@ class CacheService {
     final raw = prefs.getString(_splitGroupsKey);
     if (raw == null) return null;
     try {
-      final List decoded = jsonDecode(raw);
-      return decoded.map((e) => e as Map<String, dynamic>).toList();
+      return List<Map<String, dynamic>>.from(jsonDecode(raw));
     } catch (_) {
       return null;
     }
+  }
+
+  static String _splitGroupDetailKey(int id) => 'cache_split_group_detail_$id';
+
+  static Future<void> cacheSplitGroupDetail(int id, Map<String, dynamic> data) async {
+    await _write(_splitGroupDetailKey(id), data);
+  }
+
+  static Future<Map<String, dynamic>?> getCachedSplitGroupDetail(int id) async {
+    return await _read(_splitGroupDetailKey(id));
   }
 
   // ─── User Profile ────────────────────────────────────────────────────
@@ -795,7 +805,17 @@ class CacheService {
     }
   }
 
-  // ─── Sync Queue ──────────────────────────────────────────────────────
+  // ─── Friends ─────────────────────────────────────────────────────────
+
+  static Future<void> cacheFriends(Map<String, dynamic> data) async {
+    await _write(_friendsKey, data);
+  }
+
+  static Future<Map<String, dynamic>?> getCachedFriends() async {
+    return await _read(_friendsKey);
+  }
+
+  // ─── Synchronization & Offline Queue ──────────────────────────────────────────────────────
 
   /// Get pending sync operations
   static Future<List<Map<String, dynamic>>> getSyncQueue() async {

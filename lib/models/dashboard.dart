@@ -9,6 +9,8 @@ class DashboardData {
   final String monthlyIncome;
   final String monthlyExpenses;
   final String monthlySavings;
+  final double monthlyBudgetLimit;
+  final double monthlyBudgetSpent;
   final String currencySymbol;
   final List<TransactionModel> recentTransactions;
   final List<String> pieLabels;
@@ -29,6 +31,8 @@ class DashboardData {
     required this.monthlyIncome,
     required this.monthlyExpenses,
     required this.monthlySavings,
+    required this.monthlyBudgetLimit,
+    required this.monthlyBudgetSpent,
     required this.currencySymbol,
     required this.recentTransactions,
     required this.pieLabels,
@@ -48,10 +52,12 @@ class DashboardData {
       greeting: json['greeting'] ?? 'Morning',
       user: UserModel.fromJson(json['user'] ?? {}),
       totalBalance: json['total_balance'] ?? '0.00',
-      monthlyIncome: json['monthly_income'] ?? '0.00',
-      monthlyExpenses: json['monthly_expenses'] ?? '0.00',
-      monthlySavings: json['monthly_savings'] ?? '0.00',
-      currencySymbol: json['currency_symbol'] ?? '₹',
+      monthlyIncome: json['monthly_income']?.toString() ?? '0.00',
+      monthlyExpenses: json['monthly_expenses']?.toString() ?? '0.00',
+      monthlySavings: json['monthly_savings']?.toString() ?? '0.00',
+      monthlyBudgetLimit: double.tryParse(json['monthly_budget_limit']?.toString() ?? '0') ?? 0.0,
+      monthlyBudgetSpent: double.tryParse(json['monthly_budget_spent']?.toString() ?? '0') ?? 0.0,
+      currencySymbol: json['currency_symbol']?.toString() ?? '₹',
       recentTransactions: () {
         final rawList = (json['recent_transactions'] as List? ?? [])
             .map((t) => TransactionModel.fromJson(t))

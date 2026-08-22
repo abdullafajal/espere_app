@@ -45,7 +45,10 @@ class _BudgetTileState extends State<BudgetTile> {
 
     Widget content = Container(
       padding: const EdgeInsets.all(16),
-      color: AppColors.card,
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -110,7 +113,7 @@ class _BudgetTileState extends State<BudgetTile> {
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 12,
-                  color: isExceeded ? categoryColor : AppColors.text,
+                  color: isExceeded ? AppColors.accent : AppColors.text,
                 ),
               ),
             ],
@@ -119,7 +122,7 @@ class _BudgetTileState extends State<BudgetTile> {
           LinearProgressIndicator(
             value: (pct / 100).clamp(0.0, 1.0),
             backgroundColor: AppColors.surface,
-            color: isExceeded ? categoryColor : AppColors.accent,
+            color: AppColors.accent,
             minHeight: 10,
             borderRadius: BorderRadius.circular(5),
           ),
@@ -152,24 +155,24 @@ class _BudgetTileState extends State<BudgetTile> {
                 vertical: 8,
               ),
               decoration: BoxDecoration(
-                color: categoryColor.withValues(alpha: 0.1),
+                color: AppColors.dark,
                 borderRadius: BorderRadius.circular(
                   AppRadius.md,
                 ),
               ),
               child: Row(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.warning_amber_rounded,
                     size: 16,
-                    color: categoryColor,
+                    color: AppColors.accent,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'Budget exceeded by ${widget.currencySymbol}${double.parse(widget.budget['spent'].toString()) - double.parse(widget.budget['amount'].toString())}',
-                      style: TextStyle(
-                        color: categoryColor,
+                      style: const TextStyle(
+                        color: AppColors.accent,
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
                       ),
@@ -210,7 +213,10 @@ class _BudgetTileState extends State<BudgetTile> {
       background: Container(
         alignment: Alignment.centerLeft,
         padding: const EdgeInsets.only(left: 20),
-        color: AppColors.dark,
+        decoration: BoxDecoration(
+          color: AppColors.dark,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
         child: Transform.scale(
           scale: iconScale,
           child: Icon(Icons.delete, color: categoryColor),
@@ -219,7 +225,10 @@ class _BudgetTileState extends State<BudgetTile> {
       secondaryBackground: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
-        color: categoryColor,
+        decoration: BoxDecoration(
+          color: categoryColor,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
         child: Transform.scale(
           scale: iconScale,
           child: const Icon(Icons.edit, color: AppColors.dark),
@@ -231,11 +240,11 @@ class _BudgetTileState extends State<BudgetTile> {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppRadius.xxl),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         boxShadow: AppShadows.card,
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppRadius.xxl),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         child: content,
       ),
     );

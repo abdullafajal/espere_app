@@ -42,6 +42,7 @@ class BudgetsScreenState extends State<BudgetsScreen> {
   }
 
   Future<void> _loadBudgets() async {
+    // 1. Always check cache first to show optimistic updates
     final cached = await CacheService.getCachedBudgets();
     if (cached != null && mounted) {
       final List list = cached['budgets'] ?? [];
@@ -57,10 +58,30 @@ class BudgetsScreenState extends State<BudgetsScreen> {
             return (b['id'] ?? 0).compareTo(a['id'] ?? 0);
           });
         _currencySymbol = (cached['currency_symbol'] as String?) ?? '₹';
-        _isLoading = false;
       });
-    } else {
-      if (mounted) setState(() => _isLoading = false);
+    }
+    if (mounted) setState(() => _isLoading = false);
+
+    // 2. Fetch from API silently
+    if (ConnectivityService.isOnline) {
+      final res = await ApiService.getBudgets();
+      if (res.isSuccess && mounted) {
+        final List list = res.data!['budgets'] ?? [];
+        final currentMonthStr = "${_currentMonth.year}-${_currentMonth.month.toString().padLeft(2, '0')}";
+        setState(() {
+          _budgets = List<Map<String, dynamic>>.from(list).where((b) {
+            if (b['month'] == null) return true;
+            return b['month'].toString().startsWith(currentMonthStr);
+          }).toList()
+            ..sort((a, b) {
+              int cmp = (a['name'] ?? '').compareTo(b['name'] ?? '');
+              if (cmp != 0) return cmp;
+              return (b['id'] ?? 0).compareTo(a['id'] ?? 0);
+            });
+          _currencySymbol = (res.data!['currency_symbol'] as String?) ?? '₹';
+        });
+        CacheService.cacheBudgets(res.data!);
+      }
     }
   }
 
@@ -79,10 +100,23 @@ class BudgetsScreenState extends State<BudgetsScreen> {
             catsRaw
                 .map<Map<String, dynamic>>((c) => Map<String, dynamic>.from(c))
                 .toList();
-        _isLoadingCats = false;
       });
-    } else {
-      if (mounted) setState(() => _isLoadingCats = false);
+    }
+    if (mounted) setState(() => _isLoadingCats = false);
+    
+    // 2. Fetch from API silently
+    if (ConnectivityService.isOnline) {
+      final res = await ApiService.getCategories();
+      if (res.isSuccess && mounted) {
+        setState(() {
+          final List catsRaw = res.data!['categories'] ?? [];
+          _categories =
+              catsRaw
+                  .map<Map<String, dynamic>>((c) => Map<String, dynamic>.from(c))
+                  .toList();
+        });
+        CacheService.cacheCategories(res.data!);
+      }
     }
   }
 

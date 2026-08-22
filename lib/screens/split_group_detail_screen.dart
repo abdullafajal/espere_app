@@ -54,10 +54,30 @@ class _S extends State<SplitGroupDetailScreen>
       _currencySymbol = cached['currency_symbol'] as String? ?? '₹';
     }
 
+    // 1. Try to load full detail from cache first
+    final cachedDetail = await CacheService.getCachedSplitGroupDetail(
+      widget.groupId,
+    );
+    if (cachedDetail != null && mounted) {
+      setState(() {
+        _g = Map<String, dynamic>.from(cachedDetail);
+        _g!['recent_expenses'] ??= [];
+        _g!['balances'] ??= [];
+        _g!['settlement_history'] ??= [];
+        _g!['members'] ??= [];
+        _ld = false;
+        _isPending = false;
+      });
+    }
+
+    // Fallback to basic group info if no detail cache
     if (_g == null) {
       final cachedGroups = await CacheService.getCachedSplitGroups();
       if (cachedGroups != null) {
-        final group = cachedGroups.firstWhere((g) => g['id'] == widget.groupId, orElse: () => <String, dynamic>{});
+        final group = cachedGroups.firstWhere(
+          (g) => g['id'] == widget.groupId,
+          orElse: () => <String, dynamic>{},
+        );
         if (group.isNotEmpty) {
           setState(() {
             _g = Map<String, dynamic>.from(group);
@@ -71,29 +91,37 @@ class _S extends State<SplitGroupDetailScreen>
       }
     }
 
-    if (_g == null) {
+    if (_g == null && mounted) {
       setState(() => _ld = true);
     }
-    
+
     // Fetch profile silently
     final pr = await ApiService.getProfile();
     if (pr.isSuccess && mounted) {
       _myId = pr.data?.id;
     }
 
+    // 2. Fetch fresh detail from API silently in background
+    if (!ConnectivityService.isOnline) return;
     final r = await ApiService.getSplitGroupDetail(widget.groupId);
+
     if (!mounted) return;
+
     setState(() {
-      _ld = false;
       if (r.isSuccess) {
         _g = r.data;
         _isPending = false;
+        _ld = false;
+        // Save to cache for next time
+        CacheService.cacheSplitGroupDetail(widget.groupId, r.data!);
       } else if (r.errors != null && r.errors!['is_pending'] == true) {
         _isPending = true;
         _g = null;
+        _ld = false;
       } else {
         _isPending = false;
-        _g = null;
+        // Don't nullify _g here, keep cached data if API fails
+        if (_g == null) _ld = false;
       }
     });
     if (!r.isSuccess && !_isPending) {
@@ -106,13 +134,18 @@ class _S extends State<SplitGroupDetailScreen>
     // We need the invitation ID. The backend returns it in SplitGroupListAPIView as 'id'.
     // However, getSplitGroupDetail doesn't return it if it fails with 403.
     // We might need to find it from the list or have the backend include it in the 403 response.
-    // For now, we'll try to find it from a generic invitations list if needed, 
+    // For now, we'll try to find it from a generic invitations list if needed,
     // but better to have backend include it.
-    
+
     final invRes = await ApiService.getSplitInvitations();
     if (invRes.isSuccess) {
-      final invitations = List<Map<String, dynamic>>.from(invRes.data!['invitations']);
-      final inv = invitations.firstWhere((i) => i['group_id'] == widget.groupId, orElse: () => {});
+      final invitations = List<Map<String, dynamic>>.from(
+        invRes.data!['invitations'],
+      );
+      final inv = invitations.firstWhere(
+        (i) => i['group_id'] == widget.groupId,
+        orElse: () => {},
+      );
       if (inv.isNotEmpty) {
         final res = await ApiService.handleSplitInvitation(inv['id'], action);
         if (res.isSuccess) {
@@ -125,56 +158,66 @@ class _S extends State<SplitGroupDetailScreen>
         }
       }
     }
-    
+
     if (mounted) setState(() => _ld = false);
     _showTopMessage('Failed to $action invitation', isError: true);
   }
 
-  void _showTopMessage(String message, {bool isError = false, BuildContext? ctx}) {
+  void _showTopMessage(
+    String message, {
+    bool isError = false,
+    BuildContext? ctx,
+  }) {
     final overlay = Overlay.of(ctx ?? context);
     final entry = OverlayEntry(
-      builder: (context) => Positioned(
-        top: MediaQuery.of(context).padding.top + 20,
-        left: 20,
-        right: 20,
-        child: Material(
-          color: Colors.transparent,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-            decoration: BoxDecoration(
-              color: AppColors.text,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+      builder:
+          (context) => Positioned(
+            top: MediaQuery.of(context).padding.top + 20,
+            left: 20,
+            right: 20,
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 14,
                 ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  isError ? Icons.error_outline : Icons.check_circle_outline,
-                  color: AppColors.accent,
-                  size: 20,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    message,
-                    style: const TextStyle(
-                      color: AppColors.accent,
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
+                decoration: BoxDecoration(
+                  color: AppColors.text,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
                     ),
-                  ),
+                  ],
                 ),
-              ],
+                child: Row(
+                  children: [
+                    Icon(
+                      isError
+                          ? Icons.error_outline
+                          : Icons.check_circle_outline,
+                      color: AppColors.accent,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        message,
+                        style: const TextStyle(
+                          color: AppColors.accent,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
-        ),
-      ),
     );
     overlay.insert(entry);
     Future.delayed(const Duration(seconds: 2), () => entry.remove());
@@ -211,8 +254,10 @@ class _S extends State<SplitGroupDetailScreen>
     final res = await ApiService.getFriends();
     if (res.isSuccess) {
       final allFriends = List<Map<String, dynamic>>.from(res.data!['friends']);
-      final existingIds = (_g!['members'] as List).map((m) => m['id'] as int).toSet();
-      friends = allFriends.where((f) => !existingIds.contains(f['id'])).toList();
+      final existingIds =
+          (_g!['members'] as List).map((m) => m['id'] as int).toSet();
+      friends =
+          allFriends.where((f) => !existingIds.contains(f['id'])).toList();
     }
     loadingFriends = false;
 
@@ -222,157 +267,314 @@ class _S extends State<SplitGroupDetailScreen>
       context: context,
       backgroundColor: AppColors.background,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, ss) => Container(
-          padding: EdgeInsets.fromLTRB(24, 12, 24, MediaQuery.of(ctx).viewInsets.bottom + 24),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: AppColors.muted.withOpacity(0.2), borderRadius: BorderRadius.circular(2)))),
-                const SizedBox(height: 24),
-                const Center(
-                  child: Text('Add Members', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.text)),
-                ),
-                const SizedBox(height: 32),
-                const Text('Invite by Email', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.muted)),
-                const SizedBox(height: 12),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: emailCtrl,
-                        onChanged: (v) { if (emailError != null) ss(() => emailError = null); },
-                        decoration: _inputDeco('Friend\'s email address...').copyWith(errorText: emailError),
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    GestureDetector(
-                      onTap: isInviting ? null : () async {
-                        final email = emailCtrl.text.trim();
-                        if (email.isEmpty) {
-                          ss(() => emailError = 'Please enter an email');
-                          return;
-                        }
-                        if (!email.contains('@')) {
-                          ss(() => emailError = 'Invalid email format');
-                          return;
-                        }
-                        
-                        ss(() => isInviting = true);
-                        final r = await ApiService.addSplitMember(widget.groupId, identifier: email);
-                        ss(() => isInviting = false);
-                        
-                        if (r.isSuccess) {
-                          emailCtrl.clear();
-                          HapticFeedback.mediumImpact();
-                          _showTopMessage('Invitation sent to $email');
-                        } else {
-                          _showTopMessage(r.error ?? 'Error', isError: true);
-                        }
-                      },
-                      child: Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: AppColors.dark,
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: isInviting 
-                          ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: AppColors.accent, strokeWidth: 2)))
-                          : const Icon(Icons.send, color: AppColors.accent, size: 20),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 32),
-                const Text('Select Friends', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.muted)),
-                const SizedBox(height: 12),
-                if (loadingFriends)
-                  const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator(color: AppColors.accent)))
-                else if (friends.isEmpty)
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    width: double.infinity,
-                    decoration: BoxDecoration(color: AppColors.card, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.border)),
-                    child: const Text('No other friends to add.', style: TextStyle(color: AppColors.muted, fontSize: 13)),
-                  )
-                else ...[
-                  ConstrainedBox(
-                    constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.3),
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: friends.length,
-                      itemBuilder: (ctx, i) {
-                        final f = friends[i];
-                        final fid = f['id'] as int;
-                        final isSelected = selectedIds.contains(fid);
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      builder:
+          (ctx) => StatefulBuilder(
+            builder:
+                (ctx, ss) => Container(
+                  padding: EdgeInsets.fromLTRB(
+                    24,
+                    12,
+                    24,
+                    MediaQuery.of(ctx).viewInsets.bottom + 24,
+                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
                           child: Container(
+                            width: 36,
+                            height: 4,
                             decoration: BoxDecoration(
-                              color: isSelected ? AppColors.accent.withOpacity(0.05) : AppColors.card,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: isSelected ? AppColors.accent : AppColors.border),
-                            ),
-                            child: CheckboxListTile(
-                              value: isSelected,
-                              onChanged: (v) => ss(() { if (v!) selectedIds.add(fid); else selectedIds.remove(fid); }),
-                              title: Text(f['display_name'] ?? f['username'] ?? '', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.text)),
-                              subtitle: Text(f['email'] ?? '', style: const TextStyle(fontSize: 12, color: AppColors.muted)),
-                              secondary: UserAvatar(initial: f['initial'] ?? '?', avatarUrl: f['avatar_url'], size: 36),
-                              activeColor: AppColors.accent,
-                              checkColor: AppColors.dark,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              color: AppColors.muted.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(2),
                             ),
                           ),
-                        );
-                      },
+                        ),
+                        const SizedBox(height: 24),
+                        const Center(
+                          child: Text(
+                            'Add Members',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.text,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+                        const Text(
+                          'Invite by Email',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.muted,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: emailCtrl,
+                                onChanged: (v) {
+                                  if (emailError != null)
+                                    ss(() => emailError = null);
+                                },
+                                decoration: _inputDeco(
+                                  'Friend\'s email address...',
+                                ).copyWith(errorText: emailError),
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            GestureDetector(
+                              onTap:
+                                  isInviting
+                                      ? null
+                                      : () async {
+                                        final email = emailCtrl.text.trim();
+                                        if (email.isEmpty) {
+                                          ss(
+                                            () =>
+                                                emailError =
+                                                    'Please enter an email',
+                                          );
+                                          return;
+                                        }
+                                        if (!email.contains('@')) {
+                                          ss(
+                                            () =>
+                                                emailError =
+                                                    'Invalid email format',
+                                          );
+                                          return;
+                                        }
+
+                                        ss(() => isInviting = true);
+                                        final r =
+                                            await ApiService.addSplitMember(
+                                              widget.groupId,
+                                              identifier: email,
+                                            );
+                                        ss(() => isInviting = false);
+
+                                        if (r.isSuccess) {
+                                          emailCtrl.clear();
+                                          HapticFeedback.mediumImpact();
+                                          _showTopMessage(
+                                            'Invitation sent to $email',
+                                          );
+                                        } else {
+                                          _showTopMessage(
+                                            r.error ?? 'Error',
+                                            isError: true,
+                                          );
+                                        }
+                                      },
+                              child: Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: AppColors.dark,
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child:
+                                    isInviting
+                                        ? const Center(
+                                          child: SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                              color: AppColors.accent,
+                                              strokeWidth: 2,
+                                            ),
+                                          ),
+                                        )
+                                        : const Icon(
+                                          Icons.send,
+                                          color: AppColors.accent,
+                                          size: 20,
+                                        ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 32),
+                        const Text(
+                          'Select Friends',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.muted,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        if (loadingFriends)
+                          const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(20),
+                              child: CircularProgressIndicator(
+                                color: AppColors.accent,
+                              ),
+                            ),
+                          )
+                        else if (friends.isEmpty)
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: AppColors.card,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: const Text(
+                              'No other friends to add.',
+                              style: TextStyle(
+                                color: AppColors.muted,
+                                fontSize: 13,
+                              ),
+                            ),
+                          )
+                        else ...[
+                          ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxHeight: MediaQuery.of(ctx).size.height * 0.3,
+                            ),
+                            child: ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: friends.length,
+                              itemBuilder: (ctx, i) {
+                                final f = friends[i];
+                                final fid = f['id'] as int;
+                                final isSelected = selectedIds.contains(fid);
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color:
+                                          isSelected
+                                              ? AppColors.accent.withOpacity(
+                                                0.05,
+                                              )
+                                              : AppColors.card,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                        color:
+                                            isSelected
+                                                ? AppColors.accent
+                                                : AppColors.border,
+                                      ),
+                                    ),
+                                    child: CheckboxListTile(
+                                      value: isSelected,
+                                      onChanged:
+                                          (v) => ss(() {
+                                            if (v!)
+                                              selectedIds.add(fid);
+                                            else
+                                              selectedIds.remove(fid);
+                                          }),
+                                      title: Text(
+                                        f['display_name'] ??
+                                            f['username'] ??
+                                            '',
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.text,
+                                        ),
+                                      ),
+                                      subtitle: Text(
+                                        f['email'] ?? '',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.muted,
+                                        ),
+                                      ),
+                                      secondary: UserAvatar(
+                                        initial: f['initial'] ?? '?',
+                                        avatarUrl: f['avatar_url'],
+                                        size: 36,
+                                      ),
+                                      activeColor: AppColors.accent,
+                                      checkColor: AppColors.dark,
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                          ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 32),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.accent,
+                              foregroundColor: AppColors.dark,
+                              disabledBackgroundColor: AppColors.accent
+                                  .withOpacity(0.3),
+                              disabledForegroundColor: AppColors.dark
+                                  .withOpacity(0.3),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              elevation: 0,
+                            ),
+                            onPressed:
+                                selectedIds.isEmpty
+                                    ? null
+                                    : () async {
+                                      bool allSuccess = true;
+                                      for (final id in selectedIds) {
+                                        final r =
+                                            await ApiService.addSplitMember(
+                                              widget.groupId,
+                                              identifier: id.toString(),
+                                            );
+                                        if (!r.isSuccess) allSuccess = false;
+                                      }
+                                      if (!ctx.mounted) return;
+                                      Navigator.pop(ctx);
+                                      if (allSuccess) {
+                                        HapticFeedback.heavyImpact();
+                                        _load();
+                                        _showTopMessage('Members added!');
+                                      } else {
+                                        _showTopMessage(
+                                          'Some members could not be added.',
+                                          isError: true,
+                                        );
+                                      }
+                                    },
+                            child: Text(
+                              'Add ${selectedIds.length} Selected',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
-                const SizedBox(height: 32),
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.accent,
-                      foregroundColor: AppColors.dark,
-                      disabledBackgroundColor: AppColors.accent.withOpacity(0.3),
-                      disabledForegroundColor: AppColors.dark.withOpacity(0.3),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      elevation: 0,
-                    ),
-                    onPressed: selectedIds.isEmpty ? null : () async {
-                      bool allSuccess = true;
-                      for (final id in selectedIds) {
-                        final r = await ApiService.addSplitMember(widget.groupId, identifier: id.toString());
-                        if (!r.isSuccess) allSuccess = false;
-                      }
-                      if (!ctx.mounted) return;
-                      Navigator.pop(ctx);
-                      if (allSuccess) {
-                        HapticFeedback.heavyImpact();
-                        _load();
-                        _showTopMessage('Members added!');
-                      } else {
-                        _showTopMessage('Some members could not be added.', isError: true);
-                      }
-                    },
-                    child: Text('Add ${selectedIds.length} Selected', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   ),
                 ),
-              ],
-            ),
           ),
-        ),
-      ),
     );
   }
 
@@ -386,68 +588,129 @@ class _S extends State<SplitGroupDetailScreen>
       context: context,
       backgroundColor: AppColors.background,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, ss) => Container(
-          padding: EdgeInsets.fromLTRB(24, 12, 24, MediaQuery.of(ctx).viewInsets.bottom + 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: AppColors.muted.withOpacity(0.2), borderRadius: BorderRadius.circular(2)))),
-              const SizedBox(height: 24),
-              const Center(
-                child: Text('Edit Group', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.text)),
-              ),
-              const SizedBox(height: 32),
-              const Text('Group Name', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.muted)),
-              const SizedBox(height: 8),
-              TextField(
-                controller: nc,
-                autofocus: true,
-                style: const TextStyle(fontSize: 15, color: AppColors.text),
-                decoration: _inputDeco('Group name'),
-              ),
-              const SizedBox(height: 24),
-              IconColorPicker(
-                currentName: nc.text,
-                initialColor: _g?['color'] ?? '#C8E64A',
-                initialIcon: _g?['icon'] ?? 'groups',
-                onSelected: (color, icon) {
-                  selectedColor = color;
-                  selectedIcon = icon;
-                },
-              ),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.dark, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-                  onPressed: isSaving ? null : () async {
-                    if (nc.text.trim().isEmpty) return;
-                    ss(() => isSaving = true);
-                    final r = await ApiService.updateSplitGroup(widget.groupId, {
-                      'name': nc.text.trim(),
-                      'color': selectedColor,
-                      'icon': selectedIcon,
-                    });
-                    if (!ctx.mounted) return;
-                    Navigator.pop(ctx);
-                    if (r.isSuccess) {
-                      HapticFeedback.heavyImpact();
-                      _load();
-                    }
-                  },
-                  child: isSaving
-                      ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: AppColors.accent, strokeWidth: 2))
-                      : const Text('Save Changes', style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold, fontSize: 16)),
-                ),
-              ),
-            ],
-          ),
-        ),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
       ),
+      builder:
+          (ctx) => StatefulBuilder(
+            builder:
+                (ctx, ss) => Container(
+                  padding: EdgeInsets.fromLTRB(
+                    24,
+                    12,
+                    24,
+                    MediaQuery.of(ctx).viewInsets.bottom + 24,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 36,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: AppColors.muted.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      const Center(
+                        child: Text(
+                          'Edit Group',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.text,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      const Text(
+                        'Group Name',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.muted,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: nc,
+                        autofocus: true,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          color: AppColors.text,
+                        ),
+                        decoration: _inputDeco('Group name'),
+                      ),
+                      const SizedBox(height: 24),
+                      IconColorPicker(
+                        currentName: nc.text,
+                        initialColor: _g?['color'] ?? '#C8E64A',
+                        initialIcon: _g?['icon'] ?? 'groups',
+                        onSelected: (color, icon) {
+                          selectedColor = color;
+                          selectedIcon = icon;
+                        },
+                      ),
+                      const SizedBox(height: 32),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.dark,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          onPressed:
+                              isSaving
+                                  ? null
+                                  : () async {
+                                    if (nc.text.trim().isEmpty) return;
+                                    ss(() => isSaving = true);
+                                    final r = await ApiService.updateSplitGroup(
+                                      widget.groupId,
+                                      {
+                                        'name': nc.text.trim(),
+                                        'color': selectedColor,
+                                        'icon': selectedIcon,
+                                      },
+                                    );
+                                    if (!ctx.mounted) return;
+                                    Navigator.pop(ctx);
+                                    if (r.isSuccess) {
+                                      HapticFeedback.heavyImpact();
+                                      _load();
+                                    }
+                                  },
+                          child:
+                              isSaving
+                                  ? const SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      color: AppColors.accent,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                  : const Text(
+                                    'Save Changes',
+                                    style: TextStyle(
+                                      color: AppColors.accent,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+          ),
     );
   }
 
@@ -455,12 +718,16 @@ class _S extends State<SplitGroupDetailScreen>
     showDialog(
       context: ctx,
       barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator(color: AppColors.accent)),
+      builder:
+          (context) => const Center(
+            child: CircularProgressIndicator(color: AppColors.accent),
+          ),
     );
   }
 
   void _showExpenseDetail(Map<String, dynamic> e) {
-    bool isLoading = true;
+    bool hasCachedSplits = e['splits'] != null;
+    bool isLoading = !hasCachedSplits;
     Map<String, dynamic>? detail;
     bool fetchStarted = false;
 
@@ -471,196 +738,304 @@ class _S extends State<SplitGroupDetailScreen>
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
       ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, ss) {
-          
-          void fetchDetail() async {
-            final r = await ApiService.getSplitExpenseDetail(widget.groupId, e['id']);
-            if (mounted && ctx.mounted) {
-              ss(() {
-                isLoading = false;
-                if (r.isSuccess) {
-                  detail = r.data;
+      builder:
+          (ctx) => StatefulBuilder(
+            builder: (ctx, ss) {
+              void fetchDetail() async {
+                if (hasCachedSplits) return;
+                final r = await ApiService.getSplitExpenseDetail(
+                  widget.groupId,
+                  e['id'],
+                );
+                if (mounted && ctx.mounted) {
+                  ss(() {
+                    isLoading = false;
+                    if (r.isSuccess) {
+                      detail = r.data;
+                    }
+                  });
                 }
-              });
-            }
-          }
-          
-          if (!fetchStarted) {
-            fetchStarted = true;
-            fetchDetail();
-          }
-          
-          final displayDesc = detail?['description'] ?? e['description'] ?? '';
-          final displayAmount = detail?['amount'] ?? e['amount'] ?? '';
-          final displayDate = detail?['date'] ?? e['date'] ?? '';
-          
-          var paidBy = <String, dynamic>{};
-          if (detail?['paid_by'] is Map) {
-            paidBy = detail!['paid_by'];
-          } else if (e['paid_by'] is Map) {
-            paidBy = e['paid_by'];
-          }
+              }
 
-          final splits = List<Map<String, dynamic>>.from(detail?['splits'] ?? []);
-          final creatorId = detail?['created_by_id'] ?? e['created_by_id'];
+              if (!fetchStarted) {
+                fetchStarted = true;
+                fetchDetail();
+              }
 
-          return Container(
-            padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 36,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: AppColors.muted.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
+              final displayDesc =
+                  detail?['description'] ?? e['description'] ?? '';
+              final displayAmount = detail?['amount'] ?? e['amount'] ?? '';
+              final displayDate = detail?['date'] ?? e['date'] ?? '';
+
+              var paidBy = <String, dynamic>{};
+              if (detail?['paid_by'] is Map) {
+                paidBy = detail!['paid_by'];
+              } else if (e['paid_by'] is Map) {
+                paidBy = e['paid_by'];
+              }
+
+              final splits = List<Map<String, dynamic>>.from(
+                detail?['splits'] ?? e['splits'] ?? [],
+              );
+              final creatorId = detail?['created_by_id'] ?? e['created_by_id'];
+              final splitType =
+                  detail?['split_type'] ?? e['split_type'] ?? 'equal';
+              final splitTypeDisplay =
+                  splitType.toString()[0].toUpperCase() +
+                  splitType.toString().substring(1);
+
+              return Container(
+                padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      UserAvatar(
-                        initial: paidBy['display_name'] ?? paidBy['username'] ?? '?',
-                        avatarUrl: paidBy['avatar_url'],
-                        size: 48,
+                      Center(
+                        child: Container(
+                          width: 36,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: AppColors.muted.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              displayDesc,
-                              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.text),
+                      const SizedBox(height: 24),
+                      Row(
+                        children: [
+                          UserAvatar(
+                            initial:
+                                paidBy['display_name'] ??
+                                paidBy['username'] ??
+                                '?',
+                            avatarUrl: paidBy['avatar_url'],
+                            size: 48,
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  displayDesc,
+                                  style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.text,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Paid by ${paidBy['display_name'] ?? paidBy['username']} • ${displayDate != '' ? DateFormat('MMM d, yyyy').format(DateTime.parse(displayDate).toLocal()) : ''}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.muted,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Paid by ${paidBy['display_name'] ?? paidBy['username']} • ${displayDate != '' ? DateFormat('MMM d, yyyy').format(DateTime.parse(displayDate).toLocal()) : ''}',
-                              style: const TextStyle(fontSize: 12, color: AppColors.muted),
+                          ),
+                          Text(
+                            '${_currencySymbol}$displayAmount',
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.text,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 32),
+                      Text(
+                        'Splits • $splitTypeDisplay',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.muted,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      if (isLoading)
+                        const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(20),
+                            child: CircularProgressIndicator(
+                              color: AppColors.accent,
+                            ),
+                          ),
+                        )
+                      else if (splits.isEmpty)
+                        const Text(
+                          'No splits found',
+                          style: TextStyle(color: AppColors.muted),
+                        )
+                      else
+                        ...splits
+                            .map(
+                              (s) => Container(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: AppColors.card,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: AppColors.border),
+                                ),
+                                child: Row(
+                                  children: [
+                                    UserAvatar(
+                                      initial: s['display_name'] ?? '?',
+                                      avatarUrl: s['avatar_url'],
+                                      size: 32,
+                                    ),
+                                    const SizedBox(width: 14),
+                                    Expanded(
+                                      child: Text(
+                                        s['display_name'] ?? '',
+                                        style: const TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w500,
+                                          color: AppColors.text,
+                                        ),
+                                      ),
+                                    ),
+                                    Text(
+                                      '${_currencySymbol}${s['amount']}',
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.text,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                            .toList(),
+                      if (!isLoading && _myId == creatorId) ...[
+                        const SizedBox(height: 32),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.accent,
+                                  foregroundColor: AppColors.dark,
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                ),
+                                onPressed: () {
+                                  Navigator.pop(ctx);
+                                  _addExpense(editData: detail ?? e);
+                                },
+                                child: const Text(
+                                  'Edit',
+                                  style: TextStyle(fontWeight: FontWeight.w700),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.dark,
+                                  foregroundColor: AppColors.accent,
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                ),
+                                onPressed:
+                                    () => _confirmDeleteExpense(
+                                      detail?['id'] ?? e['id'],
+                                    ),
+                                child: const Text(
+                                  'Delete',
+                                  style: TextStyle(fontWeight: FontWeight.w700),
+                                ),
+                              ),
                             ),
                           ],
                         ),
-                      ),
-                      Text(
-                        '${_currencySymbol}$displayAmount',
-                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.text),
-                      ),
+                      ],
                     ],
                   ),
-                  const SizedBox(height: 32),
-                  const Text(
-                    'Splits',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.muted),
-                  ),
-                  const SizedBox(height: 16),
-                  if (isLoading)
-                    const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator(color: AppColors.accent)))
-                  else if (splits.isEmpty)
-                    const Text('No splits found', style: TextStyle(color: AppColors.muted))
-                  else
-                    ...splits.map((s) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Row(
-                        children: [
-                           UserAvatar(
-                             initial: s['display_name'] ?? '?',
-                             avatarUrl: s['avatar_url'],
-                             size: 28,
-                             borderRadius: 8,
-                           ),
-                           const SizedBox(width: 12),
-                           Expanded(
-                             child: Text(s['display_name'] ?? '', style: const TextStyle(fontSize: 14, color: AppColors.text)),
-                           ),
-                           Text('${_currencySymbol}${s['amount']}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.text)),
-                        ],
-                      ),
-                    )).toList(),
-                  if (!isLoading && _myId == creatorId) ...[
-                    const SizedBox(height: 32),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.text,
-                              foregroundColor: AppColors.accent,
-                              elevation: 0,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                            onPressed: () {
-                              Navigator.pop(ctx);
-                              _addExpense(editData: detail);
-                            },
-                            child: const Text('Edit', style: TextStyle(fontWeight: FontWeight.w700)),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.accent,
-                              foregroundColor: AppColors.dark,
-                              elevation: 0,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                            ),
-                            onPressed: () => _confirmDeleteExpense(detail!['id']),
-                            child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.w700)),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          );
-        },
-      ),
+                ),
+              );
+            },
+          ),
     );
   }
 
   void _confirmDeleteExpense(int id) {
-     showDialog(
-       context: context,
-       builder: (ctx) => AlertDialog(
-         backgroundColor: AppColors.card,
-         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-         title: const Text('Delete Expense?', style: TextStyle(color: AppColors.text, fontWeight: FontWeight.bold)),
-         content: const Text('This will reverse all balance changes in the group ledger. Are you sure?', style: TextStyle(color: AppColors.muted)),
-         actions: [
-           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel', style: TextStyle(color: AppColors.muted))),
-           TextButton(
-             onPressed: () async {
-               Navigator.pop(ctx); // Close dialog
-               Navigator.pop(context); // Close detail modal
-               _showLoading(context);
-               final r = await ApiService.deleteSplitExpense(widget.groupId, id);
-               if (!mounted) return;
-               Navigator.pop(context); // Close loading
-               if (r.isSuccess) {
-                 HapticFeedback.heavyImpact();
-                 _showTopMessage('Expense deleted');
-                 _load();
-               } else {
-                 _showTopMessage(r.error ?? 'Failed to delete', isError: true);
-               }
-             },
-             child: const Text('Delete', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold)),
-           ),
-         ],
-       ),
-     );
+    showDialog(
+      context: context,
+      builder:
+          (ctx) => AlertDialog(
+            backgroundColor: AppColors.card,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+            ),
+            title: const Text(
+              'Delete Expense?',
+              style: TextStyle(
+                color: AppColors.text,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            content: const Text(
+              'This will reverse all balance changes in the group ledger. Are you sure?',
+              style: TextStyle(color: AppColors.muted),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text(
+                  'Cancel',
+                  style: TextStyle(color: AppColors.muted),
+                ),
+              ),
+              TextButton(
+                onPressed: () async {
+                  Navigator.pop(ctx); // Close dialog
+                  Navigator.pop(context); // Close detail modal
+                  _showLoading(context);
+                  final r = await ApiService.deleteSplitExpense(
+                    widget.groupId,
+                    id,
+                  );
+                  if (!mounted) return;
+                  Navigator.pop(context); // Close loading
+                  if (r.isSuccess) {
+                    HapticFeedback.heavyImpact();
+                    _showTopMessage('Expense deleted');
+                    _load();
+                  } else {
+                    _showTopMessage(
+                      r.error ?? 'Failed to delete',
+                      isError: true,
+                    );
+                  }
+                },
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(
+                    color: AppColors.error,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+    );
   }
 
   void _addExpense({Map<String, dynamic>? editData}) {
@@ -684,9 +1059,35 @@ class _S extends State<SplitGroupDetailScreen>
       }
     }
 
+    DateTime _date = DateTime.now();
+    if (editData != null && editData['date'] != null) {
+      final parsed = DateTime.tryParse(editData['date']);
+      if (parsed != null) _date = parsed.toLocal();
+    }
+
     String? amountErr;
     String? descErr;
     String? splitErr;
+
+    Map<String, dynamic>? selectedPayer;
+    if (editData != null && editData['paid_by'] != null) {
+      final pid = editData['paid_by']['id'];
+      selectedPayer = members.firstWhere(
+        (m) => m['id'] == pid,
+        orElse:
+            () => members.firstWhere(
+              (m) => m['id'] == _myId,
+              orElse:
+                  () =>
+                      members.isNotEmpty ? members.first : <String, dynamic>{},
+            ),
+      );
+    } else {
+      selectedPayer = members.firstWhere(
+        (m) => m['id'] == _myId,
+        orElse: () => members.isNotEmpty ? members.first : <String, dynamic>{},
+      );
+    }
 
     showModalBottomSheet(
       context: context,
@@ -695,269 +1096,640 @@ class _S extends State<SplitGroupDetailScreen>
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
       ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, ss) => Container(
-          padding: EdgeInsets.fromLTRB(24, 12, 24, MediaQuery.of(ctx).viewInsets.bottom + 16),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: AppColors.muted.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
+      builder:
+          (ctx) => StatefulBuilder(
+            builder:
+                (ctx, ss) => Container(
+                  padding: EdgeInsets.fromLTRB(
+                    24,
+                    12,
+                    24,
+                    MediaQuery.of(ctx).viewInsets.bottom + 16,
                   ),
-                ),
-                const SizedBox(height: 24),
-                Center(
-                  child: Text(editData != null ? 'Edit Expense' : 'Add Expense', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.text)),
-                ),
-                const SizedBox(height: 32),
-                // Amount
-                EspereInput(
-                  label: 'Amount',
-                  hint: '0.00',
-                  controller: ac,
-                  prefixText: '${_currencySymbol}',
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  autofocus: editData == null,
-                  errorText: amountErr,
-                  onChanged: (_) { if (amountErr != null) ss(() => amountErr = null); },
-                ),
-                const SizedBox(height: 16),
-                // Description
-                EspereInput(
-                  label: 'Description',
-                  hint: 'What was this for?',
-                  controller: dc,
-                  errorText: descErr,
-                  onChanged: (_) { if (descErr != null) ss(() => descErr = null); },
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'Split Between',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.muted),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: ['equal', 'exact', 'percentage'].map((t) {
-                    final isSel = splitType == t;
-                    return Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.only(right: t != 'percentage' ? 8 : 0),
-                        child: GestureDetector(
-                          onTap: () => ss(() => splitType = t),
-                          child: Container(
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: isSel ? AppColors.accent : AppColors.card,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: isSel ? AppColors.accent : AppColors.border),
-                              boxShadow: isSel ? [BoxShadow(color: AppColors.accent.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))] : null,
-                            ),
-                            child: Center(
-                              child: Text(
-                                t[0].toUpperCase() + t.substring(1),
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: isSel ? AppColors.dark : AppColors.muted,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 20),
-                if (splitType == 'equal')
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppColors.card,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: Row(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.group_outlined, size: 20, color: AppColors.accent),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'This will be split equally among all ${members.length} members.',
-                            style: const TextStyle(fontSize: 13, color: AppColors.muted),
+                        Center(
+                          child: Container(
+                            width: 36,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: AppColors.muted.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
                           ),
                         ),
-                      ],
-                    ),
-                  )
-                else
-                  ...members.map((m) {
-                    final uid = m['id'] as int;
-                    final label = splitType == 'percentage' ? '%' : '${_currencySymbol}';
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppColors.card,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: AppColors.border),
+                        const SizedBox(height: 24),
+                        Center(
+                          child: Text(
+                            editData != null ? 'Edit Expense' : 'Add Expense',
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.text,
+                            ),
+                          ),
                         ),
-                        child: Row(
+                        const SizedBox(height: 32),
+                        // Amount
+                        EspereInput(
+                          label: 'Amount',
+                          hint: '0.00',
+                          controller: ac,
+                          prefixText: '${_currencySymbol}',
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          autofocus: editData == null,
+                          errorText: amountErr,
+                          onChanged: (_) {
+                            if (amountErr != null) ss(() => amountErr = null);
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        // Description
+                        EspereInput(
+                          label: 'Description',
+                          hint: 'What was this for?',
+                          controller: dc,
+                          errorText: descErr,
+                          onChanged: (_) {
+                            if (descErr != null) ss(() => descErr = null);
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        // Date & Time Picker
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            UserAvatar(initial: m['initial'] ?? '?', avatarUrl: m['avatar_url'], size: 36),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                m['display_name'] ?? m['username'] as String,
-                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.text),
+                            const Text(
+                              'Date & Time',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.text,
                               ),
                             ),
-                            SizedBox(
-                              width: 80,
-                              child: TextField(
-                                controller: splitCtrls[uid],
-                                keyboardType: TextInputType.number,
-                                textAlign: TextAlign.right,
-                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.text),
-                                decoration: InputDecoration(
-                                  hintText: '0',
-                                  hintStyle: const TextStyle(color: AppColors.muted),
-                                  suffixText: ' $label',
-                                  suffixStyle: const TextStyle(color: AppColors.muted, fontSize: 12),
-                                  border: InputBorder.none,
-                                  isDense: true,
+                            const SizedBox(height: 6),
+                            GestureDetector(
+                              onTap: () async {
+                                final pickedDate = await showDatePicker(
+                                  context: ctx,
+                                  initialDate: _date,
+                                  firstDate: DateTime(2000),
+                                  lastDate: DateTime(2100),
+                                );
+                                if (pickedDate != null) {
+                                  if (!mounted) return;
+                                  final pickedTime = await showTimePicker(
+                                    context: ctx,
+                                    initialTime: TimeOfDay.fromDateTime(_date),
+                                  );
+                                  if (pickedTime != null) {
+                                    ss(() {
+                                      _date = DateTime(
+                                        pickedDate.year,
+                                        pickedDate.month,
+                                        pickedDate.day,
+                                        pickedTime.hour,
+                                        pickedTime.minute,
+                                      );
+                                    });
+                                  }
+                                }
+                              },
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 14,
                                 ),
-                                onChanged: (_) { if (splitErr != null) ss(() => splitErr = null); },
+                                decoration: BoxDecoration(
+                                  color: AppColors.surface,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: AppColors.border,
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.calendar_today_rounded,
+                                      size: 18,
+                                      color: AppColors.muted,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        DateFormat(
+                                          'MMM dd, yyyy · hh:mm a',
+                                        ).format(_date),
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          color: AppColors.text,
+                                        ),
+                                      ),
+                                    ),
+                                    const Icon(
+                                      Icons.arrow_drop_down,
+                                      color: AppColors.muted,
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ],
                         ),
-                      ),
-                    );
-                  }).toList(),
-                
-                if (splitErr != null)
-                  Container(
-                    margin: const EdgeInsets.only(top: 24),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: AppColors.text,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: AppShadows.soft,
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.info_outline, size: 18, color: AppColors.accent),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            splitErr!,
-                            style: const TextStyle(fontSize: 13, color: AppColors.accent, fontWeight: FontWeight.w500),
+                        const SizedBox(height: 16),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Paid By',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.text,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            GestureDetector(
+                              onTap: () {
+                                showModalBottomSheet(
+                                  context: context,
+                                  backgroundColor: AppColors.card,
+                                  isScrollControlled: true,
+                                  shape: const RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.vertical(
+                                      top: Radius.circular(24),
+                                    ),
+                                  ),
+                                  builder:
+                                      (ctx) => _UserPickerSheet(
+                                        users: members,
+                                        selectedId: selectedPayer?['id'],
+                                        onSelected:
+                                            (u) => ss(() => selectedPayer = u),
+                                      ),
+                                );
+                              },
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 14,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surface,
+                                  borderRadius: BorderRadius.circular(
+                                    AppRadius.lg,
+                                  ),
+                                  border: Border.all(
+                                    color: AppColors.border,
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    if (selectedPayer != null) ...[
+                                      Container(
+                                        width: 28,
+                                        height: 28,
+                                        decoration: BoxDecoration(
+                                          color: AppColors.accent,
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                          child:
+                                              selectedPayer!['avatar_url'] !=
+                                                      null
+                                                  ? Image.network(
+                                                    selectedPayer!['avatar_url'],
+                                                    fit: BoxFit.cover,
+                                                  )
+                                                  : Center(
+                                                    child: Text(
+                                                      (selectedPayer!['initial'] ??
+                                                              '?')
+                                                          .toString()
+                                                          .toUpperCase(),
+                                                      style: const TextStyle(
+                                                        color: AppColors.dark,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontSize: 14,
+                                                      ),
+                                                    ),
+                                                  ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                    ],
+                                    Expanded(
+                                      child: Text(
+                                        selectedPayer != null
+                                            ? (selectedPayer!['display_name'] ??
+                                                selectedPayer!['username'] ??
+                                                '')
+                                            : 'Select who paid',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color:
+                                              selectedPayer != null
+                                                  ? AppColors.text
+                                                  : AppColors.muted,
+                                        ),
+                                      ),
+                                    ),
+                                    const Icon(
+                                      Icons.arrow_drop_down,
+                                      color: AppColors.muted,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        const Text(
+                          'Split Between',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.muted,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children:
+                              ['equal', 'exact', 'percentage'].map((t) {
+                                final isSel = splitType == t;
+                                return Expanded(
+                                  child: Padding(
+                                    padding: EdgeInsets.only(
+                                      right: t != 'percentage' ? 8 : 0,
+                                    ),
+                                    child: GestureDetector(
+                                      onTap: () => ss(() => splitType = t),
+                                      child: Container(
+                                        height: 44,
+                                        decoration: BoxDecoration(
+                                          color:
+                                              isSel
+                                                  ? AppColors.accent
+                                                  : AppColors.card,
+                                          borderRadius: BorderRadius.circular(
+                                            14,
+                                          ),
+                                          border: Border.all(
+                                            color:
+                                                isSel
+                                                    ? AppColors.accent
+                                                    : AppColors.border,
+                                          ),
+                                          boxShadow:
+                                              isSel
+                                                  ? [
+                                                    BoxShadow(
+                                                      color: AppColors.accent
+                                                          .withOpacity(0.3),
+                                                      blurRadius: 8,
+                                                      offset: const Offset(
+                                                        0,
+                                                        4,
+                                                      ),
+                                                    ),
+                                                  ]
+                                                  : null,
+                                        ),
+                                        child: Center(
+                                          child: Text(
+                                            t[0].toUpperCase() + t.substring(1),
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.bold,
+                                              color:
+                                                  isSel
+                                                      ? AppColors.dark
+                                                      : AppColors.muted,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                        ),
+                        const SizedBox(height: 20),
+                        if (splitType == 'equal')
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: AppColors.card,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.accent,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Icon(
+                                    Icons.group_outlined,
+                                    size: 18,
+                                    color: AppColors.dark,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    'This will be split equally among all ${members.length} members.',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: AppColors.text,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          ...members.map((m) {
+                            final uid = m['id'] as int;
+                            final label =
+                                splitType == 'percentage'
+                                    ? '%'
+                                    : '${_currencySymbol}';
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: AppColors.card,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: AppColors.border),
+                                ),
+                                child: Row(
+                                  children: [
+                                    UserAvatar(
+                                      initial: m['initial'] ?? '?',
+                                      avatarUrl: m['avatar_url'],
+                                      size: 36,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        m['display_name'] ??
+                                            m['username'] as String,
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.text,
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox(
+                                      width: 80,
+                                      child: TextField(
+                                        controller: splitCtrls[uid],
+                                        keyboardType: TextInputType.number,
+                                        textAlign: TextAlign.right,
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.text,
+                                        ),
+                                        decoration: InputDecoration(
+                                          hintText: '0',
+                                          hintStyle: const TextStyle(
+                                            color: AppColors.muted,
+                                          ),
+                                          suffixText: ' $label',
+                                          suffixStyle: const TextStyle(
+                                            color: AppColors.muted,
+                                            fontSize: 12,
+                                          ),
+                                          border: InputBorder.none,
+                                          isDense: true,
+                                        ),
+                                        onChanged: (_) {
+                                          if (splitErr != null)
+                                            ss(() => splitErr = null);
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }).toList(),
+
+                        if (splitErr != null)
+                          Container(
+                            margin: const EdgeInsets.only(top: 24),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.text,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: AppShadows.soft,
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 24,
+                                  height: 24,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.dark,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Icon(
+                                    Icons.info_outline,
+                                    size: 14,
+                                    color: AppColors.accent,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    splitErr!,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: AppColors.accent,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                        const SizedBox(height: 32),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.dark,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            onPressed:
+                                isSaving
+                                    ? null
+                                    : () async {
+                                      final amountStr = ac.text.trim();
+                                      final descStr = dc.text.trim();
+                                      bool hasErr = false;
+
+                                      if (descStr.isEmpty) {
+                                        ss(() => descErr = 'Required');
+                                        hasErr = true;
+                                      }
+                                      if (amountStr.isEmpty) {
+                                        ss(() => amountErr = 'Required');
+                                        hasErr = true;
+                                      }
+                                      if (hasErr) return;
+
+                                      final totalAmount =
+                                          double.tryParse(amountStr) ?? 0;
+
+                                      if (splitType == 'exact') {
+                                        double sum = 0;
+                                        for (var m in members) {
+                                          final uid = m['id'] as int;
+                                          final val =
+                                              double.tryParse(
+                                                splitCtrls[uid]?.text.trim() ??
+                                                    '',
+                                              ) ??
+                                              0;
+                                          sum += val;
+                                        }
+                                        if ((sum - totalAmount).abs() > 0.01) {
+                                          ss(
+                                            () =>
+                                                splitErr =
+                                                    'Total split (${_currencySymbol}${sum.toStringAsFixed(2)}) must match expense (${_currencySymbol}${totalAmount.toStringAsFixed(2)})',
+                                          );
+                                          return;
+                                        }
+                                      } else if (splitType == 'percentage') {
+                                        double sum = 0;
+                                        for (var m in members) {
+                                          final uid = m['id'] as int;
+                                          final val =
+                                              double.tryParse(
+                                                splitCtrls[uid]?.text.trim() ??
+                                                    '',
+                                              ) ??
+                                              0;
+                                          sum += val;
+                                        }
+                                        if ((sum - 100).abs() > 0.01) {
+                                          ss(
+                                            () =>
+                                                splitErr =
+                                                    'Total percentage (${sum.toStringAsFixed(0)}%) must equal 100%',
+                                          );
+                                          return;
+                                        }
+                                      }
+
+                                      ss(() => splitErr = null);
+                                      ss(() => isSaving = true);
+                                      final body = <String, dynamic>{
+                                        'description': descStr,
+                                        'amount': amountStr,
+                                        'split_type': splitType,
+                                        'date': _date.toUtc().toIso8601String(),
+                                        if (selectedPayer != null &&
+                                            selectedPayer!['id'] != null)
+                                          'paid_by': selectedPayer!['id'],
+                                      };
+                                      if (splitType != 'equal') {
+                                        body['splits'] =
+                                            members.map((m) {
+                                              final uid = m['id'] as int;
+                                              final valStr = splitCtrls[uid]?.text.trim() ?? '';
+                                              return {
+                                                'user_id': uid,
+                                                'value': valStr.isEmpty ? '0' : valStr,
+                                              };
+                                            }).toList();
+                                      }
+
+                                      ApiResult r;
+                                      if (editData != null) {
+                                        r = await ApiService.updateSplitExpense(
+                                          widget.groupId,
+                                          editData['id'],
+                                          body,
+                                        );
+                                      } else {
+                                        r = await ApiService.addSplitExpense(
+                                          widget.groupId,
+                                          body,
+                                        );
+                                      }
+
+                                      if (!ctx.mounted) return;
+                                      Navigator.pop(ctx);
+                                      if (r.isSuccess) {
+                                        HapticFeedback.heavyImpact();
+                                        _load();
+                                      } else {
+                                        _showTopMessage(
+                                          r.error ?? 'Error',
+                                          isError: true,
+                                        );
+                                      }
+                                    },
+                            child:
+                                isSaving
+                                    ? const SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(
+                                        color: AppColors.accent,
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                    : Text(
+                                      editData != null
+                                          ? 'Update Expense'
+                                          : 'Add Expense',
+                                      style: const TextStyle(
+                                        color: AppColors.accent,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                
-                const SizedBox(height: 32),
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.dark,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    ),
-                    onPressed: isSaving ? null : () async {
-                      final amountStr = ac.text.trim();
-                      final descStr = dc.text.trim();
-                      bool hasErr = false;
-
-                      if (descStr.isEmpty) {
-                        ss(() => descErr = 'Required');
-                        hasErr = true;
-                      }
-                      if (amountStr.isEmpty) {
-                        ss(() => amountErr = 'Required');
-                        hasErr = true;
-                      }
-                      if (hasErr) return;
-
-                      final totalAmount = double.tryParse(amountStr) ?? 0;
-
-                      if (splitType == 'exact') {
-                        double sum = 0;
-                        for (var m in members) {
-                          final uid = m['id'] as int;
-                          final val = double.tryParse(splitCtrls[uid]?.text.trim() ?? '') ?? 0;
-                          sum += val;
-                        }
-                        if ((sum - totalAmount).abs() > 0.01) {
-                          ss(() => splitErr = 'Total split (${_currencySymbol}${sum.toStringAsFixed(2)}) must match expense (${_currencySymbol}${totalAmount.toStringAsFixed(2)})');
-                          return;
-                        }
-                      } else if (splitType == 'percentage') {
-                        double sum = 0;
-                        for (var m in members) {
-                          final uid = m['id'] as int;
-                          final val = double.tryParse(splitCtrls[uid]?.text.trim() ?? '') ?? 0;
-                          sum += val;
-                        }
-                        if ((sum - 100).abs() > 0.01) {
-                          ss(() => splitErr = 'Total percentage (${sum.toStringAsFixed(0)}%) must equal 100%');
-                          return;
-                        }
-                      }
-
-                      ss(() => splitErr = null);
-                      ss(() => isSaving = true);
-                      final body = <String, dynamic>{
-                        'description': descStr,
-                        'amount': amountStr,
-                        'split_type': splitType,
-                      };
-                      if (splitType != 'equal') {
-                        body['splits'] = members.map((m) {
-                          final uid = m['id'] as int;
-                          return {'user_id': uid, 'value': splitCtrls[uid]?.text.trim() ?? '0'};
-                        }).toList();
-                      }
-
-                      ApiResult r;
-                      if (editData != null) {
-                         r = await ApiService.updateSplitExpense(widget.groupId, editData['id'], body);
-                      } else {
-                         r = await ApiService.addSplitExpense(widget.groupId, body);
-                      }
-
-                      if (!ctx.mounted) return;
-                      Navigator.pop(ctx);
-                      if (r.isSuccess) {
-                        HapticFeedback.heavyImpact();
-                        _load();
-                      } else {
-                        _showTopMessage(r.error ?? 'Error', isError: true);
-                      }
-                    },
-                    child: isSaving
-                        ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: AppColors.accent, strokeWidth: 2))
-                        : Text(editData != null ? 'Update Expense' : 'Add Expense', style: const TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold, fontSize: 16)),
-                  ),
                 ),
-              ],
-            ),
           ),
-        ),
-      ),
     );
   }
 
@@ -973,140 +1745,204 @@ class _S extends State<SplitGroupDetailScreen>
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
       ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, ss) => Container(
-          padding: EdgeInsets.fromLTRB(24, 12, 24, MediaQuery.of(ctx).viewInsets.bottom + 16),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.muted.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(2),
+      builder:
+          (ctx) => StatefulBuilder(
+            builder:
+                (ctx, ss) => Container(
+                  padding: EdgeInsets.fromLTRB(
+                    24,
+                    12,
+                    24,
+                    MediaQuery.of(ctx).viewInsets.bottom + 16,
                   ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              const Center(
-                child: Text('Settle Up', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.text)),
-              ),
-              const SizedBox(height: 32),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.card,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.border),
-                  boxShadow: AppShadows.soft,
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: AppColors.accent.withOpacity(0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.person, color: AppColors.accent, size: 24),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            d['from_user'] as String,
-                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.text),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 36,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: AppColors.muted.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
                           ),
-                          Text(
-                            'to pay ${d['to_user']}',
-                            style: const TextStyle(fontSize: 12, color: AppColors.muted),
+                        ),
+                        const SizedBox(height: 24),
+                        const Center(
+                          child: Text(
+                            'Settle Up',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.text,
+                            ),
                           ),
-                        ],
-                      ),
-                    ),
-                    Text(
-                      '${_currencySymbol}${d['amount']}',
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.text),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              EspereInput(
-                label: 'Amount Paid',
-                hint: '0.00',
-                controller: ac,
-                prefixText: '${_currencySymbol}',
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              ),
-              const SizedBox(height: 20),
-              Container(
-                decoration: BoxDecoration(
-                  color: AppColors.card,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: CheckboxListTile(
-                  value: isConfirmed,
-                  onChanged: (v) => ss(() => isConfirmed = v ?? false),
-                  title: const Text(
-                    'Both parties have confirmed this payment',
-                    style: TextStyle(fontSize: 12, color: AppColors.text, fontWeight: FontWeight.w500),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                  controlAffinity: ListTileControlAffinity.leading,
-                  activeColor: AppColors.accent,
-                  checkColor: AppColors.dark,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.dark,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                  onPressed: (!isConfirmed || isSaving)
-                      ? null
-                      : () async {
-                          ss(() => isSaving = true);
-                          final body = {
-                            'paid_to_id': d['to_user_id'],
-                            'paid_by_id': d['from_user_id'],
-                            'amount': ac.text.trim(),
-                          };
+                        ),
+                        const SizedBox(height: 32),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppColors.card,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: AppColors.border),
+                            boxShadow: AppShadows.soft,
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: AppColors.accent.withOpacity(0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.person,
+                                  color: AppColors.accent,
+                                  size: 24,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      d['from_user'] as String,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.text,
+                                      ),
+                                    ),
+                                    Text(
+                                      'to pay ${d['to_user']}',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.muted,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Text(
+                                '${_currencySymbol}${d['amount']}',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                  color: AppColors.text,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        EspereInput(
+                          label: 'Amount Paid',
+                          hint: '0.00',
+                          controller: ac,
+                          prefixText: '${_currencySymbol}',
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: AppColors.card,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: CheckboxListTile(
+                            value: isConfirmed,
+                            onChanged:
+                                (v) => ss(() => isConfirmed = v ?? false),
+                            title: const Text(
+                              'Both parties have confirmed this payment',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.text,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                            ),
+                            controlAffinity: ListTileControlAffinity.leading,
+                            activeColor: AppColors.accent,
+                            checkColor: AppColors.dark,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.dark,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            onPressed:
+                                (!isConfirmed || isSaving)
+                                    ? null
+                                    : () async {
+                                      ss(() => isSaving = true);
+                                      final body = {
+                                        'paid_to_id': d['to_user_id'],
+                                        'paid_by_id': d['from_user_id'],
+                                        'amount': ac.text.trim(),
+                                      };
 
-                          final r = await ApiService.settleDebt(widget.groupId, body);
-                          if (!ctx.mounted) return;
-                          Navigator.pop(ctx);
-                          if (r.isSuccess) {
-                            HapticFeedback.heavyImpact();
-                            _load();
-                          } else {
-                            _showTopMessage(r.error ?? 'Error', isError: true);
-                          }
-                        },
-                  child: isSaving
-                      ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: AppColors.accent, strokeWidth: 2))
-                      : const Text('Confirm Settlement', style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold, fontSize: 16)),
+                                      final r = await ApiService.settleDebt(
+                                        widget.groupId,
+                                        body,
+                                      );
+                                      if (!ctx.mounted) return;
+                                      Navigator.pop(ctx);
+                                      if (r.isSuccess) {
+                                        HapticFeedback.heavyImpact();
+                                        _load();
+                                      } else {
+                                        _showTopMessage(
+                                          r.error ?? 'Error',
+                                          isError: true,
+                                        );
+                                      }
+                                    },
+                            child:
+                                isSaving
+                                    ? const SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(
+                                        color: AppColors.accent,
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                    : const Text(
+                                      'Confirm Settlement',
+                                      style: TextStyle(
+                                        color: AppColors.accent,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ],
           ),
-        ),
-      ),
-    ),
-  );
-}
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1114,226 +1950,370 @@ class _S extends State<SplitGroupDetailScreen>
     return FullOfflineAlert(
       child: Scaffold(
         backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Fixed Header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: AppColors.card,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: AppShadows.soft,
-                      ),
-                      child: const Icon(Icons.arrow_back, color: AppColors.text, size: 20),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      widget.groupName,
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.text),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  if (_g != null && _g!['created_by_id'] == _myId)
+        body: SafeArea(
+          child: Column(
+            children: [
+              // Fixed Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+                child: Row(
+                  children: [
                     GestureDetector(
-                      onTap: _editGroup,
+                      onTap: () => Navigator.pop(context),
                       child: Container(
                         width: 40,
                         height: 40,
-                        margin: const EdgeInsets.only(right: 8),
                         decoration: BoxDecoration(
-                          color: AppColors.dark,
+                          color: AppColors.card,
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: AppShadows.soft,
                         ),
-                        child: const Icon(Icons.edit, color: AppColors.accent, size: 18),
-                      ),
-                    ),
-                  GestureDetector(
-                    onTap: _g != null ? _addMember : null,
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: AppColors.accent,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: AppShadows.soft,
-                      ),
-                      child: const Icon(Icons.person_add, color: AppColors.dark, size: 20),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: _ld && _g == null
-                  ? _buildSkeleton()
-                  : _isPending 
-                      ? _buildPendingMask()
-                      : _g == null
-                          ? const Center(child: Text('Error loading group', style: TextStyle(color: AppColors.muted)))
-                          : NestedScrollView(
-                headerSliverBuilder: (context, innerBoxIsScrolled) => [
-                  if (_g != null)
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                        child: Container(
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            color: AppColors.text,
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: AppShadows.elevated,
-                            border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-                          ),
-                          child: Stack(
-                            children: [
-                              Positioned.fill(
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(20),
-                                    gradient: RadialGradient(
-                                      center: Alignment.topRight,
-                                      radius: 0.6,
-                                      colors: [AppColors.accent.withValues(alpha: 0.04), Colors.transparent],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.all(20),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text('Your Net Balance', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0x99FFFFFF))),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      '${bal > 0 ? "+" : ""}${_currencySymbol}${bal.abs().toStringAsFixed(2)}',
-                                      style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.accent),
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Row(
-                                      children: [
-                                        _sc(Icons.arrow_upward, 'Paid: ${_currencySymbol}0'),
-                                        const SizedBox(width: 12),
-                                        _sc(Icons.pie_chart, 'Share: ${_currencySymbol}0'),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: GestureDetector(
-                                            onTap: _addExpense,
-                                            child: Container(
-                                              height: 44,
-                                              decoration: BoxDecoration(
-                                                color: Colors.white.withValues(alpha: 0.1),
-                                                borderRadius: BorderRadius.circular(16),
-                                              ),
-                                              child: const Row(
-                                                mainAxisAlignment: MainAxisAlignment.center,
-                                                children: [
-                                                  Icon(Icons.add, size: 18, color: AppColors.accent),
-                                                  SizedBox(width: 6),
-                                                  Text('Expense', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: GestureDetector(
-                                            onTap: () => _tc.animateTo(2),
-                                            child: Container(
-                                              height: 44,
-                                              decoration: BoxDecoration(
-                                                color: Colors.white.withValues(alpha: 0.1),
-                                                borderRadius: BorderRadius.circular(16),
-                                              ),
-                                              child: const Row(
-                                                mainAxisAlignment: MainAxisAlignment.center,
-                                                children: [
-                                                  Icon(Icons.handshake, size: 18, color: AppColors.accent),
-                                                  SizedBox(width: 6),
-                                                  Text('Settle Up', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
+                        child: const Icon(
+                          Icons.arrow_back,
+                          color: AppColors.text,
+                          size: 20,
                         ),
                       ),
                     ),
-            SliverPersistentHeader(
-              pinned: true,
-              delegate: _SliverAppBarDelegate(
-                height: 64,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: AppColors.card,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: AppShadows.soft,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        widget.groupName,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.text,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                    padding: const EdgeInsets.all(3),
-                    child: TabBar(
-                      controller: _tc,
-                      indicator: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(14)),
-                      indicatorSize: TabBarIndicatorSize.tab,
-                      labelColor: AppColors.text,
-                      unselectedLabelColor: AppColors.muted,
-                      labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                      dividerHeight: 0,
-                      tabs: const [Tab(text: 'Expenses'), Tab(text: 'Balances'), Tab(text: 'Settle Up')],
+                    if (_g != null && _g!['created_by_id'] == _myId)
+                      GestureDetector(
+                        onTap: _editGroup,
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          margin: const EdgeInsets.only(right: 8),
+                          decoration: BoxDecoration(
+                            color: AppColors.dark,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: AppShadows.soft,
+                          ),
+                          child: const Icon(
+                            Icons.edit,
+                            color: AppColors.accent,
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                    GestureDetector(
+                      onTap: _g != null ? _addMember : null,
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: AppColors.accent,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: AppShadows.soft,
+                        ),
+                        child: const Icon(
+                          Icons.person_add,
+                          color: AppColors.dark,
+                          size: 20,
+                        ),
+                      ),
                     ),
-                    ),
-                  ),
+                  ],
                 ),
               ),
+              Expanded(
+                child:
+                    _ld && _g == null
+                        ? _buildSkeleton()
+                        : _isPending
+                        ? _buildPendingMask()
+                        : _g == null
+                        ? const Center(
+                          child: Text(
+                            'Error loading group',
+                            style: TextStyle(color: AppColors.muted),
+                          ),
+                        )
+                        : NestedScrollView(
+                          headerSliverBuilder:
+                              (context, innerBoxIsScrolled) => [
+                                if (_g != null)
+                                  SliverToBoxAdapter(
+                                    child: Padding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                        16,
+                                        8,
+                                        16,
+                                        0,
+                                      ),
+                                      child: Container(
+                                        width: double.infinity,
+                                        decoration: BoxDecoration(
+                                          color: AppColors.text,
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
+                                          boxShadow: AppShadows.elevated,
+                                          border: Border.all(
+                                            color: Colors.white.withValues(
+                                              alpha: 0.05,
+                                            ),
+                                          ),
+                                        ),
+                                        child: Stack(
+                                          children: [
+                                            Positioned.fill(
+                                              child: Container(
+                                                decoration: BoxDecoration(
+                                                  borderRadius:
+                                                      BorderRadius.circular(20),
+                                                  gradient: RadialGradient(
+                                                    center: Alignment.topRight,
+                                                    radius: 0.6,
+                                                    colors: [
+                                                      AppColors.accent
+                                                          .withValues(
+                                                            alpha: 0.04,
+                                                          ),
+                                                      Colors.transparent,
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                            Padding(
+                                              padding: const EdgeInsets.all(20),
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  const Text(
+                                                    'Your Net Balance',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                      color: Color(0x99FFFFFF),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    '${bal > 0 ? "+" : ""}${_currencySymbol}${bal.abs().toStringAsFixed(2)}',
+                                                    style: const TextStyle(
+                                                      fontSize: 32,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color: AppColors.accent,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 12),
+                                                  Row(
+                                                    children: [
+                                                      _sc(
+                                                        Icons.arrow_upward,
+                                                        'Paid: ${_currencySymbol}0',
+                                                      ),
+                                                      const SizedBox(width: 12),
+                                                      _sc(
+                                                        Icons.pie_chart,
+                                                        'Share: ${_currencySymbol}0',
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  const SizedBox(height: 16),
+                                                  Row(
+                                                    children: [
+                                                      Expanded(
+                                                        child: GestureDetector(
+                                                          onTap: _addExpense,
+                                                          child: Container(
+                                                            height: 44,
+                                                            decoration: BoxDecoration(
+                                                              color: Colors
+                                                                  .white
+                                                                  .withValues(
+                                                                    alpha: 0.1,
+                                                                  ),
+                                                              borderRadius:
+                                                                  BorderRadius.circular(
+                                                                    16,
+                                                                  ),
+                                                            ),
+                                                            child: const Row(
+                                                              mainAxisAlignment:
+                                                                  MainAxisAlignment
+                                                                      .center,
+                                                              children: [
+                                                                Icon(
+                                                                  Icons.add,
+                                                                  size: 18,
+                                                                  color:
+                                                                      AppColors
+                                                                          .accent,
+                                                                ),
+                                                                SizedBox(
+                                                                  width: 6,
+                                                                ),
+                                                                Text(
+                                                                  'Expense',
+                                                                  style: TextStyle(
+                                                                    fontSize:
+                                                                        13,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w600,
+                                                                    color:
+                                                                        Colors
+                                                                            .white,
+                                                                  ),
+                                                                ),
+                                                              ],
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      const SizedBox(width: 12),
+                                                      Expanded(
+                                                        child: GestureDetector(
+                                                          onTap:
+                                                              () => _tc
+                                                                  .animateTo(2),
+                                                          child: Container(
+                                                            height: 44,
+                                                            decoration: BoxDecoration(
+                                                              color: Colors
+                                                                  .white
+                                                                  .withValues(
+                                                                    alpha: 0.1,
+                                                                  ),
+                                                              borderRadius:
+                                                                  BorderRadius.circular(
+                                                                    16,
+                                                                  ),
+                                                            ),
+                                                            child: const Row(
+                                                              mainAxisAlignment:
+                                                                  MainAxisAlignment
+                                                                      .center,
+                                                              children: [
+                                                                Icon(
+                                                                  Icons
+                                                                      .handshake,
+                                                                  size: 18,
+                                                                  color:
+                                                                      AppColors
+                                                                          .accent,
+                                                                ),
+                                                                SizedBox(
+                                                                  width: 6,
+                                                                ),
+                                                                Text(
+                                                                  'Settle Up',
+                                                                  style: TextStyle(
+                                                                    fontSize:
+                                                                        13,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w600,
+                                                                    color:
+                                                                        Colors
+                                                                            .white,
+                                                                  ),
+                                                                ),
+                                                              ],
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                SliverPersistentHeader(
+                                  pinned: true,
+                                  delegate: _SliverAppBarDelegate(
+                                    height: 64,
+                                    child: Padding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                        16,
+                                        12,
+                                        16,
+                                        0,
+                                      ),
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: AppColors.card,
+                                          borderRadius: BorderRadius.circular(
+                                            16,
+                                          ),
+                                          boxShadow: AppShadows.soft,
+                                        ),
+                                        padding: const EdgeInsets.all(3),
+                                        child: TabBar(
+                                          controller: _tc,
+                                          indicator: BoxDecoration(
+                                            color: AppColors.surface,
+                                            borderRadius: BorderRadius.circular(
+                                              14,
+                                            ),
+                                          ),
+                                          indicatorSize:
+                                              TabBarIndicatorSize.tab,
+                                          labelColor: AppColors.text,
+                                          unselectedLabelColor: AppColors.muted,
+                                          labelStyle: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                          dividerHeight: 0,
+                                          tabs: const [
+                                            Tab(text: 'Expenses'),
+                                            Tab(text: 'Balances'),
+                                            Tab(text: 'Settle Up'),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                          body: TabBarView(
+                            controller: _tc,
+                            children: [_expTab(), _balTab(), _setTab()],
+                          ),
+                        ),
+              ),
             ],
-            body: TabBarView(
-              controller: _tc,
-              children: [_expTab(), _balTab(), _setTab()],
-            ),
           ),
         ),
-      ],
-    ),
-  ),
-));
+      ),
+    );
   }
 
   Widget _buildSkeleton() {
     return ListView.builder(
       padding: const EdgeInsets.all(20),
       itemCount: 4,
-      itemBuilder: (_, __) => Container(
-        height: 80,
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          color: AppColors.card.withOpacity(0.5),
-          borderRadius: BorderRadius.circular(20),
-        ),
-      ),
+      itemBuilder:
+          (_, __) => Container(
+            height: 80,
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: AppColors.card.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(20),
+            ),
+          ),
     );
   }
 
@@ -1352,17 +2332,29 @@ class _S extends State<SplitGroupDetailScreen>
             ),
             child: Column(
               children: [
-                const Icon(Icons.mail_outline, size: 64, color: AppColors.accent),
+                const Icon(
+                  Icons.mail_outline,
+                  size: 64,
+                  color: AppColors.accent,
+                ),
                 const SizedBox(height: 24),
                 Text(
                   'Group Invitation',
-                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.text),
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.text,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Text(
                   'You have been invited to join "${widget.groupName}". Accept the invitation to view expenses and settle balances.',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 15, color: AppColors.muted, height: 1.5),
+                  style: const TextStyle(
+                    fontSize: 15,
+                    color: AppColors.muted,
+                    height: 1.5,
+                  ),
                 ),
                 const SizedBox(height: 32),
                 Row(
@@ -1373,10 +2365,15 @@ class _S extends State<SplitGroupDetailScreen>
                           backgroundColor: AppColors.surface,
                           foregroundColor: AppColors.muted,
                           padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
                         ),
                         onPressed: () => _handleInvitation('reject'),
-                        child: const Text('Reject', style: TextStyle(fontWeight: FontWeight.bold)),
+                        child: const Text(
+                          'Reject',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -1386,10 +2383,15 @@ class _S extends State<SplitGroupDetailScreen>
                           backgroundColor: AppColors.dark,
                           foregroundColor: AppColors.accent,
                           padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
                         ),
                         onPressed: () => _handleInvitation('accept'),
-                        child: const Text('Accept', style: TextStyle(fontWeight: FontWeight.bold)),
+                        child: const Text(
+                          'Accept',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
                       ),
                     ),
                   ],
@@ -1447,11 +2449,10 @@ class _S extends State<SplitGroupDetailScreen>
           final f = dt != null ? DateFormat('MMM d').format(dt.toLocal()) : '';
           final creatorId = e['created_by_id'];
           final canEdit = _myId != null && creatorId == _myId;
-          
+
           Widget card = GestureDetector(
             onTap: () => _showExpenseDetail(e),
             child: Container(
-              margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: AppColors.card,
@@ -1529,13 +2530,19 @@ class _S extends State<SplitGroupDetailScreen>
                 } else if (direction == DismissDirection.endToStart) {
                   // Edit
                   _showLoading(context);
-                  final r = await ApiService.getSplitExpenseDetail(widget.groupId, e['id']);
+                  final r = await ApiService.getSplitExpenseDetail(
+                    widget.groupId,
+                    e['id'],
+                  );
                   if (!mounted) return false;
                   Navigator.pop(context); // Close loading
                   if (r.isSuccess) {
                     _addExpense(editData: r.data);
                   } else {
-                    _showTopMessage(r.error ?? 'Failed to load expense details', isError: true);
+                    _showTopMessage(
+                      r.error ?? 'Failed to load expense details',
+                      isError: true,
+                    );
                   }
                   return false;
                 }
@@ -1552,7 +2559,10 @@ class _S extends State<SplitGroupDetailScreen>
               child: card,
             );
           }
-          return card;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: card,
+          );
         },
       ),
     );
@@ -1595,7 +2605,6 @@ class _S extends State<SplitGroupDetailScreen>
             final canRemove = isSettled && (isOwner || isSelf);
 
             Widget memberCard = Container(
-              margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: AppColors.card,
@@ -1653,7 +2662,7 @@ class _S extends State<SplitGroupDetailScreen>
                   ),
                   // Lock icon if can't be removed
                   if (!isSettled)
-                     Icon(
+                    Icon(
                       Icons.lock_outline,
                       size: 16,
                       color: AppColors.muted.withOpacity(0.3),
@@ -1677,9 +2686,12 @@ class _S extends State<SplitGroupDetailScreen>
                 child: memberCard,
               );
             }
-            
-            return memberCard;
-          }),
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: memberCard,
+            );
+          }).toList(),
         ],
       ),
     );
@@ -1878,6 +2890,11 @@ class _S extends State<SplitGroupDetailScreen>
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppColors.surface,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                  horizontal: 4,
+                                ),
+                                minimumSize: const Size(0, 32),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10),
                                 ),
@@ -1913,7 +2930,12 @@ class _S extends State<SplitGroupDetailScreen>
                                 );
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.surface,
+                                backgroundColor: AppColors.accent,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                  horizontal: 4,
+                                ),
+                                minimumSize: const Size(0, 32),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10),
                                 ),
@@ -1923,7 +2945,7 @@ class _S extends State<SplitGroupDetailScreen>
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
-                                  color: AppColors.accent,
+                                  color: AppColors.dark,
                                 ),
                               ),
                             ),
@@ -1933,6 +2955,11 @@ class _S extends State<SplitGroupDetailScreen>
                             child: ElevatedButton(
                               onPressed: () => _settle(x),
                               style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                  horizontal: 4,
+                                ),
+                                minimumSize: const Size(0, 32),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10),
                                 ),
@@ -2048,7 +3075,11 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   double get maxExtent => height;
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
     return Container(color: AppColors.background, child: child);
   }
 
@@ -2061,12 +3092,12 @@ class _SwipeableTile extends StatefulWidget {
   final DismissDirection direction;
   final Future<bool?> Function(DismissDirection) confirmDismiss;
   final Widget child;
-  
+
   final IconData? bgIcon;
   final Color? bgColor;
   final Color? bgIconColor;
   final Alignment? bgAlignment;
-  
+
   final IconData? secBgIcon;
   final Color? secBgColor;
   final Color? secBgIconColor;
@@ -2101,11 +3132,7 @@ class _SwipeableTileState extends State<_SwipeableTile> {
     Widget? bg;
     if (widget.bgIcon != null) {
       bg = Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        decoration: BoxDecoration(
-          color: widget.bgColor,
-          borderRadius: BorderRadius.circular(20),
-        ),
+        decoration: BoxDecoration(color: widget.bgColor),
         alignment: widget.bgAlignment ?? Alignment.centerLeft,
         padding: const EdgeInsets.symmetric(horizontal: 24),
         child: Transform.scale(
@@ -2118,11 +3145,7 @@ class _SwipeableTileState extends State<_SwipeableTile> {
     Widget? secBg;
     if (widget.secBgIcon != null) {
       secBg = Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        decoration: BoxDecoration(
-          color: widget.secBgColor,
-          borderRadius: BorderRadius.circular(20),
-        ),
+        decoration: BoxDecoration(color: widget.secBgColor),
         alignment: widget.secBgAlignment ?? Alignment.centerRight,
         padding: const EdgeInsets.symmetric(horizontal: 24),
         child: Transform.scale(
@@ -2132,19 +3155,251 @@ class _SwipeableTileState extends State<_SwipeableTile> {
       );
     }
 
-    return Dismissible(
-      key: widget.dismissKey,
-      direction: widget.direction,
-      onUpdate: (details) {
-        if (details.reached && !details.previousReached) {
-          HapticFeedback.vibrate();
-        }
-        setState(() => _swipeProgress = details.progress);
-      },
-      confirmDismiss: widget.confirmDismiss,
-      background: bg,
-      secondaryBackground: secBg,
-      child: widget.child,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Dismissible(
+          key: widget.dismissKey,
+          direction: widget.direction,
+          onUpdate: (details) {
+            if (details.reached && !details.previousReached) {
+              HapticFeedback.vibrate();
+            }
+            setState(() => _swipeProgress = details.progress);
+          },
+          confirmDismiss: widget.confirmDismiss,
+          background: bg,
+          secondaryBackground: secBg,
+          child: widget.child,
+        ),
+      ),
+    );
+  }
+}
+
+class _UserPickerSheet extends StatefulWidget {
+  final List<Map<String, dynamic>> users;
+  final int? selectedId;
+  final ValueChanged<Map<String, dynamic>> onSelected;
+
+  const _UserPickerSheet({
+    required this.users,
+    this.selectedId,
+    required this.onSelected,
+  });
+
+  @override
+  State<_UserPickerSheet> createState() => _UserPickerSheetState();
+}
+
+class _UserPickerSheetState extends State<_UserPickerSheet> {
+  List<Map<String, dynamic>> _filtered = [];
+  final _searchCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _filtered = List.from(widget.users);
+  }
+
+  void _filter(String q) {
+    if (q.isEmpty) {
+      setState(() => _filtered = List.from(widget.users));
+      return;
+    }
+    final query = q.toLowerCase();
+    setState(() {
+      _filtered =
+          widget.users.where((u) {
+            final name =
+                (u['display_name'] ?? u['username'] ?? '')
+                    .toString()
+                    .toLowerCase();
+            return name.contains(query);
+          }).toList();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final maxHeight = MediaQuery.of(context).size.height * 0.85;
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          24,
+          16,
+          24,
+          24 + MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Drag handle
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Title
+            const Text(
+              'Select User',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppColors.text,
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Search bar
+            TextField(
+              controller: _searchCtrl,
+              onChanged: _filter,
+              style: const TextStyle(fontSize: 14, color: AppColors.text),
+              decoration: InputDecoration(
+                hintText: 'Search user...',
+                prefixIcon: const Icon(
+                  Icons.search,
+                  size: 18,
+                  color: AppColors.muted,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.xl),
+                  borderSide: BorderSide.none,
+                ),
+                filled: true,
+                fillColor: AppColors.surface,
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // User list
+            Flexible(
+              child:
+                  _filtered.isEmpty
+                      ? const Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(vertical: 32),
+                          child: Text(
+                            'No user found',
+                            style: TextStyle(
+                              color: AppColors.muted,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      )
+                      : ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: _filtered.length,
+                        itemBuilder: (ctx, i) {
+                          final u = _filtered[i];
+                          final isSelected = u['id'] == widget.selectedId;
+
+                          return GestureDetector(
+                            onTap: () {
+                              widget.onSelected(u);
+                              Navigator.pop(context);
+                            },
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 14,
+                              ),
+                              decoration: BoxDecoration(
+                                color:
+                                    isSelected
+                                        ? AppColors.accent.withValues(
+                                          alpha: 0.15,
+                                        )
+                                        : AppColors.surface,
+                                borderRadius: BorderRadius.circular(
+                                  AppRadius.lg,
+                                ),
+                                border: Border.all(
+                                  color:
+                                      isSelected
+                                          ? AppColors.accent
+                                          : AppColors.border,
+                                  width: isSelected ? 2 : 1,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  // User Avatar
+                                  Container(
+                                    width: 36,
+                                    height: 36,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.accent,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(10),
+                                      child:
+                                          u['avatar_url'] != null
+                                              ? Image.network(
+                                                u['avatar_url'],
+                                                fit: BoxFit.cover,
+                                              )
+                                              : Center(
+                                                child: Text(
+                                                  (u['initial'] ?? '?')
+                                                      .toString()
+                                                      .toUpperCase(),
+                                                  style: const TextStyle(
+                                                    color: AppColors.dark,
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 16,
+                                                  ),
+                                                ),
+                                              ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+
+                                  // Name
+                                  Expanded(
+                                    child: Text(
+                                      u['display_name'] ?? u['username'] ?? '',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight:
+                                            isSelected
+                                                ? FontWeight.w600
+                                                : FontWeight.w400,
+                                        color: AppColors.text,
+                                      ),
+                                    ),
+                                  ),
+
+                                  // Check mark
+                                  if (isSelected)
+                                    const Icon(
+                                      Icons.check_circle,
+                                      size: 20,
+                                      color: AppColors.accent,
+                                    ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -50,7 +50,7 @@ class TransactionModel {
         'amount': amount,
         'type': type,
         'category': category.toJson(),
-        'date': date.toIso8601String(),
+        'date': date.toUtc().toIso8601String(),
         'payment_method': paymentMethod,
         'payment_method_display': paymentMethodDisplay,
         'notes': notes,
@@ -61,7 +61,7 @@ class TransactionModel {
         'amount': amount,
         'type': type,
         'category_id': category.id,
-        'date': date.toIso8601String(),
+        'date': date.toUtc().toIso8601String(),
         'payment_method': paymentMethod,
         'notes': notes,
       };
