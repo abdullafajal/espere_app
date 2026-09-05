@@ -4,7 +4,8 @@ import '../theme/app_theme.dart';
 
 class InviteScreen extends StatefulWidget {
   final String token;
-  const InviteScreen({super.key, required this.token});
+  final String? refUsername;
+  const InviteScreen({super.key, required this.token, this.refUsername});
 
   @override
   State<InviteScreen> createState() => _InviteScreenState();
@@ -44,7 +45,7 @@ class _InviteScreenState extends State<InviteScreen> {
 
   Future<void> _acceptInvite() async {
     setState(() => _isAccepting = true);
-    final result = await ApiService.acceptTokenInvite(widget.token);
+    final result = await ApiService.acceptTokenInvite(widget.token, refUsername: widget.refUsername);
     
     if (!mounted) return;
     

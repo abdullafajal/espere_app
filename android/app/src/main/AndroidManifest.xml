@@ -55,6 +55,8 @@
                 <data
                     android:pathPrefix="/invite/"/>
                 <data
+                    android:pathPrefix="/add_friend/"/>
+                <data
                     android:pathPrefix="/split/invitations"/>
                 <data
                     android:pathPrefix="/transaction/add"/>

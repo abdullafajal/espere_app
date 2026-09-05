@@ -9,6 +9,7 @@ class DashboardData {
   final String monthlyIncome;
   final String monthlyExpenses;
   final String monthlySavings;
+  final int totalFriends;
   final double monthlyBudgetLimit;
   final double monthlyBudgetSpent;
   final String currencySymbol;
@@ -31,6 +32,7 @@ class DashboardData {
     required this.monthlyIncome,
     required this.monthlyExpenses,
     required this.monthlySavings,
+    required this.totalFriends,
     required this.monthlyBudgetLimit,
     required this.monthlyBudgetSpent,
     required this.currencySymbol,
@@ -55,6 +57,7 @@ class DashboardData {
       monthlyIncome: json['monthly_income']?.toString() ?? '0.00',
       monthlyExpenses: json['monthly_expenses']?.toString() ?? '0.00',
       monthlySavings: json['monthly_savings']?.toString() ?? '0.00',
+      totalFriends: json['total_friends'] ?? 0,
       monthlyBudgetLimit: double.tryParse(json['monthly_budget_limit']?.toString() ?? '0') ?? 0.0,
       monthlyBudgetSpent: double.tryParse(json['monthly_budget_spent']?.toString() ?? '0') ?? 0.0,
       currencySymbol: json['currency_symbol']?.toString() ?? '₹',

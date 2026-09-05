@@ -21,7 +21,6 @@ class FriendsScreen extends StatefulWidget {
 }
 
 class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
   bool _isLoading = true;
   List<Map<String, dynamic>> _friends = [];
   List<Map<String, dynamic>> _pendingReceived = [];
@@ -32,13 +31,11 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
     _loadData();
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
     super.dispose();
   }
 
@@ -440,15 +437,8 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
         child: Column(
           children: [
             _buildHeader(),
-            _buildTabs(),
             Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  _buildFriendsTab(),
-                  _buildRequestsTab(),
-                ],
-              ),
+              child: _buildFriendsTab(),
             ),
           ],
         ),
@@ -457,6 +447,8 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
   }
 
   Widget _buildHeader() {
+    final int pendingCount = _pendingReceived.length + _groupInvitations.length;
+    
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
       child: Row(
@@ -478,6 +470,39 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
           ),
           const SizedBox(width: 12),
           const Expanded(child: Text('Friends', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.text))),
+          if (pendingCount > 0) ...[
+            GestureDetector(
+              onTap: _showRequestsPopup,
+              child: Stack(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppColors.card,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: AppShadows.soft,
+                    ),
+                    child: const Icon(Icons.notifications_outlined, color: AppColors.text, size: 22),
+                  ),
+                  Positioned(
+                    right: 8,
+                    top: 8,
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: AppColors.accent,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.card, width: 2),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+          ],
           GestureDetector(
             onTap: _inviteFriend,
             child: Container(
@@ -492,28 +517,7 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
     );
   }
 
-  Widget _buildTabs() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Container(
-        decoration: BoxDecoration(color: AppColors.card, borderRadius: BorderRadius.circular(16), boxShadow: AppShadows.soft),
-        padding: const EdgeInsets.all(4),
-        child: TabBar(
-          controller: _tabController,
-          indicator: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(12)),
-          indicatorSize: TabBarIndicatorSize.tab,
-          labelColor: AppColors.text,
-          unselectedLabelColor: AppColors.muted,
-          dividerHeight: 0,
-          labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-          tabs: const [
-            Tab(text: 'My Friends'),
-            Tab(text: 'Requests'),
-          ],
-        ),
-      ),
-    );
-  }
+
 
   Widget _buildFriendsTab() {
     if (_friends.isEmpty) {
@@ -584,33 +588,64 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
     );
   }
 
-  Widget _buildRequestsTab() {
-    final hasGroupInvites = _groupInvitations.isNotEmpty;
-    final hasFriendRequests = _pendingReceived.isNotEmpty;
-    final hasSentRequests = _pendingSent.isNotEmpty;
-
-    if (!hasGroupInvites && !hasFriendRequests && !hasSentRequests) {
-      return const Center(child: Text('No pending requests', style: TextStyle(color: AppColors.muted)));
-    }
-
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
-      children: [
-        if (hasGroupInvites) ...[
-          const Padding(padding: EdgeInsets.only(left: 4, bottom: 8, top: 8), child: Text('Group Invitations', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.text))),
-          ..._groupInvitations.map((inv) => _buildInviteCard(inv, true)),
-          const SizedBox(height: 16),
-        ],
-        if (hasFriendRequests) ...[
-          const Padding(padding: EdgeInsets.only(left: 4, bottom: 8), child: Text('Friend Requests', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.text))),
-          ..._pendingReceived.map((req) => _buildFriendRequestCard(req, true)),
-          const SizedBox(height: 16),
-        ],
-        if (hasSentRequests) ...[
-          const Padding(padding: EdgeInsets.only(left: 4, bottom: 8), child: Text('Sent Requests', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.text))),
-          ..._pendingSent.map((req) => _buildFriendRequestCard(req, false)),
-        ],
-      ],
+  void _showRequestsPopup() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.card,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, ss) {
+          final hasGroupInvites = _groupInvitations.isNotEmpty;
+          final hasFriendRequests = _pendingReceived.isNotEmpty;
+          
+          return Padding(
+            padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Center(
+                  child: Text('Pending Requests', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.text)),
+                ),
+                const SizedBox(height: 24),
+                
+                if (!hasGroupInvites && !hasFriendRequests)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 32),
+                    child: Center(child: Text('No pending requests.', style: TextStyle(color: AppColors.muted))),
+                  )
+                else ...[
+                  if (hasGroupInvites) ...[
+                    const Padding(
+                      padding: EdgeInsets.only(left: 4, bottom: 8), 
+                      child: Text('Group Invitations', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.text))
+                    ),
+                    ..._groupInvitations.map((inv) => _buildInviteCard(inv, true)),
+                    const SizedBox(height: 16),
+                  ],
+                  if (hasFriendRequests) ...[
+                    const Padding(
+                      padding: EdgeInsets.only(left: 4, bottom: 8), 
+                      child: Text('Friend Requests', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.text))
+                    ),
+                    ..._pendingReceived.map((req) => _buildFriendRequestCard(req, true)),
+                    const SizedBox(height: 16),
+                  ],
+                ],
+              ],
+            ),
+          );
+        }
+      ),
     );
   }
 

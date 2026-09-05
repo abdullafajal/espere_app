@@ -11,7 +11,9 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../widgets/espere_input.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import '../services/sync_service.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -54,6 +56,63 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() {
         _isLoading = false;
         _error = result.error;
+      });
+    }
+  }
+
+  Future<void> _loginWithGoogle() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final GoogleSignIn googleSignIn = GoogleSignIn(
+        serverClientId: '1057401697979-6vf6j5fu21ufaiqqh5tfj36l4na40a89.apps.googleusercontent.com',
+        scopes: ['email', 'profile'],
+      );
+
+      final GoogleSignInAccount? account = await googleSignIn.signIn();
+      if (account == null) {
+        // User canceled
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      final GoogleSignInAuthentication auth = await account.authentication;
+      final String? idToken = auth.idToken;
+
+      if (idToken == null) {
+        setState(() {
+          _error = 'Failed to get Google ID token.';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      final result = await ApiService.googleLogin(idToken);
+      if (!mounted) return;
+
+      if (result.isSuccess) {
+        // Successful login/signup, store token and data
+        final data = result.data!;
+        await AuthService.setToken(data['token']);
+        // Fetch full profile and cache it
+        await SyncService.pullData();
+        
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        Navigator.pushReplacementNamed(context, '/home');
+      } else {
+        setState(() {
+          _error = result.error;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _error = 'Google Sign In failed: $e';
+        _isLoading = false;
       });
     }
   }
@@ -186,6 +245,52 @@ class _LoginScreenState extends State<LoginScreen> {
                                       ),
                                     )
                                   : const Text('Login'),
+                            ),
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          // Google Sign In button
+                          SizedBox(
+                            width: double.infinity,
+                            height: 52,
+                            child: OutlinedButton(
+                              onPressed: _isLoading ? null : _loginWithGoogle,
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: AppColors.border),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(AppRadius.xxl),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  // Simple G icon
+                                  Container(
+                                    width: 20,
+                                    height: 20,
+                                    decoration: const BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: AppColors.dark,
+                                    ),
+                                    child: const Center(
+                                      child: Text(
+                                        'G',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  const Text(
+                                    'Continue with Google',
+                                    style: TextStyle(color: AppColors.text),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
 

@@ -22,6 +22,8 @@ class SplitGroupsScreen extends StatefulWidget {
 
 class SplitGroupsScreenState extends State<SplitGroupsScreen> {
   List<Map<String, dynamic>> _groups = [];
+  List<Map<String, dynamic>> _groupInvitations = [];
+  List<Map<String, dynamic>> _pendingReceived = [];
   bool _isLoading = true;
   String? _error;
   int? _myId;
@@ -74,9 +76,183 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
           });
         }
       });
+      
+      ApiService.getFriends().then((res) {
+        if (res.isSuccess && mounted) {
+          setState(() {
+            _pendingReceived = List<Map<String, dynamic>>.from(res.data!['pending_received'] ?? []);
+          });
+        }
+      });
+      
+      ApiService.getGroupInvitations().then((res) {
+        if (res.isSuccess && mounted) {
+          setState(() => _groupInvitations = res.data!);
+        }
+      });
     } else {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _handleFriendAction(dynamic id, String action) async {
+    final r = await ApiService.handleFriendRequest(id, action);
+    if (r.isSuccess) {
+      HapticFeedback.lightImpact();
+      _loadGroups();
+    } else {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r.error ?? 'Error')));
+    }
+  }
+
+  Future<void> _handleGroupAction(int id, String action) async {
+    final r = await ApiService.handleGroupInvitation(id, action);
+    if (r.isSuccess) {
+      HapticFeedback.lightImpact();
+      _loadGroups();
+    } else {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r.error ?? 'Error')));
+    }
+  }
+
+  Widget _buildInviteCard(Map<String, dynamic> inv, bool isReceived) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: AppColors.card, borderRadius: BorderRadius.circular(20), boxShadow: AppShadows.card, border: Border.all(color: AppColors.accent.withOpacity(0.3))),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(width: 40, height: 40, decoration: BoxDecoration(color: AppColors.accent.withOpacity(0.2), shape: BoxShape.circle), child: const Icon(Icons.groups, color: AppColors.accent, size: 20)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(inv['group_name'] ?? '', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.text)),
+                    Text('Invited by ${inv['invited_by']}', style: const TextStyle(fontSize: 12, color: AppColors.muted)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => _handleGroupAction(inv['id'], 'reject'),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppColors.border),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: const Text('Decline', style: TextStyle(color: AppColors.muted, fontSize: 13)),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () => _handleGroupAction(inv['id'], 'accept'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.dark,
+                    foregroundColor: AppColors.accent,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: const Text('Accept', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFriendRequestCard(Map<String, dynamic> req, bool isReceived) {
+    final u = isReceived ? req['sender'] : req['receiver'];
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: AppColors.card, borderRadius: BorderRadius.circular(20), boxShadow: AppShadows.card),
+      child: Row(
+        children: [
+          UserAvatar(
+            initial: u['initial'] ?? '?',
+            avatarUrl: u['avatar_url'],
+            size: 40,
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: Text(u['display_name'] ?? u['username'] ?? '', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.text))),
+          if (isReceived) ...[
+            IconButton(onPressed: () => _handleFriendAction(req['id'], 'reject'), icon: const Icon(Icons.close, color: AppColors.error, size: 20)),
+            IconButton(onPressed: () => _handleFriendAction(req['id'], 'accept'), icon: const Icon(Icons.check, color: AppColors.success, size: 20)),
+          ] else
+            TextButton(onPressed: () => _handleFriendAction(req['id'], 'cancel'), child: const Text('Cancel', style: TextStyle(color: AppColors.muted, fontSize: 12))),
+        ],
+      ),
+    );
+  }
+
+  void _showRequestsPopup() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.card,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, ss) {
+          final hasGroupInvites = _groupInvitations.isNotEmpty;
+          final hasFriendRequests = _pendingReceived.isNotEmpty;
+          
+          return Padding(
+            padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Center(
+                  child: Text('Pending Requests', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.text)),
+                ),
+                const SizedBox(height: 24),
+                
+                if (!hasGroupInvites && !hasFriendRequests)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 32),
+                    child: Center(child: Text('No pending requests.', style: TextStyle(color: AppColors.muted))),
+                  )
+                else ...[
+                  if (hasGroupInvites) ...[
+                    const Padding(
+                      padding: EdgeInsets.only(left: 4, bottom: 8), 
+                      child: Text('Group Invitations', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.text))
+                    ),
+                    ..._groupInvitations.map((inv) => _buildInviteCard(inv, true)),
+                    const SizedBox(height: 16),
+                  ],
+                  if (hasFriendRequests) ...[
+                    const Padding(
+                      padding: EdgeInsets.only(left: 4, bottom: 8), 
+                      child: Text('Friend Requests', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.text))
+                    ),
+                    ..._pendingReceived.map((req) => _buildFriendRequestCard(req, true)),
+                    const SizedBox(height: 16),
+                  ],
+                ],
+              ],
+            ),
+          );
+        }
+      ),
+    );
   }
 
   void _showCreateGroupSheet() async {
@@ -270,6 +446,39 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
                 ),
               ),
               const Spacer(),
+              if (_groupInvitations.isNotEmpty || _pendingReceived.isNotEmpty) ...[
+                GestureDetector(
+                  onTap: _showRequestsPopup,
+                  child: Stack(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: AppColors.card,
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                          boxShadow: AppShadows.soft,
+                        ),
+                        child: const Icon(Icons.notifications_outlined, color: AppColors.text, size: 22),
+                      ),
+                      Positioned(
+                        right: 8,
+                        top: 8,
+                        child: Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: AppColors.accent,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: AppColors.card, width: 2),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+              ],
               GestureDetector(
                 onTap: _showCreateGroupSheet,
                 child: Container(

@@ -100,9 +100,17 @@ class EspereApp extends StatelessWidget {
             );
 
           case '/invite':
-            final token = settings.arguments as String;
+            String token = '';
+            String ref = '';
+            if (settings.arguments is String) {
+              token = settings.arguments as String;
+            } else if (settings.arguments is Map) {
+              final map = settings.arguments as Map;
+              token = map['token'] ?? '';
+              ref = map['ref'] ?? '';
+            }
             return MaterialPageRoute(
-              builder: (_) => InviteScreen(token: token),
+              builder: (_) => InviteScreen(token: token, refUsername: ref),
             );
 
           default:

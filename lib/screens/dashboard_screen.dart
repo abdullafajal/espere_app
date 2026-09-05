@@ -1014,9 +1014,9 @@ class DashboardScreenState extends State<DashboardScreen> {
                   onTap: () => widget.onTabChange?.call(2),
                 ),
                 _QuickLink(
-                  icon: Icons.flag,
-                  label: 'Savings',
-                  subtitle: 'Track your goals',
+                  icon: Icons.group,
+                  label: 'Friends',
+                  subtitle: 'Manage friends',
                   onTap: () => widget.onTabChange?.call(3),
                 ),
                 _QuickLink(

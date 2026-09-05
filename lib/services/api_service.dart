@@ -145,6 +145,26 @@ class ApiService {
     }
   }
 
+  /// Authenticate with Google
+  static Future<ApiResult<Map<String, dynamic>>> googleLogin(String idToken) async {
+    try {
+      final url = await _url('/api/auth/google/');
+      final response = await http.post(
+        Uri.parse(url),
+        headers: await _headers(auth: false),
+        body: jsonEncode({'id_token': idToken}),
+      );
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResult(data: data);
+      }
+      return ApiResult(error: data['error'] ?? 'Google login failed.');
+    } catch (e) {
+      return ApiResult(error: 'Connection error.');
+    }
+  }
+
   /// Get user profile
   static Future<ApiResult<UserModel>> getProfile() async {
     try {
@@ -693,6 +713,25 @@ class ApiService {
     }
   }
 
+  /// Leave a split group
+  static Future<ApiResult<void>> leaveSplitGroup(int id) async {
+    try {
+      final url = await _url('/api/split/groups/$id/leave/');
+      final response = await http.post(
+        Uri.parse(url),
+        headers: await _headers(),
+      );
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return ApiResult(data: null);
+      }
+      return ApiResult(error: data['error'] ?? 'Failed to leave group.');
+    } catch (e) {
+      return ApiResult(error: 'Connection error.');
+    }
+  }
+
   /// Delete a split group
   static Future<ApiResult<void>> deleteSplitGroup(int id) async {
     try {
@@ -1104,13 +1143,14 @@ class ApiService {
   }
 
   /// Accept a token-based invitation
-  static Future<ApiResult<Map<String, dynamic>>> acceptTokenInvite(String token) async {
+  static Future<ApiResult<Map<String, dynamic>>> acceptTokenInvite(String token, {String? refUsername}) async {
     try {
       final url = await _url('/api/split/invite/$token/');
+      final body = refUsername != null && refUsername.isNotEmpty ? {'ref': refUsername} : {};
       final response = await http.post(
         Uri.parse(url),
         headers: await _headers(),
-        body: jsonEncode({}),
+        body: jsonEncode(body),
       );
       final data = jsonDecode(response.body);
       if (!data.containsKey('error')) {

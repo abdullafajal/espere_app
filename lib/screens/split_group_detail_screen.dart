@@ -583,6 +583,7 @@ class _S extends State<SplitGroupDetailScreen>
     bool isSaving = false;
     String selectedColor = _g?['color'] ?? '#C8E64A';
     String selectedIcon = _g?['icon'] ?? 'groups';
+    bool membersCanInvite = _g?['members_can_invite'] ?? true;
 
     showModalBottomSheet(
       context: context,
@@ -655,6 +656,15 @@ class _S extends State<SplitGroupDetailScreen>
                           selectedIcon = icon;
                         },
                       ),
+                      const SizedBox(height: 24),
+                      SwitchListTile(
+                        title: const Text('Allow members to invite', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.text)),
+                        subtitle: const Text('Any member can share invite links', style: TextStyle(fontSize: 12, color: AppColors.muted)),
+                        value: membersCanInvite,
+                        onChanged: (v) => ss(() => membersCanInvite = v),
+                        activeColor: AppColors.accent,
+                        contentPadding: EdgeInsets.zero,
+                      ),
                       const SizedBox(height: 32),
                       SizedBox(
                         width: double.infinity,
@@ -672,13 +682,15 @@ class _S extends State<SplitGroupDetailScreen>
                                   : () async {
                                     if (nc.text.trim().isEmpty) return;
                                     ss(() => isSaving = true);
+                                    final body = {
+                                      'name': nc.text.trim(),
+                                      'color': selectedColor,
+                                      'icon': selectedIcon,
+                                      'members_can_invite': membersCanInvite
+                                    };
                                     final r = await ApiService.updateSplitGroup(
                                       widget.groupId,
-                                      {
-                                        'name': nc.text.trim(),
-                                        'color': selectedColor,
-                                        'icon': selectedIcon,
-                                      },
+                                      body,
                                     );
                                     if (!ctx.mounted) return;
                                     Navigator.pop(ctx);
@@ -2006,11 +2018,38 @@ class _S extends State<SplitGroupDetailScreen>
                           ),
                         ),
                       ),
+                    if (_g != null && (_g!['members_can_invite'] == true || _g!['created_by_id'] == _myId))
+                      GestureDetector(
+                        onTap: () {
+                          final token = _g!['invite_token'];
+                          final me = _g!['members'].firstWhere((m) => m['id'] == _myId, orElse: () => {'username': '', 'display_name': 'Someone'});
+                          final myUsername = me['username'];
+                          final myName = me['display_name'];
+                          final url = 'https://espere.in/invite/$token?ref=$myUsername';
+                          Share.share('Join $myName\'s split group on Espere! $url');
+                        },
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          margin: const EdgeInsets.only(right: 8),
+                          decoration: BoxDecoration(
+                            color: AppColors.card,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: AppShadows.soft,
+                          ),
+                          child: const Icon(
+                            Icons.share,
+                            color: AppColors.text,
+                            size: 18,
+                          ),
+                        ),
+                      ),
                     GestureDetector(
                       onTap: _g != null ? _addMember : null,
                       child: Container(
                         width: 40,
                         height: 40,
+                        margin: const EdgeInsets.only(right: 8),
                         decoration: BoxDecoration(
                           color: AppColors.accent,
                           borderRadius: BorderRadius.circular(12),
@@ -2023,6 +2062,45 @@ class _S extends State<SplitGroupDetailScreen>
                         ),
                       ),
                     ),
+                    if (_g != null)
+                      Theme(
+                        data: Theme.of(context).copyWith(
+                          splashColor: Colors.transparent,
+                          highlightColor: Colors.transparent,
+                        ),
+                        child: PopupMenuButton<String>(
+                          offset: const Offset(0, 48),
+                          color: AppColors.card,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          icon: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: AppColors.accent,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: AppShadows.soft,
+                            ),
+                            child: const Icon(Icons.more_vert, color: AppColors.dark, size: 20),
+                          ),
+                          onSelected: (val) {
+                            if (val == 'leave') {
+                              _leaveGroup();
+                            }
+                          },
+                          itemBuilder: (ctx) => [
+                            const PopupMenuItem(
+                              value: 'leave',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.exit_to_app, color: AppColors.text, size: 20),
+                                  SizedBox(width: 12),
+                                  Text('Leave Group', style: TextStyle(color: AppColors.text, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -2741,7 +2819,7 @@ class _S extends State<SplitGroupDetailScreen>
           (ctx) => AlertDialog(
             title: const Text('Delete Group'),
             content: const Text(
-              'This will permanently delete the group and all its data. This action cannot be undone.',
+              'Are you sure you want to permanently delete this group? All expenses and balances will be erased. This cannot be undone.',
             ),
             actions: [
               TextButton(
@@ -2760,17 +2838,57 @@ class _S extends State<SplitGroupDetailScreen>
     );
 
     if (confirm == true) {
+      _showLoading(context);
       final r = await ApiService.deleteSplitGroup(widget.groupId);
+      if (!mounted) return;
+      Navigator.pop(context);
       if (r.isSuccess) {
         HapticFeedback.heavyImpact();
-        Navigator.pop(context); // Go back to groups list
-        _showTopMessage('Group deleted.');
+        Navigator.pop(context, true);
       } else {
-        _showTopMessage(r.error ?? 'Failed to delete', isError: true);
+        _showTopMessage(r.error ?? 'Error', isError: true);
       }
     }
   }
 
+  void _leaveGroup() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('Leave Group'),
+            content: const Text(
+              'Are you sure you want to leave this group? You can only leave if your balance is completely settled.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text(
+                  'Leave',
+                  style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+    );
+
+    if (confirm == true) {
+      _showLoading(context);
+      final r = await ApiService.leaveSplitGroup(widget.groupId);
+      if (!mounted) return;
+      Navigator.pop(context);
+      if (r.isSuccess) {
+        HapticFeedback.heavyImpact();
+        Navigator.pop(context, true); // Pop back to groups list and refresh
+      } else {
+        _showTopMessage(r.error ?? 'Error', isError: true);
+      }
+    }
+  }
   Widget _setTab() {
     final d = List<Map<String, dynamic>>.from(_g!['simplified_debts'] ?? []);
     final s = List<Map<String, dynamic>>.from(_g!['settlements'] ?? []);

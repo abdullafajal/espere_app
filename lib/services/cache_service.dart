@@ -16,6 +16,8 @@ class CacheService {
   static const _friendsKey = 'cache_friends';
   static const _syncQueueKey = 'sync_queue';
   static const _pendingFriendInviteKey = 'cache_pending_friend_invite';
+  static const _pendingGroupInviteKey = 'cache_pending_group_invite';
+  static const _pendingGroupInviteRefKey = 'cache_pending_group_invite_ref';
 
   // ─── Generic Helpers ─────────────────────────────────────────────────
 
@@ -908,5 +910,31 @@ class CacheService {
   static Future<void> clearPendingFriendInvite() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_pendingFriendInviteKey);
+  }
+
+  // ─── Pending Group Invite Methods ──────────────────────────────────────
+
+  static Future<void> savePendingGroupInvite(String token, {String? ref}) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_pendingGroupInviteKey, token);
+    if (ref != null && ref.isNotEmpty) {
+      await prefs.setString(_pendingGroupInviteRefKey, ref);
+    } else {
+      await prefs.remove(_pendingGroupInviteRefKey);
+    }
+  }
+
+  static Future<Map<String, String>?> getPendingGroupInvite() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString(_pendingGroupInviteKey);
+    if (token == null || token.isEmpty) return null;
+    final ref = prefs.getString(_pendingGroupInviteRefKey) ?? '';
+    return {'token': token, 'ref': ref};
+  }
+
+  static Future<void> clearPendingGroupInvite() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_pendingGroupInviteKey);
+    await prefs.remove(_pendingGroupInviteRefKey);
   }
 }

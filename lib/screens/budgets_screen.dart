@@ -11,6 +11,7 @@ import '../utils/app_toast.dart';
 import '../utils/icon_mapper.dart';
 import '../models/category.dart';
 import '../widgets/budget_tile.dart';
+import 'dart:async';
 
 class BudgetsScreen extends StatefulWidget {
   final VoidCallback? onBack;
@@ -29,11 +30,28 @@ class BudgetsScreenState extends State<BudgetsScreen> {
   String _currencySymbol = '₹';
   DateTime _currentMonth = DateTime.now();
 
+  StreamSubscription<void>? _syncSub;
+
   @override
   void initState() {
     super.initState();
     _loadBudgets();
     _loadCategories();
+
+    // Listen for background sync completions to refresh UI immediately
+    _syncSub = SyncService.onSyncComplete.listen((_) {
+      debugPrint('[BudgetsScreen] Background sync detected — refreshing data...');
+      if (mounted) {
+        _loadBudgets();
+        _loadCategories();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _syncSub?.cancel();
+    super.dispose();
   }
 
   void reload() {
@@ -499,6 +517,27 @@ class _BudgetFormSheetState extends State<_BudgetFormSheet> {
       return;
     }
 
+    final isUpdate = widget.budget != null;
+    
+    // Prevent duplicate budgets for the same category in the current month
+    if (!isUpdate) {
+      final currentMonthStr = "${widget.currentMonth.year}-${widget.currentMonth.month.toString().padLeft(2, '0')}";
+      final cached = await CacheService.getCachedBudgets();
+      if (cached != null) {
+        final List budgets = cached['budgets'] ?? [];
+        final exists = budgets.any((b) {
+          final bMonth = b['month']?.toString() ?? '';
+          final bCatId = b['category']?['id'] ?? b['category_id'];
+          return bMonth.startsWith(currentMonthStr) && bCatId.toString() == _selectedCategoryId.toString();
+        });
+        
+        if (exists) {
+          AppToast.info(context, 'A budget for this category already exists this month.');
+          return;
+        }
+      }
+    }
+
     setState(() => _isSaving = true);
     final data = {
       'category_id': _selectedCategoryId,
@@ -507,7 +546,6 @@ class _BudgetFormSheetState extends State<_BudgetFormSheet> {
     };
 
     // Always queue creation/update
-    final isUpdate = widget.budget != null;
     int? tempId;
     if (!isUpdate) {
       tempId = DateTime.now().millisecondsSinceEpoch;

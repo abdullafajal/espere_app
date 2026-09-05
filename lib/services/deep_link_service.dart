@@ -41,15 +41,16 @@ class DeepLinkService {
       final segments = uri.pathSegments;
       if (segments.length >= 2) {
         final token = segments[1];
+        final ref = uri.queryParameters['ref'];
         
-        // If not logged in, force to register page
         final isAuthenticated = await AuthService.isAuthenticated();
         if (!isAuthenticated) {
+          await CacheService.savePendingGroupInvite(token, ref: ref);
           navigatorKey.currentState?.pushNamed('/register');
           return;
         }
         
-        navigatorKey.currentState?.pushNamed('/invite', arguments: token);
+        navigatorKey.currentState?.pushNamed('/invite', arguments: {'token': token, 'ref': ref});
       }
         } else if (path.startsWith('/add_friend/')) {
       final segments = uri.pathSegments;

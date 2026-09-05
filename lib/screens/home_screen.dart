@@ -12,6 +12,7 @@ import 'friends_screen.dart';
 import 'split_groups_screen.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
+import '../services/cache_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -37,6 +38,9 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _registerDeviceToken();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _processPendingInvites();
+    });
     _screens = [
       DashboardScreen(
         key: _dashboardKey,
@@ -71,6 +75,28 @@ class _HomeScreenState extends State<HomeScreen> {
     final token = await NotificationService.getToken();
     if (token != null) {
       await ApiService.registerDeviceToken(token);
+    }
+  }
+
+  Future<void> _processPendingInvites() async {
+    // Process Friend Invite
+    final pendingFriend = await CacheService.getPendingFriendInvite();
+    if (pendingFriend != null && pendingFriend.isNotEmpty) {
+      await ApiService.inviteFriend(pendingFriend);
+      await CacheService.clearPendingFriendInvite();
+    }
+
+    // Process Group Invite
+    final pendingGroup = await CacheService.getPendingGroupInvite();
+    if (pendingGroup != null) {
+      final token = pendingGroup['token'];
+      final ref = pendingGroup['ref'];
+      if (token != null && token.isNotEmpty) {
+        if (mounted) {
+          Navigator.of(context).pushNamed('/invite', arguments: {'token': token, 'ref': ref});
+        }
+        await CacheService.clearPendingGroupInvite();
+      }
     }
   }
 
