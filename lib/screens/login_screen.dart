@@ -14,6 +14,7 @@ import '../widgets/espere_input.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/sync_service.dart';
+import '../utils/update_checker.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -27,6 +28,14 @@ class _LoginScreenState extends State<LoginScreen> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      UpdateChecker.check(context);
+    });
+  }
 
   Future<void> _login() async {
     final username = _usernameController.text.trim();

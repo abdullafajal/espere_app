@@ -13,6 +13,7 @@ import 'split_groups_screen.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
 import '../services/cache_service.dart';
+import '../utils/update_checker.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -39,6 +40,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _registerDeviceToken();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      UpdateChecker.check(context);
       _processPendingInvites();
     });
     _screens = [

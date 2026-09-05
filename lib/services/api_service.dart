@@ -1222,4 +1222,23 @@ class ApiService {
       return ApiResult(error: 'Network error.');
     }
   }
+  /// ─── General Config ───────────────────────────────────────────────────
+
+  static Future<ApiResult<Map<String, dynamic>>> checkAppVersion() async {
+    try {
+      final url = await _url('/api/version/latest/');
+      final response = await http.get(
+        Uri.parse(url),
+        headers: await _headers(auth: false),
+      );
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResult(data: data);
+      }
+      return ApiResult(error: data['error'] ?? 'Failed to fetch version.');
+    } catch (e) {
+      return ApiResult(error: 'Connection error. Please check your server.');
+    }
+  }
 }
