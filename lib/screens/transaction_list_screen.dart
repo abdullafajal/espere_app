@@ -29,7 +29,6 @@ class TransactionListScreenState extends State<TransactionListScreen> {
   List<TransactionModel> _transactions = [];
   List<CategoryModel> _categories = [];
   bool _isLoading = true;
-  String? _error;
   String _currencySymbol = '₹';
   StreamSubscription<void>? _syncSub;
 
@@ -513,13 +512,6 @@ class TransactionListScreenState extends State<TransactionListScreen> {
           child:
               _isLoading && _transactions.isEmpty
                   ? _buildSkeleton()
-                  : _error != null
-                  ? Center(
-                    child: Text(
-                      _error!,
-                      style: const TextStyle(color: AppColors.muted),
-                    ),
-                  )
                   : _transactions.isEmpty
                   ? _buildEmpty()
                   : RefreshIndicator(

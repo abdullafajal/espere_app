@@ -3,6 +3,7 @@
 /// Displays system categories (read-only) and user categories (deletable).
 /// Includes a form to add new categories with icon and color pickers.
 import 'package:flutter/material.dart';
+import '../utils/app_toast.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../models/category.dart';
@@ -22,7 +23,6 @@ class CategoriesScreen extends StatefulWidget {
 class _CategoriesScreenState extends State<CategoriesScreen> {
   List<CategoryModel> _categories = [];
   bool _isLoading = true;
-  String? _error;
   String _typeFilter = 'all';
 
   @override
@@ -224,12 +224,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                   ? const Center(
                       child: CircularProgressIndicator(
                           color: AppColors.accent))
-                  : _error != null
-                      ? Center(
-                          child: Text(_error!,
-                              style:
-                                  const TextStyle(color: AppColors.muted)))
-                      : RefreshIndicator(
+                  : RefreshIndicator(
                           onRefresh: _handleRefresh,
                           color: AppColors.accent,
                           child: ListView(
@@ -480,7 +475,6 @@ class _CategoryFormSheetState extends State<_CategoryFormSheet> {
   late String _selectedColor;
   late String _selectedType;
   bool _isSaving = false;
-  String? _error;
 
   @override
   void initState() {
@@ -494,13 +488,12 @@ class _CategoryFormSheetState extends State<_CategoryFormSheet> {
   Future<void> _save() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
-      setState(() => _error = 'Category name is required.');
+      AppToast.error(context, 'Category name is required.');
       return;
     }
 
     setState(() {
       _isSaving = true;
-      _error = null;
     });
     HapticFeedback.heavyImpact();
 
@@ -601,21 +594,6 @@ class _CategoryFormSheetState extends State<_CategoryFormSheet> {
               ),
             ),
             const SizedBox(height: 20),
-
-            // Error
-            if (_error != null)
-              Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 10),
-                decoration: BoxDecoration(
-                  color: AppColors.errorLight,
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                ),
-                child: Text(_error!,
-                    style: const TextStyle(
-                        fontSize: 13, color: AppColors.error)),
-              ),
 
             // Type field
             const Text('Type',

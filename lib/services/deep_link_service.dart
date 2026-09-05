@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
+import '../utils/app_toast.dart';
 
 class DeepLinkService {
   static final _appLinks = AppLinks();
@@ -60,9 +61,11 @@ class DeepLinkService {
         if (isAuthenticated) {
           final res = await ApiService.inviteFriend(username);
           if (navigatorKey.currentContext != null) {
-            ScaffoldMessenger.of(navigatorKey.currentContext!).showSnackBar(
-              SnackBar(content: Text(res.isSuccess ? 'Friend request sent to $username!' : (res.error ?? 'Error'))),
-            );
+            if (res.isSuccess) {
+              AppToast.success(navigatorKey.currentContext!, 'Friend request sent to $username!');
+            } else {
+              AppToast.error(navigatorKey.currentContext!, res.error ?? 'Error');
+            }
           }
         } else {
           await CacheService.savePendingFriendInvite(username);

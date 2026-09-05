@@ -41,7 +41,6 @@ class DashboardScreen extends StatefulWidget {
 class DashboardScreenState extends State<DashboardScreen> {
   DashboardData? _data;
   bool _isLoading = true;
-  String? _error;
   StreamSubscription<void>? _syncSub;
 
   void initState() {
@@ -76,7 +75,7 @@ class DashboardScreenState extends State<DashboardScreen> {
       setState(() {
         _data = d;
         _isLoading = false;
-        _error = null;
+        
       });
 
       // Update home screen widget
@@ -210,7 +209,6 @@ class DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) return _buildSkeleton();
-    if (_error != null) return _buildError();
     if (_data == null) return _buildEmpty();
 
     final d = _data!;
@@ -1127,7 +1125,7 @@ class DashboardScreenState extends State<DashboardScreen> {
         children: [
           const Icon(Icons.error_outline, size: 48, color: AppColors.muted),
           const SizedBox(height: 12),
-          Text(_error ?? 'Something went wrong', style: const TextStyle(color: AppColors.muted), textAlign: TextAlign.center),
+          const Text('Something went wrong', style: TextStyle(color: AppColors.muted), textAlign: TextAlign.center),
           const SizedBox(height: 16),
           ElevatedButton(onPressed: _loadDashboard, child: const Text('Retry')),
         ],

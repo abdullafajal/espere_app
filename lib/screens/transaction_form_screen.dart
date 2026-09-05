@@ -3,6 +3,7 @@
 /// Card with type/amount/category/date/payment/notes fields.
 /// Used for both create and edit.
 import 'package:flutter/material.dart';
+import '../utils/app_toast.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
@@ -70,7 +71,6 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   List<CategoryModel> _categories = [];
   bool _isLoading = true;
   bool _isSaving = false;
-  String? _error;
   String _currencySymbol = '₹';
 
   // Track old state for offline updates
@@ -170,13 +170,12 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   Future<void> _save() async {
     final amount = _amountController.text.trim();
     if (amount.isEmpty) {
-      setState(() => _error = 'Amount is required.');
+      AppToast.error(context, 'Amount is required.');
       return;
     }
 
     setState(() {
       _isSaving = true;
-      _error = null;
     });
     HapticFeedback.heavyImpact();
 
@@ -410,40 +409,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                         child: Column(
                           children: [
                             // Error
-                            if (_error != null)
-                              Container(
-                                margin: const EdgeInsets.only(bottom: 16),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 12,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.dark,
-                                  borderRadius: BorderRadius.circular(
-                                    AppRadius.xl,
-                                  ),
-                                  boxShadow: AppShadows.soft,
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.error,
-                                      size: 18,
-                                      color: AppColors.accent,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        _error!,
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          color: AppColors.accent,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                            
 
                             // Form container without card border
                             Container(

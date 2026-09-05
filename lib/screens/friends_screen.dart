@@ -10,6 +10,7 @@ import '../widgets/user_avatar.dart';
 import 'split_group_detail_screen.dart';
 import '../widgets/icon_color_picker.dart';
 import 'package:share_plus/share_plus.dart';
+import '../utils/app_toast.dart';
 
 class FriendsScreen extends StatefulWidget {
   final VoidCallback? onBack;
@@ -86,9 +87,9 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
         _friends.removeWhere((f) => f['id'] == friendId);
         _selectedFriendIds.remove(friendId);
       });
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$name removed from friends.')));
+      AppToast.success(context, '$name removed from friends.');
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res.error ?? 'Failed to remove friend.')));
+      AppToast.error(context, res.error ?? 'Failed to remove friend.');
       _loadData(); // Refresh to restore UI
     }
   }
@@ -193,23 +194,9 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
                     if (r.isSuccess) {
                       HapticFeedback.mediumImpact();
                       _loadData();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: const Text('Friend request sent!', style: TextStyle(color: AppColors.dark)),
-                          behavior: SnackBarBehavior.floating,
-                          margin: EdgeInsets.only(bottom: MediaQuery.of(context).size.height - 150, left: 16, right: 16),
-                          backgroundColor: AppColors.accent,
-                        )
-                      );
+                      AppToast.success(context, 'Friend request sent!');
                     } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(r.error ?? 'Error', style: const TextStyle(color: AppColors.accent)),
-                          behavior: SnackBarBehavior.floating,
-                          margin: EdgeInsets.only(bottom: MediaQuery.of(context).size.height - 150, left: 16, right: 16),
-                          backgroundColor: AppColors.dark,
-                        )
-                      );
+                      AppToast.error(context, r.error ?? 'Error');
                     }
                   },
                   child: isInviting
@@ -263,7 +250,7 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
 
   void _createGroupWithSelected() {
     if (_selectedFriendIds.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select at least one friend')));
+      AppToast.error(context, 'Please select at least one friend');
       return;
     }
     
@@ -366,7 +353,7 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
                         );
                       } else {
                         ss(() => isSaving = false);
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res.error ?? 'Error')));
+                        AppToast.error(context, res.error ?? 'Error');
                       }
                     } else {
                       // Offline: Queue and optimistic update
@@ -394,7 +381,7 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
                       Navigator.pop(ctx);
                       setState(() => _selectedFriendIds = []);
                       HapticFeedback.mediumImpact();
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Created offline. Will sync when online.')));
+                      AppToast.success(context, 'Created offline. Will sync when online.');
                     }
                   },
                   child: isSaving 
@@ -415,7 +402,7 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
       HapticFeedback.lightImpact();
       _loadData();
     } else {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r.error ?? 'Error')));
+      if (mounted) AppToast.error(context, r.error ?? 'Error');
     }
   }
 
@@ -425,7 +412,7 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
       HapticFeedback.lightImpact();
       _loadData();
     } else {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r.error ?? 'Error')));
+      if (mounted) AppToast.error(context, r.error ?? 'Error');
     }
   }
 

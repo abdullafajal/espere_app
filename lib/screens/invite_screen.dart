@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/app_toast.dart';
 
 class InviteScreen extends StatefulWidget {
   final String token;
@@ -51,23 +52,9 @@ class _InviteScreenState extends State<InviteScreen> {
     
     if (result.error != null) {
       setState(() => _isAccepting = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result.error!, style: const TextStyle(color: AppColors.accent)), 
-          backgroundColor: AppColors.dark,
-          behavior: SnackBarBehavior.floating,
-          margin: EdgeInsets.only(bottom: MediaQuery.of(context).size.height - 150, left: 16, right: 16),
-        ),
-      );
+      AppToast.error(context, result.error ?? 'Error accepting invite');
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result.data?['message'] ?? 'Invite accepted!', style: const TextStyle(color: AppColors.dark)),
-          backgroundColor: AppColors.accent,
-          behavior: SnackBarBehavior.floating,
-          margin: EdgeInsets.only(bottom: MediaQuery.of(context).size.height - 150, left: 16, right: 16),
-        ),
-      );
+      AppToast.success(context, result.data?['message'] ?? 'Invite accepted!');
       // Navigate to group or home
       if (result.data != null && result.data!['group_id'] != null) {
         // Here we could pop and push the group detail, or just go to home and let the user navigate

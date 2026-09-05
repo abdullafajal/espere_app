@@ -18,7 +18,6 @@ class ReportsScreen extends StatefulWidget {
 class _ReportsScreenState extends State<ReportsScreen> {
   Map<String, dynamic>? _reportData;
   bool _isLoading = true;
-  String? _error;
   int _selectedYear = DateTime.now().year;
 
   @override
@@ -95,23 +94,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       ? const Center(
                         child: CircularProgressIndicator(
                           color: AppColors.accent,
-                        ),
-                      )
-                      : _error != null
-                      ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              _error!,
-                              style: const TextStyle(color: AppColors.muted),
-                            ),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                              onPressed: _loadData,
-                              child: const Text('Retry'),
-                            ),
-                          ],
                         ),
                       )
                       : RefreshIndicator(

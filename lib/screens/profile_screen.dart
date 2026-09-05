@@ -27,7 +27,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String? _baseUrl;
   bool _isLoading = true;
   bool _isSaving = false;
-  String? _error;
 
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
@@ -78,7 +77,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _save() async {
     setState(() {
       _isSaving = true;
-      _error = null;
     });
 
     final data = {
@@ -128,7 +126,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       } else if (!ConnectivityService.isOnline) {
         AppToast.success(context, 'Profile update queued.');
       } else {
-        _error = result.error;
+        AppToast.error(context, result.error ?? 'Error updating profile');
       }
     });
   }
@@ -558,9 +556,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: SafeArea(
         child: _isLoading
             ? const Center(child: CircularProgressIndicator(color: AppColors.accent))
-            : _error != null && _user == null
-                ? Center(child: Text(_error!, style: const TextStyle(color: AppColors.muted)))
-                : SingleChildScrollView(
+            : SingleChildScrollView(
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.center,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
+import '../utils/app_toast.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
 import '../services/connectivity_service.dart';
@@ -25,7 +26,6 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
   List<Map<String, dynamic>> _groupInvitations = [];
   List<Map<String, dynamic>> _pendingReceived = [];
   bool _isLoading = true;
-  String? _error;
   int? _myId;
   String _currencySymbol = '₹';
 
@@ -72,8 +72,8 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
         } else if (_groups.isEmpty && mounted) {
           setState(() {
             _isLoading = false;
-            _error = result.error;
           });
+          AppToast.error(context, result.error ?? 'Failed to load groups');
         }
       });
       
@@ -101,7 +101,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
       HapticFeedback.lightImpact();
       _loadGroups();
     } else {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r.error ?? 'Error')));
+      if (mounted) AppToast.error(context, r.error ?? 'Error');
     }
   }
 
@@ -111,7 +111,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
       HapticFeedback.lightImpact();
       _loadGroups();
     } else {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r.error ?? 'Error')));
+      if (mounted) AppToast.error(context, r.error ?? 'Error');
     }
   }
 
@@ -501,13 +501,6 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
           child:
               _isLoading && _groups.isEmpty
                   ? _buildSkeleton()
-                  : _error != null
-                  ? Center(
-                    child: Text(
-                      _error!,
-                      style: const TextStyle(color: AppColors.muted),
-                    ),
-                  )
                   : _groups.isEmpty
                   ? _buildEmptyState()
                   : RefreshIndicator(
@@ -979,9 +972,7 @@ class _GroupTileState extends State<_GroupTile> {
           confirmDismiss: (direction) async {
             if (!widget.canEditDelete) {
               HapticFeedback.vibrate();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Only the group creator can edit or delete the group.')),
-              );
+              AppToast.error(context, 'Only the group creator can edit or delete the group.');
               return false;
             }
             if (direction == DismissDirection.startToEnd) {

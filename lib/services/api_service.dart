@@ -205,6 +205,67 @@ class ApiService {
     }
   }
 
+  /// Forgot Password — request OTP
+  static Future<ApiResult<Map<String, dynamic>>> forgotPassword(String email) async {
+    try {
+      final url = await _url('/api/auth/forgot-password/');
+      final response = await http.post(
+        Uri.parse(url),
+        headers: await _headers(auth: false),
+        body: jsonEncode({'email': email}),
+      );
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResult(data: data);
+      }
+      return ApiResult(error: data['error'] ?? 'Request failed.');
+    } catch (e) {
+      return ApiResult(error: 'Connection error.');
+    }
+  }
+
+  /// Verify Password Reset OTP
+  static Future<ApiResult<Map<String, dynamic>>> verifyPasswordResetOtp(String email, String otp) async {
+    try {
+      final url = await _url('/api/auth/verify-password-reset-otp/');
+      final response = await http.post(
+        Uri.parse(url),
+        headers: await _headers(auth: false),
+        body: jsonEncode({'email': email, 'otp': otp}),
+      );
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResult(data: data);
+      }
+      return ApiResult(error: data['error'] ?? 'Verification failed.');
+    } catch (e) {
+      return ApiResult(error: 'Connection error.');
+    }
+  }
+
+  /// Reset Password
+  static Future<ApiResult<Map<String, dynamic>>> resetPassword(String email, String otp, String newPassword) async {
+    try {
+      final url = await _url('/api/auth/reset-password/');
+      final response = await http.post(
+        Uri.parse(url),
+        headers: await _headers(auth: false),
+        body: jsonEncode({
+          'email': email,
+          'otp': otp,
+          'new_password': newPassword
+        }),
+      );
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResult(data: data);
+      }
+      return ApiResult(error: data['error'] ?? 'Reset failed.');
+    } catch (e) {
+      return ApiResult(error: 'Connection error.');
+    }
+  }
+
   /// Change user password
   static Future<ApiResult> changePassword(String oldPassword, String newPassword) async {
     try {

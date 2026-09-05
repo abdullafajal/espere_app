@@ -8,7 +8,7 @@ class AppToast {
   }
 
   static void error(BuildContext context, String message) {
-    _show(context, message, Icons.error, AppColors.error);
+    _show(context, message, Icons.error, AppColors.accent);
   }
 
   static void info(BuildContext context, String message) {
@@ -74,10 +74,10 @@ class AppToast {
                     Expanded(
                       child: Text(
                         message,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
-                          color: color,
+                          color: AppColors.accent,
                         ),
                       ),
                     ),

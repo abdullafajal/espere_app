@@ -34,12 +34,12 @@ class AppColors {
   static const Color incomeLight = Color(0xFFF5F9E6);
   static const Color expense = Color(0xFFC8E64A);
   static const Color expenseLight = Color(0xFFF5F9E6);
-  static const Color error = Color(0xFFC62828);
-  static const Color errorLight = Color(0xFFFFEBEE);
-  static const Color warning = Color(0xFFE65100);
-  static const Color warningLight = Color(0xFFFFF3E0);
-  static const Color success = Color(0xFF4CAF50);
-  static const Color successLight = Color(0xFFE8F5E9);
+  static const Color error = Color(0xFF1A1A1A); // AppColors.dark
+  static const Color errorLight = Color(0xFFF5F5F5); // AppColors.background
+  static const Color warning = Color(0xFF1A1A1A); // AppColors.dark
+  static const Color warningLight = Color(0xFFF5F5F5); // AppColors.background
+  static const Color success = Color(0xFFC8E64A); // AppColors.accent
+  static const Color successLight = Color(0xFFF5F5F5); // AppColors.background
 
   // Gradient for avatar
   static const LinearGradient avatarGradient = LinearGradient(

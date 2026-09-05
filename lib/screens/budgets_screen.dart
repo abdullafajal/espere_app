@@ -26,7 +26,6 @@ class BudgetsScreenState extends State<BudgetsScreen> {
   List<Map<String, dynamic>> _categories = [];
   bool _isLoading = true;
   bool _isLoadingCats = true;
-  String? _error;
   String _currencySymbol = '₹';
   DateTime _currentMonth = DateTime.now();
 
@@ -341,13 +340,6 @@ class BudgetsScreenState extends State<BudgetsScreen> {
               _isLoading
                   ? const Center(
                     child: CircularProgressIndicator(color: AppColors.accent),
-                  )
-                  : _error != null
-                  ? Center(
-                    child: Text(
-                      _error!,
-                      style: const TextStyle(color: AppColors.muted),
-                    ),
                   )
                   : _budgets.isEmpty
                   ? Center(

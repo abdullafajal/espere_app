@@ -7,6 +7,8 @@ import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/otp_verification_screen.dart';
+import 'screens/forgot_password_screen.dart';
+import 'screens/reset_password_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/transaction_form_screen.dart';
 import 'screens/categories_screen.dart';
@@ -79,6 +81,8 @@ class EspereApp extends StatelessWidget {
         '/login': (context) => const LoginScreen(),
         '/register': (context) => const RegisterScreen(),
         '/verify-otp': (context) => const OtpVerificationScreen(),
+        '/forgot-password': (context) => const ForgotPasswordScreen(),
+        '/reset-password': (context) => const ResetPasswordScreen(),
         '/home': (context) => const HomeScreen(),
         '/categories': (context) => const CategoriesScreen(),
         '/profile': (context) => const ProfileScreen(),
