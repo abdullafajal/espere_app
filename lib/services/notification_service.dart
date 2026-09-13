@@ -73,6 +73,15 @@ class NotificationService {
         handleMessageAction(msg.data);
       });
 
+      // Handle message when app is completely closed
+      final initialMsg = await fcm.getInitialMessage();
+      if (initialMsg != null) {
+        debugPrint('[FCM] Initial: ${initialMsg.data}');
+        Future.delayed(const Duration(milliseconds: 500), () {
+          handleMessageAction(initialMsg.data);
+        });
+      }
+
       // Try to get token (will fail with placeholder google-services.json)
       try {
         final token = await fcm.getToken();

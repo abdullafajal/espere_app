@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/espere_header.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
@@ -6,10 +7,12 @@ import '../services/api_service.dart';
 import '../services/cache_service.dart';
 import '../services/connectivity_service.dart';
 import '../services/sync_service.dart';
+import '../widgets/thanos_snap_widget.dart';
 import '../widgets/espere_input.dart';
 import '../utils/app_toast.dart';
 import '../utils/icon_mapper.dart';
 import '../models/category.dart';
+import '../widgets/espere_back_button.dart';
 import '../widgets/budget_tile.dart';
 import 'dart:async';
 
@@ -27,6 +30,7 @@ class BudgetsScreenState extends State<BudgetsScreen> {
   bool _isLoading = true;
   bool _isLoadingCats = true;
   String _currencySymbol = '₹';
+  final Map<int, GlobalKey<ThanosSnapWidgetState>> _budgetSnapKeys = {};
   DateTime _currentMonth = DateTime.now();
 
   StreamSubscription<void>? _syncSub;
@@ -153,7 +157,7 @@ class BudgetsScreenState extends State<BudgetsScreen> {
     );
   }
 
-  Future<void> _deleteBudget(int id) async {
+  Future<void> _deleteBudget(GlobalKey<ThanosSnapWidgetState> snapKey, int id) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder:
@@ -187,6 +191,7 @@ class BudgetsScreenState extends State<BudgetsScreen> {
     );
 
     if (confirm == true) {
+      await snapKey.currentState?.startSnap();
       // Offline mode: queue deletion
       await SyncService.queueOperation(
         action: 'delete',
@@ -201,7 +206,7 @@ class BudgetsScreenState extends State<BudgetsScreen> {
         _budgets.removeWhere((b) => b['id'] == id);
       });
 
-      HapticFeedback.heavyImpact();
+      HapticFeedback.lightImpact();
       AppToast.success(context, 'Budget deleted.');
 
       if (ConnectivityService.isOnline) {
@@ -240,53 +245,27 @@ class BudgetsScreenState extends State<BudgetsScreen> {
     return Column(
       children: [
         // Custom Fixed Header
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-          child: Row(
-            children: [
-              GestureDetector(
-                onTap: () {
-                  if (widget.onBack != null) {
-                    widget.onBack?.call();
-                  } else {
-                    Navigator.maybePop(context);
-                  }
-                },
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppColors.card,
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                    boxShadow: AppShadows.soft,
-                  ),
-                  child: const Icon(Icons.arrow_back, color: AppColors.text),
-                ),
+        EspereHeader(
+          title: 'Budgets',
+          onBack: () {
+            if (widget.onBack != null) {
+              widget.onBack?.call();
+            } else {
+              Navigator.maybePop(context);
+            }
+          },
+          trailing: GestureDetector(
+            onTap: () => _showBudgetForm(),
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: AppColors.accent,
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                boxShadow: AppShadows.soft,
               ),
-              const SizedBox(width: 16),
-              const Text(
-                'Budgets',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.text,
-                ),
-              ),
-              const Spacer(),
-              GestureDetector(
-                onTap: () => _showBudgetForm(),
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppColors.accent,
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                    boxShadow: AppShadows.soft,
-                  ),
-                  child: const Icon(Icons.add, color: AppColors.dark),
-                ),
-              ),
-            ],
+              child: const Icon(Icons.add, color: AppColors.dark, size: 20),
+            ),
           ),
         ),
 
@@ -408,11 +387,15 @@ class BudgetsScreenState extends State<BudgetsScreen> {
                       itemCount: _budgets.length,
                       itemBuilder: (context, index) {
                         final budget = _budgets[index];
-                        return BudgetTile(
-                          budget: budget,
-                          currencySymbol: _currencySymbol,
-                          onEdit: () => _showBudgetForm(budget),
-                          onDelete: () => _deleteBudget(budget['id']),
+                        final snapKey = _budgetSnapKeys.putIfAbsent(budget['id'], () => GlobalKey<ThanosSnapWidgetState>());
+                        return ThanosSnapWidget(
+                          key: snapKey,
+                          child: BudgetTile(
+                            budget: budget,
+                            currencySymbol: _currencySymbol,
+                            onEdit: () => _showBudgetForm(budget),
+                            onDelete: () => _deleteBudget(snapKey, budget['id']),
+                          ),
                         );
                       },
                     ),

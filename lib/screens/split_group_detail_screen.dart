@@ -1,16 +1,20 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../widgets/espere_header.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../services/connectivity_service.dart';
 import '../services/sync_service.dart';
+import '../widgets/thanos_snap_widget.dart';
 import '../services/cache_service.dart';
 import '../widgets/user_avatar.dart';
 import '../widgets/espere_input.dart';
 import '../widgets/icon_color_picker.dart';
 import 'package:share_plus/share_plus.dart';
+import '../widgets/espere_back_button.dart';
+import '../widgets/espere_swipe_action.dart';
 import '../widgets/full_offline_alert.dart';
 
 class SplitGroupDetailScreen extends StatefulWidget {
@@ -33,6 +37,8 @@ class _S extends State<SplitGroupDetailScreen>
   late TabController _tc;
   int? _myId;
   String _currencySymbol = '₹';
+  final Map<int, GlobalKey<ThanosSnapWidgetState>> _expenseSnapKeys = {};
+  final ScrollController _expScrollCtrl = ScrollController();
 
   @override
   void initState() {
@@ -44,6 +50,7 @@ class _S extends State<SplitGroupDetailScreen>
   @override
   void dispose() {
     _tc.dispose();
+    _expScrollCtrl.dispose();
     super.dispose();
   }
 
@@ -551,7 +558,7 @@ class _S extends State<SplitGroupDetailScreen>
                                       if (!ctx.mounted) return;
                                       Navigator.pop(ctx);
                                       if (allSuccess) {
-                                        HapticFeedback.heavyImpact();
+                                        HapticFeedback.lightImpact();
                                         _load();
                                         _showTopMessage('Members added!');
                                       } else {
@@ -695,7 +702,7 @@ class _S extends State<SplitGroupDetailScreen>
                                     if (!ctx.mounted) return;
                                     Navigator.pop(ctx);
                                     if (r.isSuccess) {
-                                      HapticFeedback.heavyImpact();
+                                      HapticFeedback.lightImpact();
                                       _load();
                                     }
                                   },
@@ -968,6 +975,7 @@ class _S extends State<SplitGroupDetailScreen>
                                 onPressed:
                                     () => _confirmDeleteExpense(
                                       detail?['id'] ?? e['id'],
+                                      fromDetail: true,
                                     ),
                                 child: const Text(
                                   'Delete',
@@ -987,7 +995,7 @@ class _S extends State<SplitGroupDetailScreen>
     );
   }
 
-  void _confirmDeleteExpense(int id) {
+  void _confirmDeleteExpense(int id, {bool fromDetail = false, GlobalKey<ThanosSnapWidgetState>? snapKey}) {
     showDialog(
       context: context,
       builder:
@@ -1018,16 +1026,24 @@ class _S extends State<SplitGroupDetailScreen>
               TextButton(
                 onPressed: () async {
                   Navigator.pop(ctx); // Close dialog
-                  Navigator.pop(context); // Close detail modal
-                  _showLoading(context);
+                  if (fromDetail) {
+                    Navigator.pop(context); // Close detail modal
+                  }
+                  if (snapKey != null) {
+                    await snapKey.currentState?.startSnap();
+                  } else {
+                    _showLoading(context);
+                  }
                   final r = await ApiService.deleteSplitExpense(
                     widget.groupId,
                     id,
                   );
                   if (!mounted) return;
-                  Navigator.pop(context); // Close loading
+                  if (snapKey == null) {
+                    Navigator.pop(context); // Close loading
+                  }
                   if (r.isSuccess) {
-                    HapticFeedback.heavyImpact();
+                    HapticFeedback.lightImpact();
                     _showTopMessage('Expense deleted');
                     _load();
                   } else {
@@ -1706,8 +1722,14 @@ class _S extends State<SplitGroupDetailScreen>
                                       if (!ctx.mounted) return;
                                       Navigator.pop(ctx);
                                       if (r.isSuccess) {
-                                        HapticFeedback.heavyImpact();
+                                        HapticFeedback.lightImpact();
                                         _load();
+                                        _tc.animateTo(0);
+                                        if (_expScrollCtrl.hasClients) {
+                                          _expScrollCtrl.animateTo(0,
+                                              duration: const Duration(milliseconds: 300),
+                                              curve: Curves.easeOut);
+                                        }
                                       } else {
                                         _showTopMessage(
                                           r.error ?? 'Error',
@@ -1919,7 +1941,7 @@ class _S extends State<SplitGroupDetailScreen>
                                       if (!ctx.mounted) return;
                                       Navigator.pop(ctx);
                                       if (r.isSuccess) {
-                                        HapticFeedback.heavyImpact();
+                                        HapticFeedback.lightImpact();
                                         _load();
                                       } else {
                                         _showTopMessage(
@@ -1966,104 +1988,11 @@ class _S extends State<SplitGroupDetailScreen>
           child: Column(
             children: [
               // Fixed Header
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
-                child: Row(
-                  children: [
-                    GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: AppColors.card,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: AppShadows.soft,
-                        ),
-                        child: const Icon(
-                          Icons.arrow_back,
-                          color: AppColors.text,
-                          size: 20,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        widget.groupName,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.text,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (_g != null && _g!['created_by_id'] == _myId)
-                      GestureDetector(
-                        onTap: _editGroup,
-                        child: Container(
-                          width: 40,
-                          height: 40,
-                          margin: const EdgeInsets.only(right: 8),
-                          decoration: BoxDecoration(
-                            color: AppColors.dark,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: AppShadows.soft,
-                          ),
-                          child: const Icon(
-                            Icons.edit,
-                            color: AppColors.accent,
-                            size: 18,
-                          ),
-                        ),
-                      ),
-                    if (_g != null && (_g!['members_can_invite'] == true || _g!['created_by_id'] == _myId))
-                      GestureDetector(
-                        onTap: () {
-                          final token = _g!['invite_token'];
-                          final me = _g!['members'].firstWhere((m) => m['id'] == _myId, orElse: () => {'username': '', 'display_name': 'Someone'});
-                          final myUsername = me['username'];
-                          final myName = me['display_name'];
-                          final url = 'https://espere.in/invite/$token?ref=$myUsername';
-                          Share.share('Join $myName\'s split group on Espere! $url');
-                        },
-                        child: Container(
-                          width: 40,
-                          height: 40,
-                          margin: const EdgeInsets.only(right: 8),
-                          decoration: BoxDecoration(
-                            color: AppColors.card,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: AppShadows.soft,
-                          ),
-                          child: const Icon(
-                            Icons.share,
-                            color: AppColors.text,
-                            size: 18,
-                          ),
-                        ),
-                      ),
-                    GestureDetector(
-                      onTap: _g != null ? _addMember : null,
-                      child: Container(
-                        width: 40,
-                        height: 40,
-                        margin: const EdgeInsets.only(right: 8),
-                        decoration: BoxDecoration(
-                          color: AppColors.accent,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: AppShadows.soft,
-                        ),
-                        child: const Icon(
-                          Icons.person_add,
-                          color: AppColors.dark,
-                          size: 20,
-                        ),
-                      ),
-                    ),
-                    if (_g != null)
-                      Theme(
+              EspereHeader(
+                title: widget.groupName,
+                onBack: () => Navigator.pop(context),
+                trailing: _g != null
+                    ? Theme(
                         data: Theme.of(context).copyWith(
                           splashColor: Colors.transparent,
                           highlightColor: Colors.transparent,
@@ -2073,36 +2002,78 @@ class _S extends State<SplitGroupDetailScreen>
                           color: AppColors.card,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                           icon: Container(
-                            width: 40,
-                            height: 40,
+                            width: 36,
+                            height: 36,
                             decoration: BoxDecoration(
                               color: AppColors.accent,
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(AppRadius.md),
                               boxShadow: AppShadows.soft,
                             ),
                             child: const Icon(Icons.more_vert, color: AppColors.dark, size: 20),
                           ),
                           onSelected: (val) {
-                            if (val == 'leave') {
+                            if (val == 'edit') {
+                              _editGroup();
+                            } else if (val == 'share') {
+                              final token = _g!['invite_token'];
+                              final me = _g!['members'].firstWhere((m) => m['id'] == _myId, orElse: () => {'username': '', 'display_name': 'Someone'});
+                              final myUsername = me['username'];
+                              final myName = me['display_name'];
+                              final url = 'https://espere.in/invite/$token?ref=$myUsername';
+                              Share.share('Join $myName\'s split group on Espere! $url');
+                            } else if (val == 'add') {
+                              _addMember();
+                            } else if (val == 'leave') {
                               _leaveGroup();
                             }
                           },
                           itemBuilder: (ctx) => [
+                            if (_g!['created_by_id'] == _myId)
+                              const PopupMenuItem(
+                                value: 'edit',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.edit, color: AppColors.text, size: 20),
+                                    SizedBox(width: 12),
+                                    Text('Edit Group', style: TextStyle(color: AppColors.text, fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
+                              ),
+                            if (_g!['members_can_invite'] == true || _g!['created_by_id'] == _myId)
+                              const PopupMenuItem(
+                                value: 'share',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.share, color: AppColors.text, size: 20),
+                                    SizedBox(width: 12),
+                                    Text('Share Invite', style: TextStyle(color: AppColors.text, fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
+                              ),
+                            const PopupMenuItem(
+                              value: 'add',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.person_add, color: AppColors.text, size: 20),
+                                  SizedBox(width: 12),
+                                  Text('Add Member', style: TextStyle(color: AppColors.text, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                            ),
                             const PopupMenuItem(
                               value: 'leave',
                               child: Row(
                                 children: [
-                                  Icon(Icons.exit_to_app, color: AppColors.text, size: 20),
+                                  Icon(Icons.exit_to_app, color: Colors.redAccent, size: 20),
                                   SizedBox(width: 12),
-                                  Text('Leave Group', style: TextStyle(color: AppColors.text, fontWeight: FontWeight.bold)),
+                                  Text('Leave Group', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
                                 ],
                               ),
                             ),
                           ],
                         ),
-                      ),
-                  ],
-                ),
+                      )
+                    : const SizedBox(),
               ),
               Expanded(
                 child:
@@ -2519,6 +2490,7 @@ class _S extends State<SplitGroupDetailScreen>
       onRefresh: _load,
       color: AppColors.accent,
       child: ListView.builder(
+        controller: _expScrollCtrl,
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
         itemCount: l.length,
         itemBuilder: (_, i) {
@@ -2526,84 +2498,86 @@ class _S extends State<SplitGroupDetailScreen>
           final dt = DateTime.tryParse(e['date'] ?? '');
           final f = dt != null ? DateFormat('MMM d').format(dt.toLocal()) : '';
           final creatorId = e['created_by_id'];
-          final canEdit = _myId != null && creatorId == _myId;
+          final paidById = e['paid_by'] != null ? e['paid_by']['id'] : null;
+          final canEdit = _myId != null && (creatorId == _myId || paidById == _myId);
 
-          Widget card = GestureDetector(
-            onTap: () => _showExpenseDetail(e),
-            child: Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: AppColors.card,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: AppShadows.card,
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: AppColors.accent,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.receipt_long,
-                      size: 22,
-                      color: AppColors.dark,
-                    ),
+          Widget cardContent = Container(
+            padding: const EdgeInsets.all(14),
+            decoration: const BoxDecoration(
+              color: AppColors.card,
+              // Shadow moved to outer wrapper
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.accent,
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          e['description'] ?? '',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.text,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                  child: const Icon(
+                    Icons.receipt_long,
+                    size: 22,
+                    color: AppColors.dark,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        e['description'] ?? '',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                          color: AppColors.text,
                         ),
-                        Text(
-                          f,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.muted,
-                          ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        f,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.muted,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  Text(
-                    '${_currencySymbol}${e['amount']}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.text,
-                    ),
+                ),
+                Text(
+                  '${_currencySymbol}${e['amount']}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.text,
                   ),
-                  const SizedBox(width: 8),
-                  const Icon(
-                    Icons.chevron_right,
-                    size: 18,
-                    color: AppColors.muted,
-                  ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(
+                  Icons.chevron_right,
+                  size: 18,
+                  color: AppColors.muted,
+                ),
+              ],
             ),
           );
 
+          Widget card = GestureDetector(
+            onTap: () => _showExpenseDetail(e),
+            child: cardContent,
+          );
+
           if (canEdit) {
-            return _SwipeableTile(
+            card = EspereSwipeAction(
               dismissKey: ValueKey('exp_${e['id']}'),
               direction: DismissDirection.horizontal,
               confirmDismiss: (direction) async {
                 if (direction == DismissDirection.startToEnd) {
                   // Delete
-                  _confirmDeleteExpense(e['id']);
+                  _confirmDeleteExpense(e['id'], snapKey: _expenseSnapKeys[e['id']]);
                   return false;
                 } else if (direction == DismissDirection.endToStart) {
                   // Edit
@@ -2634,12 +2608,25 @@ class _S extends State<SplitGroupDetailScreen>
               secBgColor: AppColors.accent,
               secBgIconColor: AppColors.dark,
               secBgAlignment: Alignment.centerRight,
+              borderRadius: BorderRadius.circular(20),
               child: card,
             );
           }
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: card,
+          
+          final snapKey = _expenseSnapKeys.putIfAbsent(e['id'], () => GlobalKey<ThanosSnapWidgetState>());
+          return ThanosSnapWidget(
+            key: snapKey,
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: AppShadows.card,
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: card,
+              ),
+            ),
           );
         },
       ),
@@ -2684,10 +2671,9 @@ class _S extends State<SplitGroupDetailScreen>
 
             Widget memberCard = Container(
               padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: AppColors.card,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: AppShadows.card,
+                // Shadow moved to outer if needed, or kept here if not swipable, but swipe requires no inner radius
               ),
               child: Row(
                 children: [
@@ -2749,8 +2735,9 @@ class _S extends State<SplitGroupDetailScreen>
               ),
             );
 
+            Widget finalCard;
             if (canRemove) {
-              return _SwipeableTile(
+              finalCard = EspereSwipeAction(
                 dismissKey: ValueKey('member_${x['id']}'),
                 direction: DismissDirection.endToStart,
                 confirmDismiss: (direction) async {
@@ -2761,13 +2748,23 @@ class _S extends State<SplitGroupDetailScreen>
                 bgColor: AppColors.dark,
                 bgIconColor: AppColors.accent,
                 bgAlignment: Alignment.centerRight,
+                borderRadius: BorderRadius.circular(20),
                 child: memberCard,
               );
+            } else {
+              finalCard = memberCard;
             }
 
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: memberCard,
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: AppShadows.card,
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: finalCard,
+              ),
             );
           }).toList(),
         ],
@@ -2806,9 +2803,20 @@ class _S extends State<SplitGroupDetailScreen>
     );
 
     if (confirm == true) {
-      // API call to remove member
-      _showTopMessage('Member removed.');
-      _load();
+      if (_g == null) return;
+      final groupId = _g!['id'] as int;
+      final userId = member['id'] as int;
+
+      setState(() => _ld = true);
+      final res = await ApiService.removeGroupMember(groupId, userId);
+      setState(() => _ld = false);
+
+      if (res.isSuccess) {
+        _showTopMessage('Member removed.');
+        _load();
+      } else {
+        _showTopMessage(res.error ?? 'Failed to remove member.', isError: true);
+      }
     }
   }
 
@@ -2843,7 +2851,7 @@ class _S extends State<SplitGroupDetailScreen>
       if (!mounted) return;
       Navigator.pop(context);
       if (r.isSuccess) {
-        HapticFeedback.heavyImpact();
+        HapticFeedback.lightImpact();
         Navigator.pop(context, true);
       } else {
         _showTopMessage(r.error ?? 'Error', isError: true);
@@ -2882,7 +2890,7 @@ class _S extends State<SplitGroupDetailScreen>
       if (!mounted) return;
       Navigator.pop(context);
       if (r.isSuccess) {
-        HapticFeedback.heavyImpact();
+        HapticFeedback.lightImpact();
         Navigator.pop(context, true); // Pop back to groups list and refresh
       } else {
         _showTopMessage(r.error ?? 'Error', isError: true);
@@ -3203,97 +3211,6 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(_SliverAppBarDelegate oldDelegate) => false;
-}
-
-class _SwipeableTile extends StatefulWidget {
-  final Key dismissKey;
-  final DismissDirection direction;
-  final Future<bool?> Function(DismissDirection) confirmDismiss;
-  final Widget child;
-
-  final IconData? bgIcon;
-  final Color? bgColor;
-  final Color? bgIconColor;
-  final Alignment? bgAlignment;
-
-  final IconData? secBgIcon;
-  final Color? secBgColor;
-  final Color? secBgIconColor;
-  final Alignment? secBgAlignment;
-
-  const _SwipeableTile({
-    required this.dismissKey,
-    required this.direction,
-    required this.confirmDismiss,
-    required this.child,
-    this.bgIcon,
-    this.bgColor,
-    this.bgIconColor,
-    this.bgAlignment,
-    this.secBgIcon,
-    this.secBgColor,
-    this.secBgIconColor,
-    this.secBgAlignment,
-  });
-
-  @override
-  State<_SwipeableTile> createState() => _SwipeableTileState();
-}
-
-class _SwipeableTileState extends State<_SwipeableTile> {
-  double _swipeProgress = 0.0;
-
-  @override
-  Widget build(BuildContext context) {
-    final double iconScale = (_swipeProgress * 4.0).clamp(0.8, 1.8);
-
-    Widget? bg;
-    if (widget.bgIcon != null) {
-      bg = Container(
-        decoration: BoxDecoration(color: widget.bgColor),
-        alignment: widget.bgAlignment ?? Alignment.centerLeft,
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Transform.scale(
-          scale: iconScale,
-          child: Icon(widget.bgIcon, color: widget.bgIconColor),
-        ),
-      );
-    }
-
-    Widget? secBg;
-    if (widget.secBgIcon != null) {
-      secBg = Container(
-        decoration: BoxDecoration(color: widget.secBgColor),
-        alignment: widget.secBgAlignment ?? Alignment.centerRight,
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Transform.scale(
-          scale: iconScale,
-          child: Icon(widget.secBgIcon, color: widget.secBgIconColor),
-        ),
-      );
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Dismissible(
-          key: widget.dismissKey,
-          direction: widget.direction,
-          onUpdate: (details) {
-            if (details.reached && !details.previousReached) {
-              HapticFeedback.vibrate();
-            }
-            setState(() => _swipeProgress = details.progress);
-          },
-          confirmDismiss: widget.confirmDismiss,
-          background: bg,
-          secondaryBackground: secBg,
-          child: widget.child,
-        ),
-      ),
-    );
-  }
 }
 
 class _UserPickerSheet extends StatefulWidget {

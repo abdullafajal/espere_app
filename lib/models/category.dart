@@ -1,4 +1,3 @@
-/// Category model matching Django's Category model.
 import 'dart:ui';
 
 class CategoryModel {

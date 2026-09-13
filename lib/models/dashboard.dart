@@ -98,10 +98,14 @@ class DashboardData {
       lineValues: (json['line_values'] as List? ?? [])
           .map((v) => (v as num).toDouble())
           .toList(),
-      budgetWarnings: (json['budget_warnings'] as List? ?? [])
-          .map((w) => Map<String, String>.from(w.map(
-              (key, value) => MapEntry(key.toString(), value.toString()))))
-          .toList(),
+      budgetWarnings: (json['budget_warnings'] as List? ?? []).map((w) {
+        return {
+          'category': w['category']?.toString() ?? '',
+          'spent': w['spent']?.toString() ?? '0',
+          'limit': w['limit']?.toString() ?? '0',
+          'icon': w['icon']?.toString() ?? 'category',
+        };
+      }).toList(),
       insights: List<String>.from(json['insights'] ?? []),
     );
   }

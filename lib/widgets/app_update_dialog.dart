@@ -7,6 +7,7 @@ class AppUpdateDialog extends StatelessWidget {
   final String releaseNotes;
   final String updateUrl;
   final bool isRequired;
+  final VoidCallback? onSkip;
 
   const AppUpdateDialog({
     super.key,
@@ -14,6 +15,7 @@ class AppUpdateDialog extends StatelessWidget {
     required this.releaseNotes,
     required this.updateUrl,
     required this.isRequired,
+    this.onSkip,
   });
 
   Future<void> _launchUpdateUrl() async {
@@ -97,7 +99,10 @@ class AppUpdateDialog extends StatelessWidget {
             if (!isRequired) ...[
               const SizedBox(height: 8),
               TextButton(
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: () {
+                  onSkip?.call();
+                  Navigator.of(context).pop();
+                },
                 style: TextButton.styleFrom(
                   foregroundColor: AppColors.dark,
                   shape: const StadiumBorder(),

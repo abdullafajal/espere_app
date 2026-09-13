@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
+import '../widgets/espere_header.dart';
+import '../widgets/espere_swipe_action.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_toast.dart';
+import '../widgets/espere_back_button.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
 import '../services/connectivity_service.dart';
 import '../services/sync_service.dart';
+import '../widgets/thanos_snap_widget.dart';
 import '../widgets/user_avatar.dart';
 import 'split_group_detail_screen.dart';
 import 'friends_screen.dart';
@@ -28,6 +32,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
   bool _isLoading = true;
   int? _myId;
   String _currencySymbol = '₹';
+  final Map<int, GlobalKey<ThanosSnapWidgetState>> _groupSnapKeys = {};
 
   @override
   void initState() {
@@ -366,7 +371,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
                       if (!ctx.mounted) return;
                       Navigator.pop(ctx);
                       if (r.isSuccess) {
-                        HapticFeedback.heavyImpact();
+                        HapticFeedback.lightImpact();
                         _loadGroups();
                       } else {
                         _showTopMessage(r.error ?? 'Error', isError: true);
@@ -413,88 +418,66 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
         body: SafeArea(
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
-                child: Row(
+              EspereHeader(
+                title: 'Split Groups',
+                onBack: () {
+                  if (widget.onBack != null) {
+                    widget.onBack?.call();
+                  } else {
+                    Navigator.maybePop(context);
+                  }
+                },
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
+                    if (_groupInvitations.isNotEmpty || _pendingReceived.isNotEmpty) ...[
+                      GestureDetector(
+                        onTap: _showRequestsPopup,
+                        child: Stack(
+                          children: [
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: AppColors.card,
+                                borderRadius: BorderRadius.circular(AppRadius.md),
+                                boxShadow: AppShadows.soft,
+                              ),
+                              child: const Icon(Icons.notifications_none, color: AppColors.text),
+                            ),
+                            Positioned(
+                              right: 8,
+                              top: 8,
+                              child: Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: Colors.redAccent,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
                     GestureDetector(
-                      onTap: () {
-                        if (widget.onBack != null) {
-                          widget.onBack?.call();
-                        } else {
-                          Navigator.maybePop(context);
-                        }
-                      },
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppColors.card,
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                    boxShadow: AppShadows.soft,
-                  ),
-                  child: const Icon(Icons.arrow_back, color: AppColors.text),
-                ),
-              ),
-              const SizedBox(width: 16),
-              const Text(
-                'Split Groups',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.text,
-                ),
-              ),
-              const Spacer(),
-              if (_groupInvitations.isNotEmpty || _pendingReceived.isNotEmpty) ...[
-                GestureDetector(
-                  onTap: _showRequestsPopup,
-                  child: Stack(
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 40,
+                      onTap: _showCreateGroupSheet,
+                      child: Container(
+                        width: 36,
+                        height: 36,
                         decoration: BoxDecoration(
-                          color: AppColors.card,
+                          color: AppColors.accent,
                           borderRadius: BorderRadius.circular(AppRadius.md),
                           boxShadow: AppShadows.soft,
                         ),
-                        child: const Icon(Icons.notifications_outlined, color: AppColors.text, size: 22),
+                        child: const Icon(Icons.add, color: AppColors.dark, size: 20),
                       ),
-                      Positioned(
-                        right: 8,
-                        top: 8,
-                        child: Container(
-                          width: 10,
-                          height: 10,
-                          decoration: BoxDecoration(
-                            color: AppColors.accent,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: AppColors.card, width: 2),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-              ],
-              GestureDetector(
-                onTap: _showCreateGroupSheet,
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppColors.accent,
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                    boxShadow: AppShadows.soft,
-                  ),
-                  child: const Icon(Icons.add, color: AppColors.dark),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
-        ),
 
         // Content
         Expanded(
@@ -574,24 +557,28 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
 
     final canEditDelete = group['is_accepted'] == true && group['created_by_id'] == _myId;
 
-    return _GroupTile(
-      group: group,
-      canEditDelete: canEditDelete,
-      onTap: () async {
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => SplitGroupDetailScreen(
-              groupId: group['id'] as int,
-              groupName: group['name'] as String,
+    final snapKey = _groupSnapKeys.putIfAbsent(group['id'], () => GlobalKey<ThanosSnapWidgetState>());
+
+    return ThanosSnapWidget(
+      key: snapKey,
+      child: _GroupTile(
+        group: group,
+        canEditDelete: canEditDelete,
+        onTap: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => SplitGroupDetailScreen(
+                groupId: group['id'] as int,
+                groupName: group['name'] as String,
+              ),
             ),
-          ),
-        );
-        _loadGroups();
-      },
-      onEdit: () => _editGroupSheet(group),
-      onDelete: () => _deleteGroup(group),
-      child: Column(
+          );
+          _loadGroups();
+        },
+        onEdit: () => _editGroupSheet(group),
+        onDelete: () => _deleteGroup(snapKey, group),
+        child: Column(
         children: [
           Padding(
             padding: const EdgeInsets.all(20),
@@ -703,6 +690,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
             ),
         ],
       ),
+    ),
     );
   }
 
@@ -780,7 +768,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
                     if (!ctx.mounted) return;
                     Navigator.pop(ctx);
                     if (res.isSuccess) {
-                      HapticFeedback.heavyImpact();
+                      HapticFeedback.lightImpact();
                       _loadGroups();
                     }
                   },
@@ -796,7 +784,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
     );
   }
 
-  void _deleteGroup(Map<String, dynamic> group) async {
+  void _deleteGroup(GlobalKey<ThanosSnapWidgetState> snapKey, Map<String, dynamic> group) async {
     final netBalance = double.tryParse(group['net_balance'].toString()) ?? 0;
     
     if (netBalance.abs() >= 0.01) {
@@ -818,9 +806,10 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
     );
 
     if (confirm == true) {
+      await snapKey.currentState?.startSnap();
       final res = await ApiService.deleteSplitGroup(group['id'] as int);
       if (res.isSuccess) {
-        HapticFeedback.heavyImpact();
+        HapticFeedback.lightImpact();
         _showTopMessage('Group deleted.');
         _loadGroups();
       } else {
@@ -926,12 +915,8 @@ class _GroupTile extends StatefulWidget {
 }
 
 class _GroupTileState extends State<_GroupTile> {
-  double _swipeProgress = 0.0;
-
   @override
   Widget build(BuildContext context) {
-    final double iconScale = (_swipeProgress * 4.0).clamp(0.8, 1.8);
-
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -940,35 +925,16 @@ class _GroupTileState extends State<_GroupTile> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24),
-        child: Dismissible(
-          key: ValueKey('group_${widget.group['id']}'),
+        child: EspereSwipeAction(
+          dismissKey: ValueKey('group_${widget.group['id']}'),
           direction: DismissDirection.horizontal,
-          onUpdate: (details) {
-            if (details.reached && !details.previousReached) {
-              HapticFeedback.vibrate();
-            }
-            setState(() {
-              _swipeProgress = details.progress;
-            });
-          },
-          background: Container( // Swipe right (startToEnd) -> Delete
-            alignment: Alignment.centerLeft,
-            padding: const EdgeInsets.only(left: 20),
-            color: AppColors.dark,
-            child: Transform.scale(
-              scale: iconScale,
-              child: const Icon(Icons.delete, color: AppColors.accent),
-            ),
-          ),
-          secondaryBackground: Container( // Swipe left (endToStart) -> Edit
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.only(right: 20),
-            color: AppColors.accent,
-            child: Transform.scale(
-              scale: iconScale,
-              child: const Icon(Icons.edit, color: AppColors.dark),
-            ),
-          ),
+          bgIcon: Icons.delete,
+          bgColor: AppColors.dark,
+          bgIconColor: AppColors.accent,
+          secBgIcon: Icons.edit,
+          secBgColor: AppColors.accent,
+          secBgIconColor: AppColors.dark,
+          borderRadius: BorderRadius.circular(24),
           confirmDismiss: (direction) async {
             if (!widget.canEditDelete) {
               HapticFeedback.vibrate();
@@ -980,7 +946,7 @@ class _GroupTileState extends State<_GroupTile> {
               return false; // we handle deletion through the callback
             } else if (direction == DismissDirection.endToStart) {
               widget.onEdit();
-              return false;
+              return false; // we handle edit through the callback
             }
             return false;
           },

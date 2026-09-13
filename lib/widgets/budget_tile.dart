@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
+import 'espere_swipe_action.dart';
 import '../utils/icon_mapper.dart';
 
 class BudgetTile extends StatefulWidget {
@@ -23,8 +24,6 @@ class BudgetTile extends StatefulWidget {
 }
 
 class _BudgetTileState extends State<BudgetTile> {
-  double _swipeProgress = 0.0;
-
   Color _parseColor(String? hex) {
     if (hex == null || hex.isEmpty) return AppColors.error;
     try {
@@ -47,7 +46,6 @@ class _BudgetTileState extends State<BudgetTile> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.card,
-        borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -186,11 +184,8 @@ class _BudgetTileState extends State<BudgetTile> {
       ),
     );
 
-    // Calculate dynamic scale based on swipe progress.
-    final double iconScale = (_swipeProgress * 4.0).clamp(0.8, 1.8);
-
-    content = Dismissible(
-      key: ValueKey(widget.budget['id']),
+    content = EspereSwipeAction(
+      dismissKey: ValueKey(widget.budget['id']),
       direction: DismissDirection.horizontal,
       confirmDismiss: (direction) async {
         if (direction == DismissDirection.startToEnd) {
@@ -202,49 +197,24 @@ class _BudgetTileState extends State<BudgetTile> {
         }
         return false;
       },
-      onUpdate: (details) {
-        if (details.reached && !details.previousReached) {
-          HapticFeedback.vibrate();
-        }
-        setState(() {
-          _swipeProgress = details.progress;
-        });
-      },
-      background: Container(
-        alignment: Alignment.centerLeft,
-        padding: const EdgeInsets.only(left: 20),
-        decoration: BoxDecoration(
-          color: AppColors.dark,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-        ),
-        child: Transform.scale(
-          scale: iconScale,
-          child: Icon(Icons.delete, color: categoryColor),
-        ),
-      ),
-      secondaryBackground: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
-        decoration: BoxDecoration(
-          color: categoryColor,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-        ),
-        child: Transform.scale(
-          scale: iconScale,
-          child: const Icon(Icons.edit, color: AppColors.dark),
-        ),
-      ),
+      bgIcon: Icons.delete,
+      bgColor: AppColors.dark,
+      bgIconColor: categoryColor,
+      secBgIcon: Icons.edit,
+      secBgColor: categoryColor,
+      secBgIconColor: AppColors.dark,
+      borderRadius: BorderRadius.circular(AppRadius.xxl),
       child: content,
     );
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppRadius.md),
+        borderRadius: BorderRadius.circular(AppRadius.xxl),
         boxShadow: AppShadows.card,
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppRadius.md),
+        borderRadius: BorderRadius.circular(AppRadius.xxl),
         child: content,
       ),
     );

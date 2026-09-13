@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import '../widgets/espere_header.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
+import '../widgets/espere_back_button.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
 import '../services/connectivity_service.dart';
@@ -52,39 +54,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
         child: Column(
           children: [
             // Custom Fixed Header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => Navigator.maybePop(context),
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: AppColors.card,
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                        boxShadow: AppShadows.soft,
-                      ),
-                      child: const Icon(
-                        Icons.arrow_back,
-                        color: AppColors.text,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  const Text(
-                    'Financial Reports',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.text,
-                    ),
-                  ),
-                  const Spacer(),
-                  _buildYearPicker(),
-                ],
-              ),
+            EspereHeader(
+              title: 'Financial Reports',
+              onBack: () => Navigator.maybePop(context),
+              trailing: _buildYearPicker(),
             ),
 
             // Content

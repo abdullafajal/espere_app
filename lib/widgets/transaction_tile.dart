@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../models/transaction.dart';
 import '../utils/icon_mapper.dart';
+import 'espere_swipe_action.dart';
 
 class TransactionTile extends StatefulWidget {
   final TransactionModel transaction;
@@ -32,8 +33,6 @@ class TransactionTile extends StatefulWidget {
 }
 
 class _TransactionTileState extends State<TransactionTile> {
-  double _swipeProgress = 0.0;
-
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('MMM d');
@@ -138,12 +137,8 @@ class _TransactionTileState extends State<TransactionTile> {
       final catColorStr = widget.transaction.category.color.replaceFirst('#', '');
       final catColor = Color(int.parse('FF$catColorStr', radix: 16));
 
-      // Calculate dynamic scale based on swipe progress.
-      // Starts at 0.8, reaches 1.8 scale.
-      final double iconScale = (_swipeProgress * 4.0).clamp(0.8, 1.8);
-
-      content = Dismissible(
-        key: ValueKey(widget.transaction.id),
+      content = EspereSwipeAction(
+        dismissKey: ValueKey(widget.transaction.id),
         direction: DismissDirection.horizontal,
         confirmDismiss: (direction) async {
           if (direction == DismissDirection.startToEnd) {
@@ -155,32 +150,13 @@ class _TransactionTileState extends State<TransactionTile> {
           }
           return false;
         },
-        onUpdate: (details) {
-          if (details.reached && !details.previousReached) {
-            HapticFeedback.vibrate();
-          }
-          setState(() {
-            _swipeProgress = details.progress;
-          });
-        },
-        background: Container(
-          alignment: Alignment.centerLeft,
-          padding: const EdgeInsets.only(left: 20),
-          color: AppColors.dark,
-          child: Transform.scale(
-            scale: iconScale,
-            child: Icon(Icons.delete, color: catColor),
-          ),
-        ),
-        secondaryBackground: Container(
-          alignment: Alignment.centerRight,
-          padding: const EdgeInsets.only(right: 20),
-          color: catColor,
-          child: Transform.scale(
-            scale: iconScale,
-            child: const Icon(Icons.edit, color: AppColors.dark),
-          ),
-        ),
+        bgIcon: Icons.delete,
+        bgColor: AppColors.dark,
+        bgIconColor: catColor,
+        secBgIcon: Icons.edit,
+        secBgColor: catColor,
+        secBgIconColor: AppColors.dark,
+        borderRadius: BorderRadius.circular(AppRadius.xxl),
         child: content,
       );
     }

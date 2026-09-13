@@ -925,7 +925,25 @@ class ApiService {
       return ApiResult(error: 'Connection error.');
     }
   }
-  /// Add a member to a group by username/email
+
+  /// Remove a member from a group
+  static Future<ApiResult<void>> removeGroupMember(int groupId, int userId) async {
+    try {
+      final url = await _url('/api/split/groups/$groupId/members/$userId/remove/');
+      final res = await http.post(
+        Uri.parse(url),
+        headers: await _headers(),
+      );
+      final data = jsonDecode(res.body);
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        return ApiResult(data: null);
+      }
+      return ApiResult(error: data['error'] ?? 'Failed to remove member.');
+    } catch (e) {
+      return ApiResult(error: 'Network error: $e');
+    }
+  }
+
   /// Add a member to a group by username/email
   static Future<ApiResult<Map<String, dynamic>>> addSplitMember(
       int groupId, {String? identifier, List<int>? userIds}) async {

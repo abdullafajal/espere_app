@@ -1,16 +1,21 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../widgets/espere_header.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
+import '../widgets/espere_swipe_action.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
 import '../services/connectivity_service.dart';
 import '../services/sync_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/user_avatar.dart';
 import 'split_group_detail_screen.dart';
 import '../widgets/icon_color_picker.dart';
 import 'package:share_plus/share_plus.dart';
 import '../utils/app_toast.dart';
+import '../widgets/espere_back_button.dart';
+import '../widgets/thanos_snap_widget.dart';
 
 class FriendsScreen extends StatefulWidget {
   final VoidCallback? onBack;
@@ -26,6 +31,7 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
   List<Map<String, dynamic>> _friends = [];
   List<Map<String, dynamic>> _pendingReceived = [];
   List<Map<String, dynamic>> _pendingSent = [];
+  final Map<int, GlobalKey<ThanosSnapWidgetState>> _friendSnapKeys = {};
   List<Map<String, dynamic>> _groupInvitations = [];
   List<int> _selectedFriendIds = [];
 
@@ -78,11 +84,13 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
 
   void reload() => _loadData();
 
-  Future<void> _removeFriend(int friendId, String name) async {
+  Future<void> _removeFriend(GlobalKey<ThanosSnapWidgetState> snapKey, int friendId, String name) async {
     final res = await ApiService.removeFriend(friendId);
     if (!mounted) return;
     
     if (res.isSuccess) {
+      await snapKey.currentState?.startSnap();
+      if (!mounted) return;
       setState(() {
         _friends.removeWhere((f) => f['id'] == friendId);
         _selectedFriendIds.remove(friendId);
@@ -436,27 +444,18 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
   Widget _buildHeader() {
     final int pendingCount = _pendingReceived.length + _groupInvitations.length;
     
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
-      child: Row(
+    return EspereHeader(
+      title: 'Friends',
+      onBack: () {
+        if (widget.onBack != null) {
+          widget.onBack!();
+        } else {
+          Navigator.pop(context);
+        }
+      },
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          GestureDetector(
-            onTap: () {
-              if (widget.onBack != null) {
-                widget.onBack!();
-              } else {
-                Navigator.pop(context);
-              }
-            },
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(color: AppColors.card, borderRadius: BorderRadius.circular(12), boxShadow: AppShadows.soft),
-              child: const Icon(Icons.arrow_back, color: AppColors.text, size: 20),
-            ),
-          ),
-          const SizedBox(width: 12),
-          const Expanded(child: Text('Friends', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.text))),
           if (pendingCount > 0) ...[
             GestureDetector(
               onTap: _showRequestsPopup,
@@ -488,14 +487,18 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
                 ],
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
           ],
           GestureDetector(
             onTap: _inviteFriend,
             child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(12), boxShadow: AppShadows.soft),
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: AppColors.accent,
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                boxShadow: AppShadows.soft,
+              ),
               child: const Icon(Icons.add, color: AppColors.dark, size: 20),
             ),
           ),
@@ -555,18 +558,22 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
               final f = _friends[i];
               final fid = f['id'] as int;
               final isSelected = _selectedFriendIds.contains(fid);
-              return _FriendTile(
-                friendData: f,
-                isSelected: isSelected,
-                onSelectChanged: (selected) {
-                  setState(() {
-                    if (selected) _selectedFriendIds.add(fid);
-                    else _selectedFriendIds.remove(fid);
-                  });
-                },
-                onRemove: () {
-                  _removeFriend(fid, f['display_name'] ?? f['username'] ?? 'Friend');
-                },
+              final snapKey = _friendSnapKeys.putIfAbsent(fid, () => GlobalKey<ThanosSnapWidgetState>());
+              return ThanosSnapWidget(
+                key: snapKey,
+                child: _FriendTile(
+                  friendData: f,
+                  isSelected: isSelected,
+                  onSelectChanged: (selected) {
+                    setState(() {
+                      if (selected) _selectedFriendIds.add(fid);
+                      else _selectedFriendIds.remove(fid);
+                    });
+                  },
+                  onRemove: () {
+                    _removeFriend(snapKey, fid, f['display_name'] ?? f['username'] ?? 'Friend');
+                  },
+                ),
               );
             },
           ),
@@ -734,42 +741,89 @@ class _FriendTile extends StatefulWidget {
 }
 
 class _FriendTileState extends State<_FriendTile> {
-  double _swipeProgress = 0.0;
-
   @override
   Widget build(BuildContext context) {
     final f = widget.friendData;
     final fid = f['id'] as int;
-    final double iconScale = (_swipeProgress * 4.0).clamp(0.8, 1.8);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Dismissible(
-          key: ValueKey('friend_$fid'),
-          direction: DismissDirection.startToEnd,
-      onUpdate: (details) {
-        if (details.reached && !details.previousReached) {
-          HapticFeedback.vibrate();
-        }
-        setState(() {
-          _swipeProgress = details.progress;
-        });
-      },
-      background: Container(
-        alignment: Alignment.centerLeft,
-        padding: const EdgeInsets.only(left: 20),
+    Widget card = GestureDetector(
+      onTap: () => widget.onSelectChanged(!widget.isSelected),
+      child: Container(
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: AppColors.dark,
+          color: AppColors.card,
+          // Removed inner borderRadius to ensure 90-degree corners when swiped
+          border: Border.all(color: widget.isSelected ? AppColors.accent : Colors.transparent, width: 2),
         ),
-        child: Transform.scale(
-          scale: iconScale,
-          child: const Icon(Icons.delete, color: AppColors.accent),
+        child: Row(
+          children: [
+            UserAvatar(
+              initial: f['initial'] ?? '?', 
+              avatarUrl: f['avatar_url'],
+              size: 48,
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    f['display_name'] ?? f['username'] ?? 'Unknown',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.text,
+                    ),
+                  ),
+                  if (f['email'] != null && f['email'].toString().isNotEmpty)
+                    Text(
+                      f['email'],
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.muted,
+                      ),
+                    ),
+                  if (f['phone_number'] != null && f['phone_number'].toString().isNotEmpty)
+                    Text(
+                      f['phone_number'],
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.muted,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: widget.isSelected ? AppColors.dark : Colors.transparent,
+                border: Border.all(
+                  color: widget.isSelected ? AppColors.dark : AppColors.muted,
+                  width: 1.5,
+                ),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              alignment: Alignment.center,
+              child: widget.isSelected
+                  ? const Icon(Icons.check, size: 18, color: AppColors.accent)
+                  : null,
+            ),
+          ],
         ),
       ),
+    );
+
+    Widget swipeAction = EspereSwipeAction(
+      dismissKey: ValueKey('friend_$fid'),
+      direction: DismissDirection.startToEnd,
+      bgIcon: Icons.delete,
+      bgColor: AppColors.dark,
+      bgIconColor: AppColors.accent,
+      borderRadius: BorderRadius.circular(20),
       confirmDismiss: (direction) async {
-        return await showDialog<bool>(
+        final confirm = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -787,46 +841,24 @@ class _FriendTileState extends State<_FriendTile> {
             ],
           ),
         ) ?? false;
+        
+        if (confirm) {
+          widget.onRemove();
+        }
+        return false;
       },
-      onDismissed: (direction) => widget.onRemove(),
-      child: GestureDetector(
-        onTap: () => widget.onSelectChanged(!widget.isSelected),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: AppColors.card, 
-            boxShadow: AppShadows.card,
-            border: Border.all(color: widget.isSelected ? AppColors.accent : Colors.transparent, width: 2),
-          ),
-          child: Row(
-            children: [
-              UserAvatar(
-                initial: f['initial'] ?? '?', 
-                avatarUrl: f['avatar_url'],
-                size: 48,
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(f['display_name'] ?? f['username'] ?? '', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.text)),
-                    Text(f['email'] ?? '', style: const TextStyle(fontSize: 12, color: AppColors.muted)),
-                  ],
-                ),
-              ),
-              Checkbox(
-                value: widget.isSelected,
-                onChanged: (v) => widget.onSelectChanged(v ?? false),
-                activeColor: AppColors.accent,
-                checkColor: AppColors.dark,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-              ),
-            ],
-          ),
-        ),
+      child: card,
+    );
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: AppShadows.card,
       ),
-        ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: swipeAction,
       ),
     );
   }

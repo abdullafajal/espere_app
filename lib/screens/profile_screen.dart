@@ -2,6 +2,7 @@
 ///
 import 'dart:io';
 import 'package:flutter/material.dart';
+import '../widgets/espere_header.dart';
 import 'package:image/image.dart' as img;
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
@@ -11,9 +12,11 @@ import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/cache_service.dart';
 import '../services/connectivity_service.dart';
+import '../widgets/espere_back_button.dart';
 import '../services/sync_service.dart';
 import '../widgets/espere_input.dart';
 import '../utils/app_toast.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -34,6 +37,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _currency = 'INR';
   String _theme = 'light';
   bool _emailReminders = true;
+  bool _shredderAnimation = true;
 
   static final _currencies = const [
     ('USD', '\$', 'US Dollar (USD)'),
@@ -71,6 +75,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
       });
     } else {
       if (mounted) setState(() => _isLoading = false);
+    }
+    
+    // Load local settings
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _shredderAnimation = prefs.getBool('enable_shredder_anim') ?? true;
+      });
     }
   }
 
@@ -556,30 +568,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: SafeArea(
         child: _isLoading
             ? const Center(child: CircularProgressIndicator(color: AppColors.accent))
-            : SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        // Back button (Optional, floating left)
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: GestureDetector(
-                            onTap: () => Navigator.pop(context),
-                            child: Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: AppColors.card,
-                                borderRadius: BorderRadius.circular(12),
-                                boxShadow: AppShadows.soft,
-                              ),
-                              child: const Icon(Icons.arrow_back, color: AppColors.text, size: 20),
-                            ),
-                          ),
-                        ),
-                        
-                        // ─── Avatar Section ────────────────────
+            : Column(
+                children: [
+                  EspereHeader(
+                    onBack: () => Navigator.pop(context),
+                  ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          // ─── Avatar Section ────────────────────
                         GestureDetector(
                           onTap: _pickImage,
                           child: Stack(
@@ -731,6 +731,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ),
                               ),
                             ),
+
+                            _buildRow(
+                              icon: Icons.animation,
+                              title: 'Delete Animation',
+                              showDivider: false,
+                              trailing: GestureDetector(
+                                onTap: () async {
+                                  setState(() => _shredderAnimation = !_shredderAnimation);
+                                  final prefs = await SharedPreferences.getInstance();
+                                  await prefs.setBool('enable_shredder_anim', _shredderAnimation);
+                                },
+                                child: Container(
+                                  width: 28,
+                                  height: 28,
+                                  decoration: BoxDecoration(
+                                    color: _shredderAnimation ? AppColors.dark : Colors.transparent,
+                                    border: Border.all(
+                                      color: _shredderAnimation ? AppColors.dark : AppColors.muted,
+                                      width: 1.5,
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: _shredderAnimation
+                                      ? const Icon(Icons.check, size: 18, color: AppColors.accent)
+                                      : null,
+                                ),
+                              ),
+                            ),
                           ],
                         ),
 
@@ -792,6 +821,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ],
                     ),
                   ),
+                ),
+              ],
+            ),
       ),
     );
   }

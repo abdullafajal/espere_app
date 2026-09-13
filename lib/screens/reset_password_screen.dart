@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../utils/app_toast.dart';
 import '../theme/app_theme.dart';
 import '../widgets/espere_input.dart';
+import '../widgets/espere_back_button.dart';
 import '../services/api_service.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
@@ -85,7 +86,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: Stack(
           children: [
@@ -180,22 +181,10 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             ),
             ),
             ),
-            Positioned(
+            const Positioned(
               top: 16,
-              left: 16,
-              child: GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppColors.card,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: AppShadows.soft,
-                  ),
-                  child: const Icon(Icons.arrow_back, color: AppColors.text, size: 20),
-                ),
-              ),
+              left: 20,
+              child: EspereBackButton(),
             ),
           ],
         ),

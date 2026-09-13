@@ -60,8 +60,16 @@ void main() async {
   runApp(const EspereApp());
 }
 
-class EspereApp extends StatelessWidget {
+class EspereApp extends StatefulWidget {
   const EspereApp({super.key});
+
+  @override
+  State<EspereApp> createState() => _EspereAppState();
+}
+
+class _EspereAppState extends State<EspereApp> {
+  // Use Stopwatch instead of DateTime to prevent GC allocation lag on low-end devices
+  final Stopwatch _throttleStopwatch = Stopwatch()..start();
 
   @override
   Widget build(BuildContext context) {
@@ -73,6 +81,23 @@ class EspereApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.light,
+
+      builder: (context, child) {
+        return NotificationListener<ScrollNotification>(
+          onNotification: (notification) {
+            // Ultra-fast zero-allocation check for overscroll boundaries
+            if (notification.metrics.outOfRange) {
+              if (_throttleStopwatch.elapsedMilliseconds > 300) {
+                HapticFeedback.lightImpact();
+                _throttleStopwatch.reset();
+              }
+            }
+            return false;
+          },
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
+
 
       // ─── Named Routes ────────────────────────────────────────
       initialRoute: '/',

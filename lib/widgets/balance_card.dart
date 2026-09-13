@@ -102,8 +102,18 @@ class _BalanceCardState extends State<BalanceCard> {
                       opacity: animation,
                       child: ScaleTransition(
                         scale: animation,
+                        alignment: Alignment.centerLeft,
                         child: child,
                       ),
+                    );
+                  },
+                  layoutBuilder: (Widget? currentChild, List<Widget> previousChildren) {
+                    return Stack(
+                      alignment: Alignment.centerLeft,
+                      children: <Widget>[
+                        ...previousChildren,
+                        if (currentChild != null) currentChild,
+                      ],
                     );
                   },
                   child: Text(

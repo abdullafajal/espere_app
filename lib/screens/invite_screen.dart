@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import '../widgets/espere_header.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_toast.dart';
+import '../widgets/espere_back_button.dart';
+import '../services/auth_service.dart';
+import '../services/cache_service.dart';
 
 class InviteScreen extends StatefulWidget {
   final String token;
@@ -45,6 +49,15 @@ class _InviteScreenState extends State<InviteScreen> {
   }
 
   Future<void> _acceptInvite() async {
+    final isAuthenticated = await AuthService.isAuthenticated();
+    if (!isAuthenticated) {
+      await CacheService.savePendingGroupInvite(widget.token, ref: widget.refUsername);
+      if (!mounted) return;
+      AppToast.success(context, 'Please login or register to accept the invite.');
+      Navigator.of(context).pushNamed('/register');
+      return;
+    }
+
     setState(() => _isAccepting = true);
     final result = await ApiService.acceptTokenInvite(widget.token, refUsername: widget.refUsername);
     
@@ -68,13 +81,23 @@ class _InviteScreenState extends State<InviteScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Group Invitation')),
-      body: Center(
-        child: _isLoading
-            ? const CircularProgressIndicator()
-            : _isValid
-                ? _buildValidInvite()
-                : _buildInvalidInvite(),
+      body: SafeArea(
+        child: Column(
+          children: [
+            EspereHeader(
+              title: 'Group Invitation',
+            ),
+            Expanded(
+              child: Center(
+                child: _isLoading
+                    ? const CircularProgressIndicator()
+                    : _isValid
+                        ? _buildValidInvite()
+                        : _buildInvalidInvite(),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -88,7 +111,14 @@ class _InviteScreenState extends State<InviteScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.group_add, size: 80, color: Colors.blue),
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: AppColors.dark,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: const Icon(Icons.group_add, size: 56, color: AppColors.accent),
+          ),
           const SizedBox(height: 24),
           Text(
             "You're invited!",
@@ -111,8 +141,8 @@ class _InviteScreenState extends State<InviteScreen> {
                 onPressed: _acceptInvite,
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
+                  backgroundColor: AppColors.dark,
+                  foregroundColor: AppColors.accent,
                 ),
                 child: const Text('Accept Invitation', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),

@@ -47,9 +47,9 @@ class CacheService {
 
   // ─── Dashboard ───────────────────────────────────────────────────────
 
-  static Future<Map<String, dynamic>> cacheDashboard(Map<String, dynamic> data) async {
+  static Future<Map<String, dynamic>> cacheDashboard(Map<String, dynamic> data, {bool preserveUnsynced = true}) async {
     final current = await getCachedDashboard();
-    if (current != null) {
+    if (current != null && preserveUnsynced) {
       final oldTxns = List<Map<String, dynamic>>.from(current['recent_transactions'] ?? []);
       final newTxns = List<Map<String, dynamic>>.from(data['recent_transactions'] ?? []);
 
@@ -203,9 +203,9 @@ class CacheService {
 
   // ─── Transactions ────────────────────────────────────────────────────
 
-  static Future<void> cacheTransactions(Map<String, dynamic> data) async {
+  static Future<void> cacheTransactions(Map<String, dynamic> data, {bool preserveUnsynced = true}) async {
     final current = await getCachedTransactions();
-    if (current != null) {
+    if (current != null && preserveUnsynced) {
       final oldList = List<Map<String, dynamic>>.from(current['transactions'] ?? []);
       final newList = List<Map<String, dynamic>>.from(data['transactions'] ?? []);
       
@@ -254,9 +254,9 @@ class CacheService {
 
   // ─── Categories ──────────────────────────────────────────────────────
 
-  static Future<void> cacheCategories(Map<String, dynamic> data) async {
+  static Future<void> cacheCategories(Map<String, dynamic> data, {bool preserveUnsynced = true}) async {
     final current = await getCachedCategories();
-    if (current != null) {
+    if (current != null && preserveUnsynced) {
       final oldList = List<Map<String, dynamic>>.from(current['categories'] ?? []);
       final newList = List<Map<String, dynamic>>.from(data['categories'] ?? []);
 
@@ -281,9 +281,9 @@ class CacheService {
 
   // ─── Budgets ─────────────────────────────────────────────────────────
 
-  static Future<void> cacheBudgets(Map<String, dynamic> data) async {
+  static Future<void> cacheBudgets(Map<String, dynamic> data, {bool preserveUnsynced = true}) async {
     final current = await getCachedBudgets();
-    if (current != null) {
+    if (current != null && preserveUnsynced) {
       final oldList = List<Map<String, dynamic>>.from(current['budgets'] ?? []);
       final newList = List<Map<String, dynamic>>.from(data['budgets'] ?? []);
 
@@ -412,7 +412,7 @@ class CacheService {
     await cacheTransactions({
       'transactions': list,
       'currency_symbol': cached['currency_symbol'],
-    });
+    }, preserveUnsynced: false);
   }
 
   /// Update an existing transaction in the local cache
@@ -433,7 +433,7 @@ class CacheService {
       await cacheTransactions({
         'transactions': list,
         'currency_symbol': cached['currency_symbol'],
-      });
+      }, preserveUnsynced: false);
     }
   }
 
@@ -446,7 +446,7 @@ class CacheService {
     await cacheCategories({
       'categories': list,
       'currency_symbol': cached['currency_symbol'],
-    });
+    }, preserveUnsynced: false);
   }
 
   /// Update an existing category in the local cache immediately
@@ -463,7 +463,7 @@ class CacheService {
       await cacheCategories({
         'categories': list,
         'currency_symbol': cached['currency_symbol'],
-      });
+      }, preserveUnsynced: false);
     }
   }
 
@@ -476,7 +476,7 @@ class CacheService {
     await cacheBudgets({
       'budgets': list,
       'currency_symbol': cached['currency_symbol'],
-    });
+    }, preserveUnsynced: false);
   }
 
   /// Remove a budget from the local cache immediately without merging
@@ -506,7 +506,7 @@ class CacheService {
       await cacheBudgets({
         'budgets': list,
         'currency_symbol': cached['currency_symbol'],
-      });
+      }, preserveUnsynced: false);
     }
   }
 
@@ -599,7 +599,7 @@ class CacheService {
       await cacheBudgets({
         'budgets': budgets,
         'currency_symbol': cached['currency_symbol'],
-      });
+      }, preserveUnsynced: false);
     }
   }
 
@@ -730,7 +730,7 @@ class CacheService {
       }
     }
 
-    await cacheDashboard(cached);
+    await cacheDashboard(cached, preserveUnsynced: false);
   }
 
 

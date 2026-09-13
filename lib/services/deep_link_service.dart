@@ -43,17 +43,11 @@ class DeepLinkService {
       if (segments.length >= 2) {
         final token = segments[1];
         final ref = uri.queryParameters['ref'];
-        
-        final isAuthenticated = await AuthService.isAuthenticated();
-        if (!isAuthenticated) {
-          await CacheService.savePendingGroupInvite(token, ref: ref);
-          navigatorKey.currentState?.pushNamed('/register');
-          return;
-        }
-        
+        // Always show the invite screen first.
+        // The InviteScreen will handle the authentication check when they click "Accept".
         navigatorKey.currentState?.pushNamed('/invite', arguments: {'token': token, 'ref': ref});
       }
-        } else if (path.startsWith('/add_friend/')) {
+    } else if (path.startsWith('/add_friend/')) {
       final segments = uri.pathSegments;
       if (segments.length >= 2) {
         final username = segments[1];

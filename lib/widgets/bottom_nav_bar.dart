@@ -66,7 +66,7 @@ class EspereBottomNav extends StatelessWidget {
               
               return GestureDetector(
                 onTap: () {
-                  HapticFeedback.selectionClick();
+                  HapticFeedback.lightImpact();
                   onTap(index);
                 },
                 child: SizedBox(
