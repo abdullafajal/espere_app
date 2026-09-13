@@ -21,6 +21,7 @@ import '../services/cache_service.dart';
 import '../widgets/balance_card.dart';
 import '../widgets/summary_card.dart';
 import '../widgets/transaction_tile.dart';
+import '../widgets/thanos_snap_widget.dart';
 import '../utils/icon_mapper.dart';
 import '../utils/app_toast.dart';
 import '../services/connectivity_service.dart';
@@ -42,6 +43,7 @@ class DashboardScreenState extends State<DashboardScreen> {
   DashboardData? _data;
   bool _isLoading = true;
   StreamSubscription<void>? _syncSub;
+  final Map<int, GlobalKey<ThanosSnapWidgetState>> _snapKeys = {};
 
   void initState() {
     super.initState();
@@ -128,7 +130,7 @@ class DashboardScreenState extends State<DashboardScreen> {
     return (math.max(max, 1.0) / interval).ceil() * interval;
   }
 
-  Future<void> _deleteTransaction(int id) async {
+  Future<void> _deleteTransaction(int id, {GlobalKey<ThanosSnapWidgetState>? snapKey}) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder:
@@ -160,7 +162,11 @@ class DashboardScreenState extends State<DashboardScreen> {
     );
 
     if (confirm == true) {
-      HapticFeedback.heavyImpact();
+      if (snapKey != null) {
+        await snapKey.currentState?.startSnap();
+      }
+      
+      HapticFeedback.lightImpact();
       
       // Offline mode: queue deletion
       await SyncService.queueOperation(
@@ -970,29 +976,35 @@ class DashboardScreenState extends State<DashboardScreen> {
               )
             else
               ...d.recentTransactions.map(
-                (txn) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: TransactionTile(
-                    transaction: txn,
-                    currencySymbol: d.currencySymbol,
-                    showActions: true,
-                    onTap: () {
-                      TransactionFormScreen.show(
-                        context,
-                        transactionId: txn.id,
-                        onSaved: _loadDashboard,
-                      );
-                    },
-                    onEdit: () {
-                      TransactionFormScreen.show(
-                        context,
-                        transactionId: txn.id,
-                        onSaved: _loadDashboard,
-                      );
-                    },
-                    onDelete: () => _deleteTransaction(txn.id),
-                  ),
-                ),
+                (txn) {
+                  final snapKey = _snapKeys.putIfAbsent(txn.id, () => GlobalKey<ThanosSnapWidgetState>());
+                  return ThanosSnapWidget(
+                    key: snapKey,
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: TransactionTile(
+                        transaction: txn,
+                        currencySymbol: d.currencySymbol,
+                        showActions: true,
+                        onTap: () {
+                          TransactionFormScreen.show(
+                            context,
+                            transactionId: txn.id,
+                            onSaved: _loadDashboard,
+                          );
+                        },
+                        onEdit: () {
+                          TransactionFormScreen.show(
+                            context,
+                            transactionId: txn.id,
+                            onSaved: _loadDashboard,
+                          );
+                        },
+                        onDelete: () => _deleteTransaction(txn.id, snapKey: snapKey),
+                      ),
+                    ),
+                  );
+                },
               ),
 
             // ─── Quick Links ────────────────────────────────────

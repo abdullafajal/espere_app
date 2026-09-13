@@ -14,6 +14,7 @@ import '../services/cache_service.dart';
 import '../services/connectivity_service.dart';
 import '../services/sync_service.dart';
 import '../widgets/transaction_tile.dart';
+import '../widgets/thanos_snap_widget.dart';
 import 'transaction_form_screen.dart';
 import '../utils/icon_mapper.dart';
 
@@ -31,6 +32,7 @@ class TransactionListScreenState extends State<TransactionListScreen> {
   bool _isLoading = true;
   String _currencySymbol = '₹';
   StreamSubscription<void>? _syncSub;
+  final Map<int, GlobalKey<ThanosSnapWidgetState>> _snapKeys = {};
 
   // Filters
   String _searchQuery = '';
@@ -180,7 +182,7 @@ class TransactionListScreenState extends State<TransactionListScreen> {
     _loadTransactions();
   }
 
-  Future<void> _deleteTransaction(int id) async {
+  Future<void> _deleteTransaction(int id, {GlobalKey<ThanosSnapWidgetState>? snapKey}) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder:
@@ -212,7 +214,11 @@ class TransactionListScreenState extends State<TransactionListScreen> {
     );
 
     if (confirm == true) {
-      HapticFeedback.heavyImpact();
+      if (snapKey != null) {
+        await snapKey.currentState?.startSnap();
+      }
+      
+      HapticFeedback.lightImpact();
       
       // Offline mode: queue deletion
       await SyncService.queueOperation(
@@ -563,25 +569,33 @@ class TransactionListScreenState extends State<TransactionListScreen> {
                               ),
                             Padding(
                               padding: const EdgeInsets.only(bottom: 8),
-                              child: TransactionTile(
-                                transaction: txn,
-                                currencySymbol: _currencySymbol,
-                                showActions: true,
-                                onTap: () {
-                                  TransactionFormScreen.show(
-                                    context,
-                                    transactionId: txn.id,
-                                    onSaved: _loadTransactions,
+                              child: Builder(
+                                builder: (context) {
+                                  final snapKey = _snapKeys.putIfAbsent(txn.id, () => GlobalKey<ThanosSnapWidgetState>());
+                                  return ThanosSnapWidget(
+                                    key: snapKey,
+                                    child: TransactionTile(
+                                      transaction: txn,
+                                      currencySymbol: _currencySymbol,
+                                      showActions: true,
+                                      onTap: () {
+                                        TransactionFormScreen.show(
+                                          context,
+                                          transactionId: txn.id,
+                                          onSaved: _loadTransactions,
+                                        );
+                                      },
+                                      onEdit: () {
+                                        TransactionFormScreen.show(
+                                          context,
+                                          transactionId: txn.id,
+                                          onSaved: _loadTransactions,
+                                        );
+                                      },
+                                      onDelete: () => _deleteTransaction(txn.id, snapKey: snapKey),
+                                    ),
                                   );
                                 },
-                                onEdit: () {
-                                  TransactionFormScreen.show(
-                                    context,
-                                    transactionId: txn.id,
-                                    onSaved: _loadTransactions,
-                                  );
-                                },
-                                onDelete: () => _deleteTransaction(txn.id),
                               ),
                             ),
                           ],
