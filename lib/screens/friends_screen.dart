@@ -407,7 +407,7 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
   Future<void> _handleFriendAction(dynamic id, String action) async {
     final r = await ApiService.handleFriendRequest(id, action);
     if (r.isSuccess) {
-      HapticFeedback.lightImpact();
+      HapticFeedback.mediumImpact();
       _loadData();
     } else {
       if (mounted) AppToast.error(context, r.error ?? 'Error');
@@ -417,7 +417,7 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
   Future<void> _handleGroupAction(int id, String action) async {
     final r = await ApiService.handleGroupInvitation(id, action);
     if (r.isSuccess) {
-      HapticFeedback.lightImpact();
+      HapticFeedback.mediumImpact();
       _loadData();
     } else {
       if (mounted) AppToast.error(context, r.error ?? 'Error');
@@ -750,10 +750,8 @@ class _FriendTileState extends State<_FriendTile> {
       onTap: () => widget.onSelectChanged(!widget.isSelected),
       child: Container(
         padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           color: AppColors.card,
-          // Removed inner borderRadius to ensure 90-degree corners when swiped
-          border: Border.all(color: widget.isSelected ? AppColors.accent : Colors.transparent, width: 2),
         ),
         child: Row(
           children: [
@@ -853,11 +851,16 @@ class _FriendTileState extends State<_FriendTile> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
+        color: AppColors.card,
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: widget.isSelected ? AppColors.accent : Colors.transparent,
+          width: 2,
+        ),
         boxShadow: AppShadows.card,
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(18),
         child: swipeAction,
       ),
     );

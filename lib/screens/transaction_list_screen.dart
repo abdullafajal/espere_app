@@ -218,7 +218,7 @@ class TransactionListScreenState extends State<TransactionListScreen> {
         await snapKey.currentState?.startSnap();
       }
       
-      HapticFeedback.lightImpact();
+      HapticFeedback.mediumImpact();
       
       // Offline mode: queue deletion
       await SyncService.queueOperation(

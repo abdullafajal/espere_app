@@ -129,16 +129,71 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     );
   }
 
-  Widget _buildFilterChip(String label, String value) {
-    final isSelected = _typeFilter == value;
-    return ChoiceChip(
-      label: Text(label),
-      selected: isSelected,
-      onSelected: (selected) {
-        if (selected) setState(() => _typeFilter = value);
+  void _showTypeFilterSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.card,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.border,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Filter Categories',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.text,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _buildTypePickerOption('All Types', 'all'),
+                _buildTypePickerOption('Expense', 'expense'),
+                _buildTypePickerOption('Income', 'income'),
+              ],
+            ),
+          ),
+        );
       },
-      selectedColor: AppColors.accent,
-      checkmarkColor: AppColors.dark,
+    );
+  }
+
+  Widget _buildTypePickerOption(String title, String value) {
+    final isSelected = _typeFilter == value;
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text(
+        title,
+        style: TextStyle(
+          fontSize: 15,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+          color: isSelected ? AppColors.accent : AppColors.text,
+        ),
+      ),
+      trailing: isSelected
+          ? const Icon(Icons.check, color: AppColors.accent, size: 20)
+          : null,
+      onTap: () {
+        Navigator.pop(context);
+        setState(() => _typeFilter = value);
+      },
     );
   }
 
@@ -209,11 +264,25 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               child: Row(
                 children: [
-                  _buildFilterChip('All', 'all'),
-                  const SizedBox(width: 8),
-                  _buildFilterChip('Expense', 'expense'),
-                  const SizedBox(width: 8),
-                  _buildFilterChip('Income', 'income'),
+                  _FilterChip(
+                    label: _typeFilter == 'all'
+                        ? 'All Types'
+                        : _typeFilter == 'expense'
+                            ? 'Expense'
+                            : 'Income',
+                    onTap: () {
+                      setState(() {
+                        if (_typeFilter == 'all') {
+                          _typeFilter = 'expense';
+                        } else if (_typeFilter == 'expense') {
+                          _typeFilter = 'income';
+                        } else {
+                          _typeFilter = 'all';
+                        }
+                      });
+                    },
+                    onLongPress: _showTypeFilterSheet,
+                  ),
                 ],
               ),
             ),
@@ -495,7 +564,7 @@ class _CategoryFormSheetState extends State<_CategoryFormSheet> {
     setState(() {
       _isSaving = true;
     });
-    HapticFeedback.heavyImpact();
+    HapticFeedback.mediumImpact();
 
     final catData = {
       'name': name,
@@ -940,6 +1009,50 @@ class _CategoryTypePickerSheet extends StatelessWidget {
               const Spacer(),
               const Icon(Icons.check_circle, color: AppColors.accent),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FilterChip extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+
+  const _FilterChip({
+    required this.label,
+    required this.onTap,
+    this.onLongPress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      onLongPress: onLongPress,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppColors.card,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: AppColors.border),
+          boxShadow: AppShadows.soft,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: AppColors.text,
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(Icons.arrow_drop_down, size: 16, color: AppColors.muted),
           ],
         ),
       ),

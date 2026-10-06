@@ -558,7 +558,7 @@ class _S extends State<SplitGroupDetailScreen>
                                       if (!ctx.mounted) return;
                                       Navigator.pop(ctx);
                                       if (allSuccess) {
-                                        HapticFeedback.lightImpact();
+                                        HapticFeedback.mediumImpact();
                                         _load();
                                         _showTopMessage('Members added!');
                                       } else {
@@ -702,7 +702,7 @@ class _S extends State<SplitGroupDetailScreen>
                                     if (!ctx.mounted) return;
                                     Navigator.pop(ctx);
                                     if (r.isSuccess) {
-                                      HapticFeedback.lightImpact();
+                                      HapticFeedback.mediumImpact();
                                       _load();
                                     }
                                   },
@@ -1043,7 +1043,7 @@ class _S extends State<SplitGroupDetailScreen>
                     Navigator.pop(context); // Close loading
                   }
                   if (r.isSuccess) {
-                    HapticFeedback.lightImpact();
+                    HapticFeedback.mediumImpact();
                     _showTopMessage('Expense deleted');
                     _load();
                   } else {
@@ -1722,7 +1722,7 @@ class _S extends State<SplitGroupDetailScreen>
                                       if (!ctx.mounted) return;
                                       Navigator.pop(ctx);
                                       if (r.isSuccess) {
-                                        HapticFeedback.lightImpact();
+                                        HapticFeedback.mediumImpact();
                                         _load();
                                         _tc.animateTo(0);
                                         if (_expScrollCtrl.hasClients) {
@@ -1941,7 +1941,7 @@ class _S extends State<SplitGroupDetailScreen>
                                       if (!ctx.mounted) return;
                                       Navigator.pop(ctx);
                                       if (r.isSuccess) {
-                                        HapticFeedback.lightImpact();
+                                        HapticFeedback.mediumImpact();
                                         _load();
                                       } else {
                                         _showTopMessage(
@@ -2851,7 +2851,7 @@ class _S extends State<SplitGroupDetailScreen>
       if (!mounted) return;
       Navigator.pop(context);
       if (r.isSuccess) {
-        HapticFeedback.lightImpact();
+        HapticFeedback.mediumImpact();
         Navigator.pop(context, true);
       } else {
         _showTopMessage(r.error ?? 'Error', isError: true);
@@ -2890,7 +2890,7 @@ class _S extends State<SplitGroupDetailScreen>
       if (!mounted) return;
       Navigator.pop(context);
       if (r.isSuccess) {
-        HapticFeedback.lightImpact();
+        HapticFeedback.mediumImpact();
         Navigator.pop(context, true); // Pop back to groups list and refresh
       } else {
         _showTopMessage(r.error ?? 'Error', isError: true);

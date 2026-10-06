@@ -86,9 +86,16 @@ class _EspereAppState extends State<EspereApp> {
         return NotificationListener<ScrollNotification>(
           onNotification: (notification) {
             // Ultra-fast zero-allocation check for overscroll boundaries
-            if (notification.metrics.outOfRange) {
+            bool isEdge = false;
+            if (notification is OverscrollNotification) {
+              isEdge = true;
+            } else if (notification.metrics.outOfRange) {
+              isEdge = true;
+            }
+
+            if (isEdge) {
               if (_throttleStopwatch.elapsedMilliseconds > 300) {
-                HapticFeedback.lightImpact();
+                HapticFeedback.mediumImpact();
                 _throttleStopwatch.reset();
               }
             }

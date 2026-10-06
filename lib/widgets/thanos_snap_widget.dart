@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 
 class ThanosSnapWidget extends StatefulWidget {
   final Widget child;
@@ -24,6 +25,7 @@ class ThanosSnapWidgetState extends State<ThanosSnapWidget>
   Float32List? _rstTransforms;
   Float32List? _rects;
   Int32List? _colors;
+  DateTime? _lastVibration;
 
   @override
   void initState() {
@@ -32,6 +34,17 @@ class ThanosSnapWidgetState extends State<ThanosSnapWidget>
       vsync: this,
       duration: const Duration(milliseconds: 1800),
     );
+    _controller.addListener(() {
+      if (_controller.isAnimating) {
+        final now = DateTime.now();
+        if (_lastVibration == null || now.difference(_lastVibration!).inMilliseconds > 50) {
+          HapticFeedback.selectionClick();
+          _lastVibration = now;
+        }
+      } else {
+        _lastVibration = null;
+      }
+    });
   }
 
   /// Triggers the snap animation and completes when the animation is done.

@@ -177,7 +177,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     setState(() {
       _isSaving = true;
     });
-    HapticFeedback.lightImpact();
+    HapticFeedback.mediumImpact();
 
     final txnData = {
       'amount': amount,

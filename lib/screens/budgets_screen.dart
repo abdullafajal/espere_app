@@ -206,7 +206,7 @@ class BudgetsScreenState extends State<BudgetsScreen> {
         _budgets.removeWhere((b) => b['id'] == id);
       });
 
-      HapticFeedback.lightImpact();
+      HapticFeedback.mediumImpact();
       AppToast.success(context, 'Budget deleted.');
 
       if (ConnectivityService.isOnline) {

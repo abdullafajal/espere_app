@@ -103,7 +103,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
   Future<void> _handleFriendAction(dynamic id, String action) async {
     final r = await ApiService.handleFriendRequest(id, action);
     if (r.isSuccess) {
-      HapticFeedback.lightImpact();
+      HapticFeedback.mediumImpact();
       _loadGroups();
     } else {
       if (mounted) AppToast.error(context, r.error ?? 'Error');
@@ -113,7 +113,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
   Future<void> _handleGroupAction(int id, String action) async {
     final r = await ApiService.handleGroupInvitation(id, action);
     if (r.isSuccess) {
-      HapticFeedback.lightImpact();
+      HapticFeedback.mediumImpact();
       _loadGroups();
     } else {
       if (mounted) AppToast.error(context, r.error ?? 'Error');
@@ -371,7 +371,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
                       if (!ctx.mounted) return;
                       Navigator.pop(ctx);
                       if (r.isSuccess) {
-                        HapticFeedback.lightImpact();
+                        HapticFeedback.mediumImpact();
                         _loadGroups();
                       } else {
                         _showTopMessage(r.error ?? 'Error', isError: true);
@@ -768,7 +768,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
                     if (!ctx.mounted) return;
                     Navigator.pop(ctx);
                     if (res.isSuccess) {
-                      HapticFeedback.lightImpact();
+                      HapticFeedback.mediumImpact();
                       _loadGroups();
                     }
                   },
@@ -788,7 +788,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
     final netBalance = double.tryParse(group['net_balance'].toString()) ?? 0;
     
     if (netBalance.abs() >= 0.01) {
-      HapticFeedback.vibrate();
+      HapticFeedback.mediumImpact();
       _showTopMessage('Settle all balances before deleting group.', isError: true);
       return;
     }
@@ -809,7 +809,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
       await snapKey.currentState?.startSnap();
       final res = await ApiService.deleteSplitGroup(group['id'] as int);
       if (res.isSuccess) {
-        HapticFeedback.lightImpact();
+        HapticFeedback.mediumImpact();
         _showTopMessage('Group deleted.');
         _loadGroups();
       } else {
@@ -937,7 +937,7 @@ class _GroupTileState extends State<_GroupTile> {
           borderRadius: BorderRadius.circular(24),
           confirmDismiss: (direction) async {
             if (!widget.canEditDelete) {
-              HapticFeedback.vibrate();
+              HapticFeedback.mediumImpact();
               AppToast.error(context, 'Only the group creator can edit or delete the group.');
               return false;
             }

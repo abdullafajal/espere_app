@@ -166,7 +166,7 @@ class DashboardScreenState extends State<DashboardScreen> {
         await snapKey.currentState?.startSnap();
       }
       
-      HapticFeedback.lightImpact();
+      HapticFeedback.mediumImpact();
       
       // Offline mode: queue deletion
       await SyncService.queueOperation(

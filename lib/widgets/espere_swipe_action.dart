@@ -88,7 +88,7 @@ class _EspereSwipeActionState extends State<EspereSwipeAction> {
           final now = DateTime.now();
           // Vibrate continuously every 50 milliseconds while held past threshold
           if (_lastVibration == null || now.difference(_lastVibration!).inMilliseconds > 50) {
-            HapticFeedback.lightImpact();
+            HapticFeedback.selectionClick();
             _lastVibration = now;
           }
         } else {

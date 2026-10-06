@@ -58,6 +58,16 @@ class CacheService {
         return id is int && id > 1000000000000;
       }).toList();
 
+      // Check for pending deletes in sync queue
+      final syncQueue = await getSyncQueue();
+      final pendingDeletes = syncQueue
+          .where((op) => op['entity'] == 'transaction' && op['action'] == 'delete')
+          .map((op) => op['entityId'])
+          .toSet();
+
+      // Filter out transactions that have a pending delete operation
+      newTxns.removeWhere((t) => pendingDeletes.contains(t['id']));
+
       for (var item in unsynced) {
         // Smart De-duplication:
         bool exists = newTxns.any((t) {
@@ -215,6 +225,16 @@ class CacheService {
         final id = t['id'];
         return id is int && id > 1000000000000;
       }).toList();
+
+      // Check for pending deletes in sync queue
+      final syncQueue = await getSyncQueue();
+      final pendingDeletes = syncQueue
+          .where((op) => op['entity'] == 'transaction' && op['action'] == 'delete')
+          .map((op) => op['entityId'])
+          .toSet();
+
+      // Filter out transactions that have a pending delete operation
+      newList.removeWhere((t) => pendingDeletes.contains(t['id']));
 
       for (var item in unsynced) {
         // Smart De-duplication:
