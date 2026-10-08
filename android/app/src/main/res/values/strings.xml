@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="widget_description">Quick view of your total balance and spending summary.</string>
+    <string name="quick_add_widget_title">Quick Add Expense</string>
+    <string name="quick_add_widget_description">Add expenses quickly in a fluid multi-step experience directly from your home screen.</string>
 </resources>

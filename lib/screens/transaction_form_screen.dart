@@ -13,6 +13,7 @@ import '../services/api_service.dart';
 import '../services/cache_service.dart';
 import '../services/connectivity_service.dart';
 import '../services/sync_service.dart';
+import '../services/widget_service.dart';
 import '../utils/icon_mapper.dart';
 import '../widgets/espere_input.dart';
 
@@ -268,6 +269,9 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     if (ConnectivityService.isOnline) {
       SyncService.syncAll();
     }
+
+    // Refresh home screen widgets
+    WidgetService.refreshAllWidgets();
 
     if (!mounted) return;
     setState(() => _isSaving = false);

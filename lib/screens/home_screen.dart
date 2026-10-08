@@ -13,6 +13,7 @@ import 'split_groups_screen.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
 import '../services/cache_service.dart';
+import '../services/sync_service.dart';
 import '../utils/update_checker.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -22,7 +23,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _currentIndex = 0;
   bool _isBottomNavVisible = true;
   double _lastScrollOffset = 0;
@@ -38,6 +39,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _registerDeviceToken();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       UpdateChecker.check(context);
@@ -121,6 +123,24 @@ class _HomeScreenState extends State<HomeScreen> {
         _splitGroupsKey.currentState?.reload();
         break;
     }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      CacheService.reload().then((_) {
+        if (mounted) {
+          _refreshTab(_currentIndex);
+          SyncService.syncAll();
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   @override

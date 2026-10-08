@@ -6,6 +6,8 @@
         android:maxSdkVersion="29"/>
     <uses-permission
         android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/>
+    <uses-permission
+        android:name="android.permission.VIBRATE"/>
     <application
         android:label="Espere"
         android:name="${applicationName}"
@@ -75,8 +77,11 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_color"
             android:resource="@color/notification_icon_color"/>
+        <!-- Quick Add Expense Home-Screen Widget Provider -->
         <receiver
-            android:name=".DashboardWidgetProvider"
+            android:name=".QuickAddWidgetProvider"
+            android:label="Quick Add Expense"
+            android:icon="@mipmap/ic_launcher"
             android:exported="true">
             <intent-filter>
                 <action
@@ -84,8 +89,21 @@
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/dashboard_widget_info"/>
+                android:resource="@xml/quick_add_widget_info"/>
         </receiver>
+
+        <!-- Lightweight Dialog Activities without opening full app -->
+        <activity
+            android:name=".QuickAmountDialogActivity"
+            android:exported="false"
+            android:theme="@style/Theme.QuickAddDialog"
+            android:windowSoftInputMode="stateVisible|adjustResize"/>
+
+        <activity
+            android:name=".QuickNoteDialogActivity"
+            android:exported="false"
+            android:theme="@style/Theme.QuickAddDialog"
+            android:windowSoftInputMode="stateVisible|adjustResize"/>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

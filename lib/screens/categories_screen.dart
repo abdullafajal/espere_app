@@ -11,6 +11,7 @@ import '../services/api_service.dart';
 import '../services/cache_service.dart';
 import '../services/connectivity_service.dart';
 import '../services/sync_service.dart';
+import '../services/widget_service.dart';
 import '../utils/icon_mapper.dart';
 
 class CategoriesScreen extends StatefulWidget {
@@ -48,6 +49,10 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
               });
         _isLoading = false;
       });
+      WidgetService.syncQuickAddCategories(
+        _categories,
+        currencySymbol: cachedCats['currency_symbol'] as String? ?? '₹',
+      );
     } else {
       if (mounted) setState(() => _isLoading = false);
     }

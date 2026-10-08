@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="50dp"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingStart="14dp"
+    android:paddingEnd="14dp">
+
+    <ImageView
+        android:id="@+id/spinner_cat_icon"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:src="@drawable/ic_cat_food" />
+
+    <TextView
+        android:id="@+id/spinner_cat_name"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="Food"
+        android:textColor="@color/quick_widget_text_primary"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        android:layout_marginStart="12dp" />
+
+    <ImageView
+        android:id="@+id/spinner_arrow"
+        android:layout_width="22dp"
+        android:layout_height="22dp"
+        android:src="@drawable/ic_arrow_drop_down"
+        android:tint="@color/quick_widget_text_secondary" />
+</LinearLayout>
+

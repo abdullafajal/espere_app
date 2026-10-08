@@ -27,9 +27,10 @@ class CacheService {
     await prefs.setString(key, jsonEncode(data));
   }
 
-  /// Read raw JSON map from cache
+  /// Read raw JSON map from cache (reloads from disk first to pick up native widget writes)
   static Future<Map<String, dynamic>?> _read(String key) async {
     final prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
     final raw = prefs.getString(key);
     if (raw == null) return null;
     try {
@@ -37,6 +38,12 @@ class CacheService {
     } catch (_) {
       return null;
     }
+  }
+
+  /// Reload preferences from disk to ensure in-memory cache reflects external native writes
+  static Future<void> reload() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
   }
 
   /// Clear a specific cache key
@@ -843,6 +850,7 @@ class CacheService {
   /// Get pending sync operations
   static Future<List<Map<String, dynamic>>> getSyncQueue() async {
     final prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
     final raw = prefs.getString(_syncQueueKey);
     if (raw == null) return [];
     try {

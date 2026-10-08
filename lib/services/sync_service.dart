@@ -8,6 +8,7 @@ import '../models/category.dart';
 import '../models/user.dart';
 
 import 'dart:async';
+import 'widget_service.dart';
 
 class SyncService {
   static final _syncController = StreamController<void>.broadcast();
@@ -57,18 +58,30 @@ class SyncService {
   static Future<void> _pullDashboard() async {
     final res = await ApiService.getDashboard();
     if (res.isSuccess && res.data != null) {
-      await CacheService.cacheDashboard(res.data!.toJson());
+      final d = res.data!;
+      await CacheService.cacheDashboard(d.toJson());
+      WidgetService.updateDashboard(
+        totalBalance: double.tryParse(d.totalBalance.replaceAll(',', '')) ?? 0,
+        totalIncome: double.tryParse(d.monthlyIncome.replaceAll(',', '')) ?? 0,
+        totalExpense: double.tryParse(d.monthlyExpenses.replaceAll(',', '')) ?? 0,
+        currencySymbol: d.currencySymbol,
+      );
     }
   }
 
   static Future<void> _pullCategories() async {
     final res = await ApiService.getCategories();
     if (res.isSuccess && res.data != null) {
-      final catsJson = (res.data!['categories'] as List).map((c) => (c as CategoryModel).toJson()).toList();
+      final cats = List<CategoryModel>.from(res.data!['categories'] ?? []);
+      final catsJson = cats.map((c) => c.toJson()).toList();
       await CacheService.cacheCategories({
         'categories': catsJson,
         'currency_symbol': res.data!['currency_symbol'],
       });
+      WidgetService.syncQuickAddCategories(
+        cats,
+        currencySymbol: res.data!['currency_symbol'] ?? '₹',
+      );
     }
   }
 

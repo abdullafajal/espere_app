@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="320dp"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:background="@drawable/dialog_rounded_bg">
+
+    <!-- Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_edit_note"
+            android:tint="@color/quick_widget_primary" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Expense Note"
+            android:textColor="@color/quick_widget_text_primary"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginStart="10dp" />
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Add optional description or pick a quick suggestion:"
+        android:textColor="@color/quick_widget_text_secondary"
+        android:textSize="13sp"
+        android:layout_marginTop="6dp" />
+
+    <!-- Text Input -->
+    <EditText
+        android:id="@+id/dialog_note_input"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="48dp"
+        android:layout_marginTop="16dp"
+        android:background="@drawable/quick_widget_item_normal"
+        android:padding="12dp"
+        android:hint="e.g. Lunch with team, Groceries..."
+        android:textColorHint="@color/quick_widget_text_tertiary"
+        android:textColor="@color/quick_widget_text_primary"
+        android:textSize="15sp"
+        android:inputType="textCapSentences"
+        android:maxLines="2" />
+
+    <!-- Action Buttons -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="end"
+        android:layout_marginTop="20dp">
+
+        <Button
+            android:id="@+id/dialog_btn_cancel"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:text="Cancel"
+            android:textColor="@color/quick_widget_text_secondary"
+            android:textSize="14sp"
+            android:background="@android:color/transparent"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp" />
+
+        <Button
+            android:id="@+id/dialog_btn_save"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:text="Set Note"
+            android:textColor="@color/quick_widget_on_primary"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:background="@drawable/quick_widget_action_btn"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:layout_marginStart="8dp" />
+    </LinearLayout>
+
+</LinearLayout>

@@ -10,4 +10,23 @@
     <color name="accent_lime">#7A5C44</color>
     <color name="pill_background">#E7D1C1</color>
     <color name="circle_background">#F7D8C5</color>
+
+    <!-- Quick Add Widget Theme Colors (Light Fallback) -->
+    <color name="quick_widget_bg">#FFF8F5</color>
+    <color name="quick_widget_surface">#FFFFFF</color>
+    <color name="quick_widget_surface_variant">#F4ECE4</color>
+    <color name="quick_widget_card_bg">#FDEEE3</color>
+    <color name="quick_widget_keypad_bg">#FFFFFF</color>
+    <color name="quick_widget_primary">#7A5C44</color>
+    <color name="quick_widget_on_primary">#FFFFFF</color>
+    <color name="quick_widget_primary_container">#F7D8C5</color>
+    <color name="quick_widget_on_primary_container">#2C1A0E</color>
+    <color name="quick_widget_text_primary">#212121</color>
+    <color name="quick_widget_text_secondary">#666666</color>
+    <color name="quick_widget_text_tertiary">#999999</color>
+    <color name="quick_widget_divider">#E7D1C1</color>
+    <color name="quick_widget_success">#2E7D32</color>
+    <color name="quick_widget_error">#C62828</color>
+    <color name="quick_widget_progress_track">#E0D4CA</color>
+    <color name="quick_widget_progress_fill">#7A5C44</color>
 </resources>

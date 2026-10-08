@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="widget_background_color">#262220</color>
+    <color name="widget_text_primary">#F4ECE4</color>
+    <color name="widget_text_secondary">#C0B3A9</color>
+    <color name="widget_divider">#403934</color>
+    <color name="widget_button_background_color">#543D2D</color>
+    <color name="notification_icon_color">#E8BEA5</color>
+    <color name="ic_launcher_background">#1A1715</color>
+    <color name="accent_lime">#E8BEA5</color>
+    <color name="pill_background">#332D2A</color>
+    <color name="circle_background">#332D2A</color>
+
+    <!-- Quick Add Widget Theme Colors (Dark Fallback) -->
+    <color name="quick_widget_bg">#1A1715</color>
+    <color name="quick_widget_surface">#262220</color>
+    <color name="quick_widget_surface_variant">#332D2A</color>
+    <color name="quick_widget_card_bg">#262220</color>
+    <color name="quick_widget_keypad_bg">#2A2522</color>
+    <color name="quick_widget_primary">#E8BEA5</color>
+    <color name="quick_widget_on_primary">#2C1A0E</color>
+    <color name="quick_widget_primary_container">#543D2D</color>
+    <color name="quick_widget_on_primary_container">#FFDCBE</color>
+    <color name="quick_widget_text_primary">#F4ECE4</color>
+    <color name="quick_widget_text_secondary">#C0B3A9</color>
+    <color name="quick_widget_text_tertiary">#8C8077</color>
+    <color name="quick_widget_divider">#403934</color>
+    <color name="quick_widget_success">#81C784</color>
+    <color name="quick_widget_error">#E57373</color>
+    <color name="quick_widget_progress_track">#403934</color>
+    <color name="quick_widget_progress_fill">#E8BEA5</color>
+</resources>

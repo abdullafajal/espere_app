@@ -13,6 +13,7 @@ import '../services/api_service.dart';
 import '../services/cache_service.dart';
 import '../services/connectivity_service.dart';
 import '../services/sync_service.dart';
+import '../services/widget_service.dart';
 import '../widgets/transaction_tile.dart';
 import '../widgets/thanos_snap_widget.dart';
 import 'transaction_form_screen.dart';
@@ -145,6 +146,28 @@ class TransactionListScreenState extends State<TransactionListScreen> {
         _currencySymbol = (cached['currency_symbol'] as String?) ?? '₹';
         _isLoading = false;
       });
+
+      // Sync 2x2 financial metrics for current month to home-screen widget
+      if (!_showAll && _currentMonth.year == DateTime.now().year && _currentMonth.month == DateTime.now().month) {
+        final expenses = list.where((t) => t.type == 'expense');
+        final incomes = list.where((t) => t.type == 'income');
+        final totalSpend = expenses.fold(0.0, (sum, t) => sum + (double.tryParse(t.amount.toString()) ?? 0));
+        final totalIncome = incomes.fold(0.0, (sum, t) => sum + (double.tryParse(t.amount.toString()) ?? 0));
+        final now = DateTime.now();
+        final todaySpend = expenses.where((t) {
+          final d = t.date.toLocal();
+          return d.year == now.year && d.month == now.month && d.day == now.day;
+        }).fold(0.0, (sum, t) => sum + (double.tryParse(t.amount.toString()) ?? 0));
+        final avgDaily = totalSpend / (now.day > 0 ? now.day : 1);
+
+        WidgetService.syncQuickAddFinancialMetrics(
+          totalSpend: totalSpend,
+          totalIncome: totalIncome,
+          todaySpend: todaySpend,
+          avgDaily: avgDaily,
+          currencySymbol: _currencySymbol,
+        );
+      }
     } else {
       if (mounted) setState(() => _isLoading = false);
     }

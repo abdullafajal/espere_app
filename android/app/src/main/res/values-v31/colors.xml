@@ -1,13 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="widget_background_color">@android:color/system_accent2_100</color>
+    <!-- Wallpaper-based Material You Dynamic Color Tokens (Android 12+ Light) -->
+    <color name="quick_widget_bg">@android:color/system_neutral1_100</color>
+    <color name="quick_widget_surface">@android:color/system_neutral1_10</color>
+    <color name="quick_widget_surface_variant">@android:color/system_neutral2_100</color>
+    <color name="quick_widget_card_bg">@android:color/system_neutral1_10</color>
+    <color name="quick_widget_keypad_bg">@android:color/system_neutral1_10</color>
+    <color name="quick_widget_primary">@android:color/system_accent1_600</color>
+    <color name="quick_widget_on_primary">#FFFFFF</color>
+    <color name="quick_widget_primary_container">@android:color/system_accent1_100</color>
+    <color name="quick_widget_on_primary_container">@android:color/system_accent1_900</color>
+    <color name="quick_widget_text_primary">@android:color/system_neutral1_900</color>
+    <color name="quick_widget_text_secondary">@android:color/system_neutral2_700</color>
+    <color name="quick_widget_text_tertiary">@android:color/system_neutral2_500</color>
+    <color name="quick_widget_divider">@android:color/system_neutral2_200</color>
+    <color name="quick_widget_success">#2E7D32</color>
+    <color name="quick_widget_error">#C62828</color>
+    <color name="quick_widget_progress_track">@android:color/system_neutral2_200</color>
+    <color name="quick_widget_progress_fill">@android:color/system_accent1_600</color>
+
+    <!-- Legacy / Shared Widget Tokens (Monet Adaptive) -->
+    <color name="widget_background_color">@android:color/system_neutral1_100</color>
     <color name="widget_text_primary">@android:color/system_neutral1_900</color>
-    <color name="widget_text_secondary">@android:color/system_neutral1_700</color>
-    <color name="widget_divider">@android:color/system_accent2_200</color>
-    <color name="widget_button_background_color">@android:color/system_accent1_300</color>
-    <color name="notification_icon_color">@android:color/system_accent1_700</color>
-    <color name="ic_launcher_background">#FFFFFF</color>
-    <color name="accent_lime">@android:color/system_accent1_700</color>
-    <color name="pill_background">@android:color/system_accent1_200</color>
-    <color name="circle_background">@android:color/system_accent2_200</color>
+    <color name="widget_text_secondary">@android:color/system_neutral2_700</color>
+    <color name="widget_divider">@android:color/system_neutral2_200</color>
+    <color name="widget_button_background_color">@android:color/system_accent1_100</color>
 </resources>
