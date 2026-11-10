@@ -3,6 +3,7 @@ import '../widgets/espere_header.dart';
 import '../widgets/espere_swipe_action.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
+import '../widgets/espere_action_button.dart';
 import '../utils/app_toast.dart';
 import '../widgets/espere_back_button.dart';
 import '../services/api_service.dart';
@@ -55,7 +56,8 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
     final cached = await CacheService.getCachedSplitGroups();
     if (cached != null && mounted) {
       setState(() {
-        _groups = cached;
+        // Groups are live-only: drop any leftover offline placeholder groups.
+        _groups = cached.where((g) => g['is_temp'] != true).toList();
         _isLoading = false;
       });
     }
@@ -431,49 +433,17 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (_groupInvitations.isNotEmpty || _pendingReceived.isNotEmpty) ...[
-                      GestureDetector(
-                        onTap: _showRequestsPopup,
-                        child: Stack(
-                          children: [
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: AppColors.card,
-                                borderRadius: BorderRadius.circular(AppRadius.md),
-                                boxShadow: AppShadows.soft,
-                              ),
-                              child: const Icon(Icons.notifications_none, color: AppColors.text),
-                            ),
-                            Positioned(
-                              right: 8,
-                              top: 8,
-                              child: Container(
-                                width: 8,
-                                height: 8,
-                                decoration: const BoxDecoration(
-                                  color: Colors.redAccent,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                      EspereActionButton(
+                        icon: Icons.notifications_none,
+                        showBadge: true,
+                        onPressed: _showRequestsPopup,
                       ),
                       const SizedBox(width: 8),
                     ],
-                    GestureDetector(
-                      onTap: _showCreateGroupSheet,
-                      child: Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: AppColors.accent,
-                          borderRadius: BorderRadius.circular(AppRadius.md),
-                          boxShadow: AppShadows.soft,
-                        ),
-                        child: const Icon(Icons.add, color: AppColors.dark, size: 20),
-                      ),
+                    EspereActionButton(
+                      icon: Icons.add,
+                      primary: true,
+                      onPressed: _showCreateGroupSheet,
                     ),
                   ],
                 ),
@@ -491,8 +461,9 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
                     color: AppColors.accent,
                     child: ListView.builder(
                       padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
-                      itemCount: _groups.length,
-                      itemBuilder: (_, i) => _buildGroupCard(i),
+                      itemCount: _groups.length + 1,
+                      itemBuilder: (_, i) =>
+                          i == 0 ? _buildOverview() : _buildGroupCard(i - 1),
                     ),
                   ),
             ),
@@ -519,41 +490,178 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
   }
 
   Widget _buildEmptyState() => Center(
-    child: Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Container(
-          width: 80,
-          height: 80,
-          decoration: BoxDecoration(
-            color: const Color.fromARGB(255, 1, 1, 1).withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(AppRadius.xxl),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 32),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 88,
+            height: 88,
+            decoration: BoxDecoration(
+              color: AppColors.dark,
+              borderRadius: BorderRadius.circular(AppRadius.xxxl),
+              boxShadow: AppShadows.elevated,
+            ),
+            child: const Icon(Icons.groups_rounded, size: 44, color: AppColors.accent),
           ),
-          child: const Icon(Icons.groups, size: 40, color: AppColors.accent),
-        ),
-        const SizedBox(height: 16),
-        const Text(
-          'No groups yet',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: AppColors.text,
+          const SizedBox(height: 20),
+          const Text(
+            'No groups yet',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppColors.text,
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'Create a group to start splitting expenses',
-          style: TextStyle(color: AppColors.muted),
-        ),
-      ],
+          const SizedBox(height: 8),
+          const Text(
+            'Create a group to start splitting expenses with friends',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppColors.muted, height: 1.4),
+          ),
+          const SizedBox(height: 24),
+          GestureDetector(
+            onTap: _showCreateGroupSheet,
+            child: Container(
+              height: 48,
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              decoration: BoxDecoration(
+                color: AppColors.accent,
+                borderRadius: BorderRadius.circular(AppRadius.xl),
+                boxShadow: AppShadows.soft,
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.add, size: 20, color: AppColors.dark),
+                  SizedBox(width: 8),
+                  Text(
+                    'Create Group',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.dark,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     ),
   );
+
+  /// Summary of all accepted groups: what you are owed vs what you owe.
+  Widget _buildOverview() {
+    double owed = 0, owe = 0;
+    for (final g in _groups) {
+      if (g['is_accepted'] == false) continue;
+      final b = double.tryParse(g['net_balance'].toString()) ?? 0;
+      if (b > 0) owed += b;
+      if (b < 0) owe += b.abs();
+    }
+    final net = owed - owe;
+    final acceptedCount = _groups.where((g) => g['is_accepted'] != false).length;
+    if (acceptedCount == 0) return const SizedBox.shrink();
+
+    Widget stat(IconData icon, String label, double value) => Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: AppColors.accent.withValues(alpha: 0.18),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 14, color: AppColors.accent),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(fontSize: 11, color: Color(0x99FFFFFF)),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '$_currencySymbol${value.toStringAsFixed(0)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.dark,
+        borderRadius: BorderRadius.circular(AppRadius.xxxl),
+        boxShadow: AppShadows.elevated,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Overall balance · $acceptedCount ${acceptedCount == 1 ? 'group' : 'groups'}',
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: Color(0x99FFFFFF),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            net.abs() < 0.5
+                ? 'All settled up'
+                : '${net > 0 ? '+' : '-'}$_currencySymbol${net.abs().toStringAsFixed(0)}',
+            style: const TextStyle(
+              fontSize: 30,
+              fontWeight: FontWeight.bold,
+              color: AppColors.accent,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              stat(Icons.south_west_rounded, 'You get back', owed),
+              const SizedBox(width: 10),
+              stat(Icons.north_east_rounded, 'You owe', owe),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildGroupCard(int index) {
     final group = _groups[index];
     final netBalance = double.tryParse(group['net_balance'].toString()) ?? 0;
     final memberCount = group['total_members'] ?? 0;
-    final groupColor = Color(int.parse((group['color'] ?? '#C8E64A').replaceFirst('#', '0xFF')));
+
+    final groupColor = _parseColor(group['color']);
 
     final canEditDelete = group['is_accepted'] == true && group['created_by_id'] == _myId;
 
@@ -579,136 +687,186 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
         onEdit: () => _editGroupSheet(group),
         onDelete: () => _deleteGroup(snapKey, group),
         child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: groupColor,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Center(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: groupColor,
+                      borderRadius: BorderRadius.circular(AppRadius.xl),
+                    ),
                     child: Icon(
                       _getIconData(group['icon'] ?? 'groups'),
                       color: AppColors.dark,
-                      size: 28,
+                      size: 24,
                     ),
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        group['name'] ?? 'Group',
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.text),
-                      ),
-                      const SizedBox(height: 6),
-                      if (group['is_accepted'] == false)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.muted.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Text('Invitation Pending', style: TextStyle(fontSize: 10, color: AppColors.muted, fontWeight: FontWeight.bold)),
-                        )
-                      else
-                        _buildBalanceText(netBalance),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (group['is_accepted'] == false)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: AppColors.muted.withOpacity(0.05),
-                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
-              ),
-              child: Row(
-                children: [
+                  const SizedBox(width: 14),
                   Expanded(
-                    child: TextButton(
-                      onPressed: () => _handleCardAction(group['id'], 'reject'),
-                      style: TextButton.styleFrom(foregroundColor: AppColors.muted),
-                      child: const Text('Decline', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          group['name'] ?? 'Group',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.text,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Icon(Icons.people_alt_outlined, size: 13, color: AppColors.muted),
+                            const SizedBox(width: 4),
+                            Text(
+                              '$memberCount ${memberCount == 1 ? 'member' : 'members'}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.muted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => _handleCardAction(group['id'], 'accept'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.dark,
-                        foregroundColor: AppColors.accent,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  if (group['is_accepted'] == false)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                        border: Border.all(color: AppColors.border),
                       ),
-                      child: const Text('Accept', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
-                border: Border(top: BorderSide(color: AppColors.border.withOpacity(0.1))),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Created ${group['created_at'].toString().split('T')[0]}',
-                    style: const TextStyle(fontSize: 11, color: AppColors.muted, fontWeight: FontWeight.w600),
-                  ),
-                  Row(
-                    children: [
-                      const Text(
-                        'View Details',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.muted),
+                      child: const Text(
+                        'Invited',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.muted,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                      const SizedBox(width: 4),
-                      const Icon(Icons.arrow_forward_ios, size: 10, color: AppColors.muted),
-                    ],
-                  ),
+                    )
+                  else
+                    _buildBalanceChip(netBalance),
                 ],
               ),
             ),
-        ],
+            if (group['is_accepted'] == false)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => _handleCardAction(group['id'], 'reject'),
+                        child: Container(
+                          height: 40,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: const Text(
+                            'Decline',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: AppColors.muted,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => _handleCardAction(group['id'], 'accept'),
+                        child: Container(
+                          height: 40,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: AppColors.dark,
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                          ),
+                          child: const Text(
+                            'Accept',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: AppColors.accent,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
       ),
-    ),
     );
   }
 
-  Widget _buildBalanceText(double balance) {
-    String label;
-    String amount = '$_currencySymbol${balance.abs().toStringAsFixed(0)}';
-
-    if (balance > 0) {
-      label = 'Gets back $amount';
-    } else if (balance < 0) {
-      label = 'To pay $amount';
+  /// Right-aligned balance chip: lime = you get back, dark = you owe.
+  Widget _buildBalanceChip(double balance) {
+    final amount = '$_currencySymbol${balance.abs().toStringAsFixed(0)}';
+    Color bg;
+    Color fg;
+    String caption;
+    String value;
+    if (balance > 0.005) {
+      bg = AppColors.accent;
+      fg = AppColors.dark;
+      caption = 'gets back';
+      value = amount;
+    } else if (balance < -0.005) {
+      bg = AppColors.dark;
+      fg = AppColors.accent;
+      caption = 'to pay';
+      value = amount;
     } else {
-      label = 'Settled up';
+      bg = AppColors.surface;
+      fg = AppColors.muted;
+      caption = 'settled';
+      value = '✓';
     }
-
-    return Text(
-      label,
-      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.text),
+    return Container(
+      constraints: const BoxConstraints(minWidth: 64),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: balance.abs() <= 0.005 ? Border.all(color: AppColors.border) : null,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            value,
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: fg),
+          ),
+          Text(
+            caption,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: fg.withValues(alpha: 0.75),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -891,6 +1049,15 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
   }
 
   IconData _getIconData(String name) => IconMapper.map(name);
+
+  /// Group colour chosen by the user (falls back to the app accent).
+  Color _parseColor(dynamic hex) {
+    try {
+      return Color(int.parse('FF${hex.toString().replaceFirst('#', '')}', radix: 16));
+    } catch (_) {
+      return AppColors.accent;
+    }
+  }
 }
 
 class _GroupTile extends StatefulWidget {
@@ -920,11 +1087,11 @@ class _GroupTileState extends State<_GroupTile> {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadius.xxl),
         boxShadow: AppShadows.card,
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadius.xxl),
         child: EspereSwipeAction(
           dismissKey: ValueKey('group_${widget.group['id']}'),
           direction: DismissDirection.horizontal,
@@ -934,7 +1101,7 @@ class _GroupTileState extends State<_GroupTile> {
           secBgIcon: Icons.edit,
           secBgColor: AppColors.accent,
           secBgIconColor: AppColors.dark,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(AppRadius.xxl),
           confirmDismiss: (direction) async {
             if (!widget.canEditDelete) {
               HapticFeedback.mediumImpact();

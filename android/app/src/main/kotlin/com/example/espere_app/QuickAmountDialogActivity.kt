@@ -10,6 +10,9 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.*
 import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
+import android.text.Editable
+import android.text.TextWatcher
 import androidx.core.content.ContextCompat
 import java.util.Locale
 
@@ -46,7 +49,7 @@ class QuickAmountDialogActivity : Activity() {
 
     // Step 2: Category
     private lateinit var step2AmountSubtext: TextView
-    private lateinit var step2CategorySpinner: Spinner
+    private lateinit var step2CategoryGrid: GridLayout
     private lateinit var step2BtnBack: View
     private lateinit var step2BtnNext: View
 
@@ -75,8 +78,12 @@ class QuickAmountDialogActivity : Activity() {
     private lateinit var step4SummaryAmount: TextView
     private lateinit var step4SummaryDetails: TextView
     private lateinit var step4NoteInput: EditText
+    private lateinit var sheetScroll: ScrollView
     private lateinit var step4BtnBack: View
     private lateinit var step4BtnSave: View
+
+    // Wallpaper palette (Android 12+), null = use the resource colours
+    private var palette: WidgetPalette? = null
 
     // State
     private var amount: Double = 0.0
@@ -84,12 +91,12 @@ class QuickAmountDialogActivity : Activity() {
     private var selectedCategory: CategoryItem = CategoryItem(1, "Food", "restaurant", "#FF9800")
     private var selectedPaymentMethod = "upi"
     private var selectedPaymentDisplay = "UPI"
-    private var isCategorySpinnerInitialized = false
-    private var categoryAdapter: ArrayAdapter<CategoryItem>? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialog_quick_amount)
+        applyWindowStyle()
+        palette = WidgetPalettes.get(this)
 
         bindViews()
         setupStep1Amount()
@@ -98,6 +105,8 @@ class QuickAmountDialogActivity : Activity() {
         setupStep4Notes()
         setupNavigation()
 
+        applyPalette(findViewById(android.R.id.content))
+        dialogStepBadge.setTextColor(ink())
         updateStepIndicators(STEP_AMOUNT)
 
         // Focus keyboard automatically on Step 1
@@ -106,6 +115,62 @@ class QuickAmountDialogActivity : Activity() {
             val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
             imm?.showSoftInput(step1AmountInput, InputMethodManager.SHOW_IMPLICIT)
         }
+    }
+
+    // Bottom sheet: full width at the bottom, soft dim + blur (Android 12+) behind.
+    private fun applyWindowStyle() {
+        window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        window.setGravity(android.view.Gravity.BOTTOM)
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+        window.setDimAmount(0.3f)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+            window.attributes = window.attributes.also { it.blurBehindRadius = 28 }
+        }
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        applyWindowStyle()
+    }
+
+    /** Quick left-right shake used to say "this needs a value". */
+    private fun shake(view: View) {
+        android.animation.ObjectAnimator.ofFloat(
+            view, "translationX", 0f, 18f, -18f, 12f, -12f, 6f, 0f
+        ).setDuration(320).start()
+    }
+
+    private fun ink(): Int = palette?.block ?: ContextCompat.getColor(this, R.color.widget_accent_ink)
+
+    private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
+
+    /** Replace the fill of a shape background (keeps corners and stroke). */
+    private fun fill(view: View, color: Int) {
+        (view.background?.mutate() as? GradientDrawable)?.setColor(color)
+    }
+
+    private fun applyPalette(root: View) {
+        val p = palette ?: return
+        if (root.tag is String) {
+            when (root.tag as String) {
+                "panel" -> fill(root, p.sheet)
+                "block", "btn" -> fill(root, p.block)
+                "accent" -> fill(root, p.accent)
+                "pill" -> fill(root, p.pill)
+            }
+        }
+        if (root is ViewGroup) for (i in 0 until root.childCount) applyPalette(root.getChildAt(i))
+    }
+
+    /** Tile / option background after a selection change (keeps the wallpaper fill). */
+    private fun styleOption(view: View, selected: Boolean) {
+        view.setBackgroundResource(
+            if (selected) R.drawable.quick_widget_item_selected else R.drawable.quick_widget_item_normal
+        )
+        val p = palette ?: return
+        fill(view, p.pill)
+        if (selected) (view.background as? GradientDrawable)?.setStroke(dp(2), p.block)
     }
 
     private fun bindViews() {
@@ -128,7 +193,7 @@ class QuickAmountDialogActivity : Activity() {
 
         // Step 2
         step2AmountSubtext = findViewById(R.id.step2_amount_subtext)
-        step2CategorySpinner = findViewById(R.id.step2_category_spinner)
+        step2CategoryGrid = findViewById(R.id.step2_category_grid)
         step2BtnBack = findViewById(R.id.step2_btn_back)
         step2BtnNext = findViewById(R.id.step2_btn_next)
 
@@ -157,6 +222,7 @@ class QuickAmountDialogActivity : Activity() {
         step4SummaryAmount = findViewById(R.id.step4_summary_amount)
         step4SummaryDetails = findViewById(R.id.step4_summary_details)
         step4NoteInput = findViewById(R.id.step4_note_input)
+        sheetScroll = findViewById(R.id.sheet_scroll)
         step4BtnBack = findViewById(R.id.step4_btn_back)
         step4BtnSave = findViewById(R.id.step4_btn_save)
     }
@@ -206,8 +272,8 @@ class QuickAmountDialogActivity : Activity() {
         val amountStr = step1AmountInput.text.toString().trim()
         val parsed = amountStr.toDoubleOrNull() ?: 0.0
         if (parsed <= 0.0) {
-            step1AmountInput.error = "Enter an amount > 0"
             step1AmountInput.requestFocus()
+            shake(step1AmountInput)
             QuickAddWidgetProvider.triggerHaptic(this)
             return
         }
@@ -224,80 +290,69 @@ class QuickAmountDialogActivity : Activity() {
             selectedCategory = categories[0]
         }
 
-        val adapter = object : ArrayAdapter<CategoryItem>(
-            this,
-            R.layout.item_category_spinner,
-            categories
-        ) {
-            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-                val view = convertView ?: LayoutInflater.from(context).inflate(R.layout.item_category_spinner, parent, false)
-                val item = getItem(position) ?: return view
-                val iconView = view.findViewById<ImageView>(R.id.spinner_cat_icon)
-                val nameView = view.findViewById<TextView>(R.id.spinner_cat_name)
-
-                iconView.setImageResource(QuickAddWidgetProvider.getCategoryDrawable(item.icon, item.name))
-                val wallpaperColor = ContextCompat.getColor(context, R.color.quick_widget_primary)
-                iconView.setColorFilter(wallpaperColor)
-                nameView.text = item.name
-                return view
+        // Category tiles (icon + name). Tapping one picks it and moves on.
+        val inflater = LayoutInflater.from(this)
+        categories.forEach { cat ->
+            val tile = inflater.inflate(R.layout.item_category_tile, step2CategoryGrid, false)
+            tile.findViewById<ImageView>(R.id.tile_icon)
+                .setImageResource(QuickAddWidgetProvider.getCategoryDrawable(cat.icon, cat.name))
+            tile.findViewById<TextView>(R.id.tile_name).text = cat.name
+            tile.tag = cat.id
+            val lp = GridLayout.LayoutParams(
+                GridLayout.spec(GridLayout.UNDEFINED, 1f),
+                GridLayout.spec(GridLayout.UNDEFINED, 1f)
+            ).apply {
+                width = 0
+                setMargins(4, 4, 4, 4)
             }
-
-            override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
-                val view = convertView ?: LayoutInflater.from(context).inflate(R.layout.item_category_dropdown, parent, false)
-                val item = getItem(position) ?: return view
-                val iconView = view.findViewById<ImageView>(R.id.dropdown_cat_icon)
-                val nameView = view.findViewById<TextView>(R.id.dropdown_cat_name)
-                val checkView = view.findViewById<ImageView>(R.id.dropdown_cat_check)
-
-                iconView.setImageResource(QuickAddWidgetProvider.getCategoryDrawable(item.icon, item.name))
-                val wallpaperColor = ContextCompat.getColor(context, R.color.quick_widget_primary)
-                iconView.setColorFilter(wallpaperColor)
-                nameView.text = item.name
-
-                val isSelected = (item.id == selectedCategory.id)
-                checkView.visibility = if (isSelected) View.VISIBLE else View.GONE
-                if (isSelected) {
-                    nameView.setTextColor(wallpaperColor)
-                } else {
-                    nameView.setTextColor(ContextCompat.getColor(context, R.color.quick_widget_text_primary))
-                }
-                return view
+            tile.layoutParams = lp
+            tile.setOnClickListener {
+                selectedCategory = cat
+                refreshCategoryTiles()
+                QuickAddWidgetProvider.triggerHaptic(this)
+                hideKeyboard()
+                goToStep(STEP_PAYMENT, isForward = true)
             }
+            step2CategoryGrid.addView(tile)
         }
+        refreshCategoryTiles()
 
-        categoryAdapter = adapter
-        step2CategorySpinner.adapter = adapter
+        // More categories than fit: show a search box and tell the user the list scrolls.
+        if (categories.size > 8) {
+            val hint = findViewById<TextView>(R.id.step2_more_hint)
+            val empty = findViewById<TextView>(R.id.step2_empty)
+            val box = findViewById<View>(R.id.step2_search_box)
+            val input = findViewById<EditText>(R.id.step2_search_input)
+            val clear = findViewById<View>(R.id.step2_search_clear)
+            box.visibility = View.VISIBLE
+            hint.text = "${categories.size} categories · scroll for more"
+            hint.visibility = View.VISIBLE
 
-        step2CategorySpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                if (position in categories.indices) {
-                    selectedCategory = categories[position]
-                    adapter.notifyDataSetChanged()
-                    // If user manually chose an item after initialization, auto advance with animation!
-                    if (isCategorySpinnerInitialized) {
-                        QuickAddWidgetProvider.triggerHaptic(this@QuickAmountDialogActivity)
-                        goToStep(STEP_PAYMENT, isForward = true)
-                    } else {
-                        isCategorySpinnerInitialized = true
+            input.addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) {}
+                override fun onTextChanged(s: CharSequence?, st: Int, b: Int, c: Int) {}
+                override fun afterTextChanged(s: Editable?) {
+                    val q = s?.toString()?.trim()?.lowercase(Locale.ROOT).orEmpty()
+                    var shown = 0
+                    for (i in 0 until step2CategoryGrid.childCount) {
+                        val tile = step2CategoryGrid.getChildAt(i)
+                        val name = tile.findViewById<TextView>(R.id.tile_name).text.toString()
+                        val match = q.isEmpty() || name.lowercase(Locale.ROOT).contains(q)
+                        tile.visibility = if (match) View.VISIBLE else View.GONE
+                        if (match) shown++
                     }
+                    clear.visibility = if (q.isEmpty()) View.GONE else View.VISIBLE
+                    hint.visibility = if (q.isEmpty()) View.VISIBLE else View.GONE
+                    empty.visibility = if (shown == 0) View.VISIBLE else View.GONE
                 }
+            })
+            clear.setOnClickListener {
+                input.setText("")
+                QuickAddWidgetProvider.triggerHaptic(this)
             }
-
-            override fun onNothingSelected(parent: AdapterView<*>?) {}
-        }
-
-        // Quick Top Category Pick Chips (1-tap selection)
-        findViewById<TextView>(R.id.step2_chip_food).setOnClickListener {
-            selectQuickCategory("Food", "restaurant", "#FF9800")
-        }
-        findViewById<TextView>(R.id.step2_chip_grocery).setOnClickListener {
-            selectQuickCategory("Grocery", "shopping_bag", "#4CAF50")
-        }
-        findViewById<TextView>(R.id.step2_chip_transport).setOnClickListener {
-            selectQuickCategory("Transport", "directions_car", "#2196F3")
-        }
-        findViewById<TextView>(R.id.step2_chip_bills).setOnClickListener {
-            selectQuickCategory("Bills", "payments", "#FF5722")
+            input.setOnEditorActionListener { _, actionId, _ ->
+                if (actionId == EditorInfo.IME_ACTION_DONE) { hideKeyboard(); true } else false
+            }
         }
 
         step2BtnBack.setOnClickListener {
@@ -310,18 +365,17 @@ class QuickAmountDialogActivity : Activity() {
         }
     }
 
-    private fun selectQuickCategory(name: String, icon: String, color: String) {
-        val found = categories.find { it.name.equals(name, ignoreCase = true) }
-        selectedCategory = found ?: CategoryItem(1, name, icon, color)
-        val idx = categories.indexOfFirst { it.name.equals(name, ignoreCase = true) }
-        if (idx >= 0) {
-            isCategorySpinnerInitialized = false
-            step2CategorySpinner.setSelection(idx)
-            isCategorySpinnerInitialized = true
+    private fun refreshCategoryTiles() {
+        val ink = ink()
+        val normal = ContextCompat.getColor(this, R.color.widget_text_1)
+        for (i in 0 until step2CategoryGrid.childCount) {
+            val tile = step2CategoryGrid.getChildAt(i)
+            val selected = tile.tag == selectedCategory.id
+            styleOption(tile, selected)
+            val color = if (selected) ink else normal
+            tile.findViewById<ImageView>(R.id.tile_icon).setColorFilter(color)
+            tile.findViewById<TextView>(R.id.tile_name).setTextColor(color)
         }
-        categoryAdapter?.notifyDataSetChanged()
-        QuickAddWidgetProvider.triggerHaptic(this)
-        goToStep(STEP_PAYMENT, isForward = true)
     }
 
     private fun setupStep3Payment() {
@@ -354,18 +408,18 @@ class QuickAmountDialogActivity : Activity() {
             Quadruple(step3PayBank, step3PayBankIcon, step3PayBankText, step3PayBankCheck to ("bank" == method))
         )
 
-        val primaryColor = getColor(R.color.quick_widget_primary)
-        val normalTextColor = getColor(R.color.quick_widget_text_primary)
+        val primaryColor = ink()
+        val normalTextColor = getColor(R.color.widget_text_1)
 
         for (quad in items) {
             val (checkView, isSelected) = quad.checkPair
             if (isSelected) {
-                quad.layout.setBackgroundResource(R.drawable.quick_widget_item_selected)
+                styleOption(quad.layout, true)
                 quad.icon.setColorFilter(primaryColor)
                 quad.text.setTextColor(primaryColor)
                 checkView.visibility = View.VISIBLE
             } else {
-                quad.layout.setBackgroundResource(R.drawable.quick_widget_item_normal)
+                styleOption(quad.layout, false)
                 quad.icon.setColorFilter(normalTextColor)
                 quad.text.setTextColor(normalTextColor)
                 checkView.visibility = View.GONE
@@ -387,6 +441,12 @@ class QuickAmountDialogActivity : Activity() {
     )
 
     private fun setupStep4Notes() {
+        // The sheet sits above the keyboard (adjustResize); also scroll the note
+        // field into view once the keyboard is up, so it is never hidden.
+        step4NoteInput.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) sheetScroll.postDelayed({ sheetScroll.fullScroll(View.FOCUS_DOWN) }, 300)
+        }
+
         setupNoteChip(findViewById(R.id.step4_chip_lunch), "Lunch")
         setupNoteChip(findViewById(R.id.step4_chip_coffee), "Coffee")
         setupNoteChip(findViewById(R.id.step4_chip_grocery), "Grocery")
@@ -444,7 +504,7 @@ class QuickAmountDialogActivity : Activity() {
         val formattedAmount = if (amount % 1.0 == 0.0) amount.toLong().toString() else String.format(Locale.US, "%.2f", amount)
 
         btnHeaderBack.visibility = if (step > STEP_AMOUNT) View.VISIBLE else View.GONE
-        dialogStepBadge.text = "${step + 1} of 4"
+        dialogStepBadge.text = "STEP ${step + 1} OF 4"
 
         val activeRes = R.drawable.quick_widget_progress_active
         val inactiveRes = R.drawable.quick_widget_progress_inactive
@@ -453,6 +513,11 @@ class QuickAmountDialogActivity : Activity() {
         dotStep2.setBackgroundResource(if (step >= STEP_CATEGORY) activeRes else inactiveRes)
         dotStep3.setBackgroundResource(if (step >= STEP_PAYMENT) activeRes else inactiveRes)
         dotStep4.setBackgroundResource(if (step >= STEP_NOTES) activeRes else inactiveRes)
+        palette?.let { p ->
+            listOf(dotStep1, dotStep2, dotStep3, dotStep4).forEachIndexed { i, dot ->
+                if (step >= i) fill(dot, p.block)
+            }
+        }
 
         when (step) {
             STEP_AMOUNT -> {

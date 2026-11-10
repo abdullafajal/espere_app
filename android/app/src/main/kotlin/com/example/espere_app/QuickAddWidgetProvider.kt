@@ -4,9 +4,11 @@ import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
+import android.content.res.ColorStateList
 import android.content.Intent
 import android.content.SharedPreferences
 import android.net.ConnectivityManager
+import android.net.Uri
 import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.VibrationEffect
@@ -33,7 +35,9 @@ data class FinancialMetrics(
     val totalSpend: String,
     val totalIncome: String,
     val todaySpend: String,
-    val avgDaily: String
+    val avgDaily: String,
+    /** Share of this month's income already spent (0-100) */
+    val spendPct: Int = 0
 )
 
 class QuickAddWidgetProvider : HomeWidgetProvider() {
@@ -400,6 +404,8 @@ class QuickAddWidgetProvider : HomeWidgetProvider() {
                     })
                     put("entityId", tempId)
                     put("createdAt", dateIso)
+                    // The widget POSTs this itself; tells the app not to retry it immediately
+                    put("source", "widget")
                 }
                 queueArray.put(op)
                 flutterPrefs.edit().putString("flutter.sync_queue", queueArray.toString()).commit()
@@ -543,6 +549,9 @@ class QuickAddWidgetProvider : HomeWidgetProvider() {
             return null
         }
 
+        private fun pct(spent: Double, income: Double): Int =
+            if (income <= 0.0) 0 else ((spent / income) * 100).toInt().coerceIn(0, 100)
+
         fun getFinancialMetrics(context: Context): FinancialMetrics {
             val currency = getCurrencySymbol(context)
             val numFormat = NumberFormat.getNumberInstance(Locale.US).apply {
@@ -606,16 +615,19 @@ class QuickAddWidgetProvider : HomeWidgetProvider() {
                     totalSpend = "$currency${numFormat.format(calculatedTotalSpend)}",
                     totalIncome = "$currency${numFormat.format(calculatedTotalIncome)}",
                     todaySpend = "$currency${numFormat.format(calculatedTodaySpend)}",
-                    avgDaily = "$currency${numFormat.format(calculatedAvgDaily)}"
+                    avgDaily = "$currency${numFormat.format(calculatedAvgDaily)}",
+                    spendPct = pct(calculatedTotalSpend, calculatedTotalIncome)
                 )
             }
 
             if (!homeSpend.isNullOrEmpty() && !homeIncome.isNullOrEmpty()) {
+                fun num(v: String) = v.replace(Regex("[^0-9.]"), "").toDoubleOrNull() ?: 0.0
                 return FinancialMetrics(
                     totalSpend = homeSpend,
                     totalIncome = homeIncome,
                     todaySpend = homeToday ?: "$currency 0.00",
-                    avgDaily = homeAvg ?: "$currency 0.00"
+                    avgDaily = homeAvg ?: "$currency 0.00",
+                    spendPct = pct(num(homeSpend), num(homeIncome))
                 )
             }
 
@@ -631,7 +643,8 @@ class QuickAddWidgetProvider : HomeWidgetProvider() {
                         totalSpend = "$currency${numFormat.format(exp)}",
                         totalIncome = "$currency${numFormat.format(inc)}",
                         todaySpend = "$currency${numFormat.format(0.0)}",
-                        avgDaily = "$currency${numFormat.format(avg)}"
+                        avgDaily = "$currency${numFormat.format(avg)}",
+                        spendPct = pct(exp, inc)
                     )
                 } catch (_: Exception) {}
             }
@@ -652,27 +665,154 @@ class QuickAddWidgetProvider : HomeWidgetProvider() {
         widgetData: SharedPreferences
     ) {
         val metrics = getFinancialMetrics(context)
-
         for (appWidgetId in appWidgetIds) {
-            val views = RemoteViews(context.packageName, R.layout.quick_add_widget)
+            renderWidget(context, appWidgetManager, appWidgetId, metrics)
+        }
+    }
 
-            // Bind 2x2 Financial Metrics
-            views.setTextViewText(R.id.widget_total_spend, metrics.totalSpend)
-            views.setTextViewText(R.id.widget_total_income, metrics.totalIncome)
-            views.setTextViewText(R.id.widget_today_spend, metrics.todaySpend)
-            views.setTextViewText(R.id.widget_avg_daily, metrics.avgDaily)
+    // Re-render with the best-fitting layout whenever the user resizes the widget.
+    override fun onAppWidgetOptionsChanged(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        newOptions: android.os.Bundle
+    ) {
+        super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
+        renderWidget(context, appWidgetManager, appWidgetId, getFinancialMetrics(context))
+    }
 
-            // Tint logo icon to exact Add Expense button background color
-            val primaryColor = ContextCompat.getColor(context, R.color.quick_widget_primary)
-            views.setInt(R.id.widget_app_logo, "setColorFilter", primaryColor)
+    private enum class WidgetSize { STRIP, SMALL, MEDIUM, LARGE }
 
-            // 1. Main Action: Tap card or plus to open all-in-one Quick Add Popup
-            val openDialogPendingIntent = createOpenDialogPendingIntent(context, 0.0, 1001)
-            views.setOnClickPendingIntent(R.id.widget_root, openDialogPendingIntent)
-            views.setOnClickPendingIntent(R.id.btn_open_quick_add, openDialogPendingIntent)
-            views.setOnClickPendingIntent(R.id.widget_btn_plus, openDialogPendingIntent)
+    private fun resolveSize(options: android.os.Bundle?): WidgetSize {
+        // Worst-case (guaranteed) size in dp for the current orientation.
+        val w = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0) ?: 0
+        val h = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0) ?: 0
+        if (w == 0 || h == 0) return WidgetSize.MEDIUM
+        return when {
+            h < 100 -> WidgetSize.STRIP
+            w < 200 -> WidgetSize.SMALL
+            h >= 250 -> WidgetSize.LARGE
+            else -> WidgetSize.MEDIUM
+        }
+    }
 
-            appWidgetManager.updateAppWidget(appWidgetId, views)
+    private fun renderWidget(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        metrics: FinancialMetrics
+    ) {
+        val size = resolveSize(appWidgetManager.getAppWidgetOptions(appWidgetId))
+        val layout = when (size) {
+            WidgetSize.STRIP -> R.layout.quick_add_widget_strip
+            WidgetSize.SMALL -> R.layout.quick_add_widget_small
+            WidgetSize.MEDIUM -> R.layout.quick_add_widget
+            WidgetSize.LARGE -> R.layout.quick_add_widget_large
+        }
+        val views = RemoteViews(context.packageName, layout)
+
+        // Metrics present in each layout
+        views.setTextViewText(R.id.widget_today_spend, metrics.todaySpend)
+        when (size) {
+            WidgetSize.STRIP -> Unit
+            WidgetSize.SMALL ->
+                views.setTextViewText(R.id.widget_total_spend, metrics.totalSpend)
+            WidgetSize.MEDIUM -> {
+                views.setTextViewText(R.id.widget_total_spend, metrics.totalSpend)
+                views.setTextViewText(R.id.widget_avg_daily, metrics.avgDaily)
+            }
+            WidgetSize.LARGE -> {
+                views.setTextViewText(R.id.widget_total_spend, metrics.totalSpend)
+                views.setTextViewText(R.id.widget_total_income, metrics.totalIncome)
+                views.setTextViewText(R.id.widget_avg_daily, metrics.avgDaily)
+            }
+        }
+
+        // "Income used" ring (4x2 and larger)
+        if (size == WidgetSize.MEDIUM || size == WidgetSize.LARGE) {
+            views.setProgressBar(R.id.widget_progress, 100, metrics.spendPct, false)
+            views.setTextViewText(R.id.widget_pct, "${metrics.spendPct}%")
+        }
+
+        // Brand mark (the real app logo) sits on the coloured block. Its colour follows the
+        // wallpaper too; falls back to the plain "on block" colour.
+        if (size != WidgetSize.STRIP) {
+            val fallback = ContextCompat.getColor(context, R.color.widget_on_hero)
+            val light = WidgetPalettes.get(context, dark = false)
+            val dark = WidgetPalettes.get(context, dark = true)
+            if (Build.VERSION.SDK_INT >= 34 && light != null && dark != null) {
+                views.setColorInt(R.id.widget_app_logo, "setColorFilter", light.onBlock, dark.onBlock)
+            } else {
+                val now = WidgetPalettes.get(context)?.onBlock ?: fallback
+                views.setInt(R.id.widget_app_logo, "setColorFilter", now)
+            }
+        }
+
+        // Colours from several parts of the wallpaper (Android 12+)
+        applyPalette(context, views, size)
+
+        // Same flow as before: any tap opens the Quick Add popup
+        val openDialogPendingIntent = createOpenDialogPendingIntent(context, 0.0, 1001)
+        views.setOnClickPendingIntent(R.id.widget_root, openDialogPendingIntent)
+        views.setOnClickPendingIntent(R.id.btn_open_quick_add, openDialogPendingIntent)
+        views.setOnClickPendingIntent(R.id.widget_btn_plus, openDialogPendingIntent)
+
+        // Large layout: the round list button opens the app on the Transactions tab
+        // (handled by DeepLinkService via the https://espere.in/transactions link).
+        if (size == WidgetSize.LARGE) {
+            val openList = Intent(Intent.ACTION_VIEW, Uri.parse("https://espere.in/transactions")).apply {
+                setPackage(context.packageName)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            val openListPending = PendingIntent.getActivity(
+                context, 1002, openList, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(R.id.widget_btn_app, openListPending)
+        }
+
+        appWidgetManager.updateAppWidget(appWidgetId, views)
+    }
+
+    private fun applyPalette(context: Context, views: RemoteViews, size: WidgetSize) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        val light = WidgetPalettes.get(context, dark = false) ?: return
+        val dark = WidgetPalettes.get(context, dark = true) ?: return
+
+        // Android 14+ switches between the light and dark tint by itself when the
+        // system theme changes; older versions use the colour for the current theme.
+        fun tint(id: Int, solid: Int, pick: (WidgetPalette) -> Int) {
+            views.setInt(id, "setBackgroundResource", solid)
+            if (Build.VERSION.SDK_INT >= 34) {
+                views.setColorStateList(
+                    id, "setBackgroundTintList",
+                    ColorStateList.valueOf(pick(light)), ColorStateList.valueOf(pick(dark))
+                )
+            } else {
+                val now = if (WidgetPalettes.isDark(context)) dark else light
+                views.setColorStateList(id, "setBackgroundTintList", ColorStateList.valueOf(pick(now)))
+            }
+        }
+
+        tint(R.id.widget_root, R.drawable.widget_panel_solid) { it.panel }
+        when (size) {
+            WidgetSize.STRIP -> {
+                tint(R.id.btn_open_quick_add, R.drawable.widget_pill_solid) { it.pill }
+                tint(R.id.widget_btn_plus, R.drawable.widget_circle_solid) { it.accent }
+            }
+            WidgetSize.SMALL, WidgetSize.MEDIUM -> {
+                tint(R.id.btn_open_quick_add, R.drawable.widget_block_solid) { it.block }
+                tint(R.id.widget_pill_a, R.drawable.widget_pill_solid) { it.pill }
+                tint(R.id.widget_btn_plus, R.drawable.widget_circle_solid) { it.accent }
+            }
+            WidgetSize.LARGE -> {
+                tint(R.id.btn_open_quick_add, R.drawable.widget_block_solid) { it.block }
+                tint(R.id.widget_chip, R.drawable.widget_chip_solid) { it.accent }
+                tint(R.id.widget_dial, R.drawable.widget_circle_solid) { it.accent }
+                tint(R.id.widget_pill_a, R.drawable.widget_tile_solid) { it.pill }
+                tint(R.id.widget_btn_plus, R.drawable.widget_pill_solid) { it.pill }
+                tint(R.id.widget_circle_a, R.drawable.widget_circle_solid) { it.accent }
+                tint(R.id.widget_btn_app, R.drawable.widget_circle_solid) { it.accent }
+            }
         }
     }
 

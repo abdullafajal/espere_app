@@ -15,6 +15,7 @@ class CacheService {
   static const _reportsKey = 'cache_reports';
   static const _friendsKey = 'cache_friends';
   static const _syncQueueKey = 'sync_queue';
+  static const _deadLetterKey = 'sync_failed_items';
   static const _pendingFriendInviteKey = 'cache_pending_friend_invite';
   static const _pendingGroupInviteKey = 'cache_pending_group_invite';
   static const _pendingGroupInviteRefKey = 'cache_pending_group_invite_ref';
@@ -845,6 +846,24 @@ class CacheService {
     return await _read(_friendsKey);
   }
 
+  /// Apply a newly chosen currency symbol to every cached payload at once, so the
+  /// app, the home-screen widget and the quick-add popup all show it immediately
+  /// (they read these caches; waiting for the next server pull would show the old one).
+  static Future<void> setCurrencySymbol(String symbol) async {
+    final keys = [
+      _categoriesKey, _transactionsKey, _dashboardKey, _budgetsKey,
+      _savingsKey, _reportsKey, _userKey,
+    ];
+    for (final key in keys) {
+      final m = await _read(key);
+      if (m == null) continue;
+      if (m.containsKey('currency_symbol') || key == _userKey) {
+        m['currency_symbol'] = symbol;
+        await _write(key, m);
+      }
+    }
+  }
+
   // ─── Synchronization & Offline Queue ──────────────────────────────────────────────────────
 
   /// Get pending sync operations
@@ -878,6 +897,27 @@ class CacheService {
     final queue = await getSyncQueue();
     queue.removeWhere((op) => op['id'] == operationId);
     await saveSyncQueue(queue);
+  }
+
+  /// Operations the server definitively rejected. They are never deleted
+  /// automatically, so no user data is ever silently lost.
+  static Future<List<Map<String, dynamic>>> getFailedItems() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_deadLetterKey);
+    if (raw == null) return [];
+    try {
+      return List<Map<String, dynamic>>.from(jsonDecode(raw));
+    } catch (_) {
+      return [];
+    }
+  }
+
+  static Future<void> addToFailedItems(Map<String, dynamic> op, String reason) async {
+    final list = await getFailedItems();
+    list.add({...op, 'failedAt': DateTime.now().toUtc().toIso8601String(), 'reason': reason});
+    if (list.length > 500) list.removeRange(0, list.length - 500);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_deadLetterKey, jsonEncode(list));
   }
 
   // ─── Split Optimistic Updates ────────────────────────────────────────

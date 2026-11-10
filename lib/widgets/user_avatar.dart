@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../utils/avatar_cache.dart';
 
 class UserAvatar extends StatelessWidget {
   final String? avatarUrl;
@@ -17,23 +18,25 @@ class UserAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // If we have an avatar URL, show the image
+    final fallback = _initialBox();
+
+    // If we have an avatar URL, show the cached image
     if (avatarUrl != null && avatarUrl!.isNotEmpty) {
-      return Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(borderRadius),
-          image: DecorationImage(
-            image: NetworkImage(avatarUrl!),
-            fit: BoxFit.cover,
-          ),
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(borderRadius),
+        child: CachedAvatarImage(
+          url: avatarUrl!,
+          size: size,
+          fallback: fallback,
         ),
       );
     }
 
-    // Fallback: 1 letter in avatar with app color, square-ish
+    return fallback;
+  }
+
+  // Fallback: 1 letter in avatar with app color, square-ish
+  Widget _initialBox() {
     return Container(
       width: size,
       height: size,

@@ -6,6 +6,11 @@ import 'package:flutter/material.dart';
 import '../utils/app_toast.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
+import '../widgets/espere_action_button.dart';
+import '../widgets/espere_header.dart';
+import '../widgets/espere_filter_chip.dart';
+import '../widgets/espere_swipe_action.dart';
+import '../widgets/thanos_snap_widget.dart';
 import '../models/category.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
@@ -25,6 +30,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   List<CategoryModel> _categories = [];
   bool _isLoading = true;
   String _typeFilter = 'all';
+  final Map<int, GlobalKey<ThanosSnapWidgetState>> _snapKeys = {};
 
   @override
   void initState() {
@@ -63,7 +69,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     await _loadCategories();
   }
 
-  Future<void> _deleteCategory(CategoryModel cat) async {
+  Future<void> _deleteCategory(CategoryModel cat, {GlobalKey<ThanosSnapWidgetState>? snapKey}) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -88,6 +94,9 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     );
 
     if (confirm == true) {
+      // Thanos snap effect (respects the Delete Animation setting)
+      await snapKey?.currentState?.startSnap();
+
       // Offline mode: queue deletion
       await SyncService.queueOperation(
         action: 'delete',
@@ -218,77 +227,45 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
         child: Column(
           children: [
             // ─── Top Bar ────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: AppColors.card,
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                        boxShadow: AppShadows.soft,
-                      ),
-                      child: const Icon(Icons.arrow_back,
-                          color: AppColors.text),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  const Text(
-                    'Categories',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.text,
-                    ),
-                  ),
-                  const Spacer(),
-                  GestureDetector(
-                    onTap: () => _showCategoryForm(),
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: AppColors.accent,
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                        boxShadow: AppShadows.soft,
-                      ),
-                      child:
-                          const Icon(Icons.add, color: AppColors.dark),
-                    ),
-                  ),
-                ],
+            EspereHeader(
+              title: 'Categories',
+              onBack: () => Navigator.pop(context),
+              trailing: EspereActionButton(
+                icon: Icons.add,
+                primary: true,
+                onPressed: () => _showCategoryForm(),
               ),
             ),
 
             // ─── Filter Bar ─────────────────────────────────
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              child: Row(
-                children: [
-                  _FilterChip(
-                    label: _typeFilter == 'all'
-                        ? 'All Types'
-                        : _typeFilter == 'expense'
-                            ? 'Expense'
-                            : 'Income',
-                    onTap: () {
-                      setState(() {
-                        if (_typeFilter == 'all') {
-                          _typeFilter = 'expense';
-                        } else if (_typeFilter == 'expense') {
-                          _typeFilter = 'income';
-                        } else {
-                          _typeFilter = 'all';
-                        }
-                      });
-                    },
-                    onLongPress: _showTypeFilterSheet,
-                  ),
-                ],
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    EspereFilterChip(
+                      active: _typeFilter != 'all',
+                      label: _typeFilter == 'all'
+                          ? 'All Types'
+                          : _typeFilter == 'expense'
+                              ? 'Expense'
+                              : 'Income',
+                      onTap: () {
+                        setState(() {
+                          if (_typeFilter == 'all') {
+                            _typeFilter = 'expense';
+                          } else if (_typeFilter == 'expense') {
+                            _typeFilter = 'income';
+                          } else {
+                            _typeFilter = 'all';
+                          }
+                        });
+                      },
+                      onLongPress: _showTypeFilterSheet,
+                    ),
+                  ],
+                ),
               ),
             ),
 
@@ -312,13 +289,20 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                                   count: userCats.length,
                                 ),
                                 const SizedBox(height: 8),
-                                ...userCats.map((cat) => _CategoryTile(
+                                ...userCats.map((cat) {
+                                  final snapKey = _snapKeys.putIfAbsent(
+                                      cat.id, () => GlobalKey<ThanosSnapWidgetState>());
+                                  return ThanosSnapWidget(
+                                    key: snapKey,
+                                    child: _CategoryTile(
                                       category: cat,
                                       canEdit: true,
                                       onEdit: () => _showCategoryForm(category: cat),
                                       onDelete: () =>
-                                          _deleteCategory(cat),
-                                    )),
+                                          _deleteCategory(cat, snapKey: snapKey),
+                                    ),
+                                  );
+                                }),
                                 const SizedBox(height: 20),
                               ],
 
@@ -406,14 +390,9 @@ class _CategoryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
+    Widget content = Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(AppRadius.xxl),
-        boxShadow: AppShadows.card,
-      ),
+      color: AppColors.card,
       child: Row(
         children: [
           // Icon badge
@@ -456,32 +435,44 @@ class _CategoryTile extends StatelessWidget {
               ],
             ),
           ),
-
-          // Actions (only for user categories)
-          if (canEdit) ...[
-            GestureDetector(
-              onTap: onEdit,
-              child: Container(
-                width: 32,
-                height: 32,
-                decoration: const BoxDecoration(shape: BoxShape.circle),
-                child: const Icon(Icons.edit_outlined,
-                    size: 18, color: AppColors.muted),
-              ),
-            ),
-            const SizedBox(width: 4),
-            GestureDetector(
-              onTap: onDelete,
-              child: Container(
-                width: 32,
-                height: 32,
-                decoration: const BoxDecoration(shape: BoxShape.circle),
-                child: const Icon(Icons.delete_outline,
-                    size: 18, color: AppColors.muted),
-              ),
-            ),
-          ],
         ],
+      ),
+    );
+
+    // Same swipe pattern as transactions: right = delete, left = edit
+    // (only for user categories).
+    if (canEdit) {
+      content = EspereSwipeAction(
+        dismissKey: ValueKey('category_${category.id}'),
+        direction: DismissDirection.horizontal,
+        confirmDismiss: (direction) async {
+          if (direction == DismissDirection.startToEnd) {
+            onDelete?.call();
+          } else if (direction == DismissDirection.endToStart) {
+            onEdit?.call();
+          }
+          return false;
+        },
+        bgIcon: Icons.delete,
+        bgColor: AppColors.dark,
+        bgIconColor: category.colorValue,
+        secBgIcon: Icons.edit,
+        secBgColor: category.colorValue,
+        secBgIconColor: AppColors.dark,
+        borderRadius: BorderRadius.circular(AppRadius.xxl),
+        child: content,
+      );
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppRadius.xxl),
+        boxShadow: AppShadows.card,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppRadius.xxl),
+        child: content,
       ),
     );
   }
@@ -1014,50 +1005,6 @@ class _CategoryTypePickerSheet extends StatelessWidget {
               const Spacer(),
               const Icon(Icons.check_circle, color: AppColors.accent),
             ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _FilterChip extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
-  final VoidCallback? onLongPress;
-
-  const _FilterChip({
-    required this.label,
-    required this.onTap,
-    this.onLongPress,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      onLongPress: onLongPress,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: AppColors.card,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(color: AppColors.border),
-          boxShadow: AppShadows.soft,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: AppColors.text,
-              ),
-            ),
-            const SizedBox(width: 4),
-            const Icon(Icons.arrow_drop_down, size: 16, color: AppColors.muted),
           ],
         ),
       ),

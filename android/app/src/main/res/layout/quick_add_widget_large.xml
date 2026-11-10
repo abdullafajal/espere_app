@@ -1,0 +1,283 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_glass_bg"
+    android:orientation="vertical"
+    android:padding="14dp">
+
+    <LinearLayout
+        android:id="@+id/btn_open_quick_add"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@drawable/widget_hero_block"
+        android:orientation="vertical"
+        android:paddingStart="16dp"
+        android:paddingTop="12dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="12dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:id="@+id/widget_app_logo"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_app_logo" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:alpha="0.85"
+                android:maxLines="1"
+                android:text="ESPERE"
+                android:textColor="@color/widget_on_hero"
+                android:textSize="10sp"
+                android:ellipsize="end"
+                android:textStyle="bold"
+                android:letterSpacing="0.14" />
+
+            <FrameLayout
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <LinearLayout
+        android:id="@+id/widget_chip"
+                android:layout_width="wrap_content"
+                android:layout_height="26dp"
+                android:background="@drawable/widget_chip_onhero"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:alpha="0.75"
+                    android:maxLines="1"
+                    android:text="Today  "
+                    android:textColor="@color/widget_on_hero"
+                    android:textSize="11sp"
+                    android:ellipsize="end" />
+
+                <TextView
+                    android:id="@+id/widget_today_spend"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:maxLines="1"
+                    android:text="₹0.00"
+                    android:textColor="@color/widget_on_hero"
+                    android:textSize="11sp"
+                    android:ellipsize="end"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:alpha="0.75"
+            android:maxLines="1"
+            android:text="Spent this month"
+            android:textColor="@color/widget_on_hero"
+            android:textSize="12sp"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/widget_total_spend"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:text="₹0.00"
+            android:textColor="@color/widget_on_hero"
+            android:autoSizeTextType="uniform"
+            android:autoSizeMinTextSize="14sp"
+            android:autoSizeMaxTextSize="32sp"
+            android:autoSizeStepGranularity="1sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="68dp"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal">
+
+        <FrameLayout
+        android:id="@+id/widget_dial"
+            android:layout_width="68dp"
+            android:layout_height="68dp"
+            android:background="@drawable/widget_glass_circle">
+
+            <FrameLayout
+                android:layout_width="54dp"
+                android:layout_height="54dp"
+                android:layout_gravity="center">
+
+                <ProgressBar
+                    android:id="@+id/widget_progress"
+                    style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:indeterminate="false"
+                    android:max="100"
+                    android:progress="35"
+                    android:progressDrawable="@drawable/widget_ring" />
+
+                <TextView
+                    android:id="@+id/widget_pct"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:maxLines="1"
+                    android:text="35%"
+                    android:textColor="@color/widget_on_hero"
+                    android:textSize="15sp"
+                    android:ellipsize="end"
+                    android:textStyle="bold" />
+            </FrameLayout>
+        </FrameLayout>
+
+        <LinearLayout
+        android:id="@+id/widget_pill_a"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_block_soft"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="18dp"
+            android:paddingEnd="14dp">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:maxLines="1"
+                    android:text="Total Income"
+                    android:textColor="@color/widget_text_2"
+                    android:textSize="9sp"
+                    android:ellipsize="end" />
+
+                <TextView
+                    android:id="@+id/widget_total_income"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:maxLines="1"
+                    android:text="₹0.00"
+                    android:textColor="@color/widget_text_1"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="9sp"
+                    android:autoSizeMaxTextSize="15sp"
+                    android:autoSizeStepGranularity="1sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:maxLines="1"
+                    android:text="Avg Daily"
+                    android:textColor="@color/widget_text_2"
+                    android:textSize="9sp"
+                    android:ellipsize="end" />
+
+                <TextView
+                    android:id="@+id/widget_avg_daily"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:maxLines="1"
+                    android:text="₹0.00"
+                    android:textColor="@color/widget_text_1"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="9sp"
+                    android:autoSizeMaxTextSize="15sp"
+                    android:autoSizeStepGranularity="1sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/widget_btn_plus"
+        android:contentDescription="Add expense"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/widget_pill_soft"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="6dp"
+        android:paddingEnd="6dp">
+
+        <FrameLayout
+        android:id="@+id/widget_circle_a"
+        android:contentDescription="Add expense"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:layout_gravity="center_vertical"
+            android:background="@drawable/widget_glass_circle">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_plus_hero" />
+        </FrameLayout>
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:maxLines="1"
+            android:text="Add expense"
+            android:textColor="@color/widget_text_1"
+            android:textSize="15sp"
+            android:ellipsize="end"
+            android:textStyle="bold" />
+
+        <FrameLayout
+            android:id="@+id/widget_btn_app"
+        android:contentDescription="Open transactions"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:layout_gravity="center_vertical"
+            android:background="@drawable/widget_glass_circle">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_gravity="center"
+                android:tint="@color/widget_on_hero"
+                android:src="@drawable/ic_list" />
+        </FrameLayout>
+    </LinearLayout>
+</LinearLayout>

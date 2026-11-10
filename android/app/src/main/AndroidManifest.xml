@@ -96,6 +96,7 @@
         <activity
             android:name=".QuickAmountDialogActivity"
             android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
             android:theme="@style/Theme.QuickAddDialog"
             android:windowSoftInputMode="stateVisible|adjustResize"/>
 

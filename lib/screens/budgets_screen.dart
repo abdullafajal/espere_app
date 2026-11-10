@@ -3,6 +3,7 @@ import '../widgets/espere_header.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
+import '../widgets/espere_action_button.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
 import '../services/connectivity_service.dart';
@@ -86,7 +87,8 @@ class BudgetsScreenState extends State<BudgetsScreen> {
     // 2. Fetch from API silently
     if (ConnectivityService.isOnline) {
       final res = await ApiService.getBudgets();
-      if (res.isSuccess && mounted) {
+      // Never overwrite local changes that are still waiting to be synced.
+      if (res.isSuccess && mounted && !await SyncService.hasPending('budget')) {
         final List list = res.data!['budgets'] ?? [];
         final currentMonthStr = "${_currentMonth.year}-${_currentMonth.month.toString().padLeft(2, '0')}";
         setState(() {
@@ -128,7 +130,7 @@ class BudgetsScreenState extends State<BudgetsScreen> {
     // 2. Fetch from API silently
     if (ConnectivityService.isOnline) {
       final res = await ApiService.getCategories();
-      if (res.isSuccess && mounted) {
+      if (res.isSuccess && mounted && !await SyncService.hasPending('category')) {
         setState(() {
           final List catsRaw = res.data!['categories'] ?? [];
           _categories =
@@ -254,18 +256,10 @@ class BudgetsScreenState extends State<BudgetsScreen> {
               Navigator.maybePop(context);
             }
           },
-          trailing: GestureDetector(
-            onTap: () => _showBudgetForm(),
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: AppColors.accent,
-                borderRadius: BorderRadius.circular(AppRadius.md),
-                boxShadow: AppShadows.soft,
-              ),
-              child: const Icon(Icons.add, color: AppColors.dark, size: 20),
-            ),
+          trailing: EspereActionButton(
+            icon: Icons.add,
+            primary: true,
+            onPressed: () => _showBudgetForm(),
           ),
         ),
 

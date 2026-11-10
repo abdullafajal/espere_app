@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 import '../widgets/espere_header.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
+import '../widgets/espere_action_button.dart';
 import '../widgets/espere_swipe_action.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
 import '../services/connectivity_service.dart';
-import '../services/sync_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/user_avatar.dart';
 import 'split_group_detail_screen.dart';
@@ -364,32 +364,11 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
                         AppToast.error(context, res.error ?? 'Error');
                       }
                     } else {
-                      // Offline: Queue and optimistic update
-                      final tempId = DateTime.now().millisecondsSinceEpoch;
-                      await SyncService.queueOperation(
-                        action: 'create',
-                        entity: 'split_group',
-                        data: body,
-                      );
-                      
-                      final optGroup = {
-                        'id': tempId,
-                        'name': body['name'],
-                        'net_balance': '0.00',
-                        'total_members': _selectedFriendIds.length + 1,
-                        'created_at': DateTime.now().toIso8601String(),
-                        'color': selectedColor,
-                        'icon': selectedIcon,
-                        'is_temp': true,
-                      };
-                      
-                      await CacheService.addSplitGroupToCache(optGroup);
-                      
-                      if (!ctx.mounted) return;
-                      Navigator.pop(ctx);
-                      setState(() => _selectedFriendIds = []);
+                      // Groups are live-only: members get notified instantly,
+                      // so never queue or fake a group while offline.
+                      ss(() => isSaving = false);
                       HapticFeedback.mediumImpact();
-                      AppToast.success(context, 'Created offline. Will sync when online.');
+                      AppToast.error(context, 'Internet connection is required to create a group.');
                     }
                   },
                   child: isSaving 
@@ -457,50 +436,17 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
         mainAxisSize: MainAxisSize.min,
         children: [
           if (pendingCount > 0) ...[
-            GestureDetector(
-              onTap: _showRequestsPopup,
-              child: Stack(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: AppColors.card,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: AppShadows.soft,
-                    ),
-                    child: const Icon(Icons.notifications_outlined, color: AppColors.text, size: 22),
-                  ),
-                  Positioned(
-                    right: 8,
-                    top: 8,
-                    child: Container(
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(
-                        color: AppColors.accent,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.card, width: 2),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+            EspereActionButton(
+              icon: Icons.notifications_none,
+              showBadge: true,
+              onPressed: _showRequestsPopup,
             ),
             const SizedBox(width: 8),
           ],
-          GestureDetector(
-            onTap: _inviteFriend,
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: AppColors.accent,
-                borderRadius: BorderRadius.circular(AppRadius.md),
-                boxShadow: AppShadows.soft,
-              ),
-              child: const Icon(Icons.add, color: AppColors.dark, size: 20),
-            ),
+          EspereActionButton(
+            icon: Icons.add,
+            primary: true,
+            onPressed: _inviteFriend,
           ),
         ],
       ),
@@ -819,7 +765,7 @@ class _FriendTileState extends State<_FriendTile> {
       bgIcon: Icons.delete,
       bgColor: AppColors.dark,
       bgIconColor: AppColors.accent,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(AppRadius.xxl),
       confirmDismiss: (direction) async {
         final confirm = await showDialog<bool>(
           context: context,
@@ -852,15 +798,20 @@ class _FriendTileState extends State<_FriendTile> {
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: AppColors.card,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadius.xxl),
+        boxShadow: AppShadows.card,
+      ),
+      // Selection border is painted on top so the card, the swipe background
+      // and the border all share one radius.
+      foregroundDecoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppRadius.xxl),
         border: Border.all(
           color: widget.isSelected ? AppColors.accent : Colors.transparent,
           width: 2,
         ),
-        boxShadow: AppShadows.card,
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(AppRadius.xxl),
         child: swipeAction,
       ),
     );

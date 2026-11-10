@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../widgets/espere_header.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
@@ -85,7 +86,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     final years = List.generate(5, (index) => DateTime.now().year - index);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14),
-      height: 40,
+      height: 36,
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(AppRadius.md),
@@ -95,6 +96,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       child: DropdownButtonHideUnderline(
         child: DropdownButton<int>(
           value: _selectedYear,
+          onTap: HapticFeedback.mediumImpact,
           items:
               years
                   .map(

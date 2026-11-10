@@ -4,6 +4,8 @@ import '../widgets/espere_header.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
+import '../utils/icon_mapper.dart';
+import '../utils/avatar_cache.dart';
 import '../services/api_service.dart';
 import '../services/connectivity_service.dart';
 import '../services/sync_service.dart';
@@ -38,6 +40,7 @@ class _S extends State<SplitGroupDetailScreen>
   int? _myId;
   String _currencySymbol = '₹';
   final Map<int, GlobalKey<ThanosSnapWidgetState>> _expenseSnapKeys = {};
+  final Map<int, GlobalKey<ThanosSnapWidgetState>> _memberSnapKeys = {};
   final ScrollController _expScrollCtrl = ScrollController();
 
   @override
@@ -121,6 +124,10 @@ class _S extends State<SplitGroupDetailScreen>
         _ld = false;
         // Save to cache for next time
         CacheService.cacheSplitGroupDetail(widget.groupId, r.data!);
+        AvatarCache.warmUp(
+          ((r.data!['members'] as List?) ?? const [])
+              .map((m) => m is Map ? m['avatar_url']?.toString() : null),
+        );
       } else if (r.errors != null && r.errors!['is_pending'] == true) {
         _isPending = true;
         _g = null;
@@ -1339,9 +1346,10 @@ class _S extends State<SplitGroupDetailScreen>
                                           child:
                                               selectedPayer!['avatar_url'] !=
                                                       null
-                                                  ? Image.network(
-                                                    selectedPayer!['avatar_url'],
-                                                    fit: BoxFit.cover,
+                                                  ? CachedAvatarImage(
+                                                    url: selectedPayer!['avatar_url'],
+                                                    size: 36,
+                                                    fallback: const SizedBox(),
                                                   )
                                                   : Center(
                                                     child: Text(
@@ -1999,6 +2007,7 @@ class _S extends State<SplitGroupDetailScreen>
                         ),
                         child: PopupMenuButton<String>(
                           offset: const Offset(0, 48),
+                          onOpened: HapticFeedback.mediumImpact,
                           color: AppColors.card,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                           icon: Container(
@@ -2012,6 +2021,7 @@ class _S extends State<SplitGroupDetailScreen>
                             child: const Icon(Icons.more_vert, color: AppColors.dark, size: 20),
                           ),
                           onSelected: (val) {
+                            HapticFeedback.mediumImpact();
                             if (val == 'edit') {
                               _editGroup();
                             } else if (val == 'share') {
@@ -2064,9 +2074,9 @@ class _S extends State<SplitGroupDetailScreen>
                               value: 'leave',
                               child: Row(
                                 children: [
-                                  Icon(Icons.exit_to_app, color: Colors.redAccent, size: 20),
+                                  Icon(Icons.exit_to_app, color: AppColors.text, size: 20),
                                   SizedBox(width: 12),
-                                  Text('Leave Group', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                                  Text('Leave Group', style: TextStyle(color: AppColors.text, fontWeight: FontWeight.bold)),
                                 ],
                               ),
                             ),
@@ -2092,203 +2102,7 @@ class _S extends State<SplitGroupDetailScreen>
                           headerSliverBuilder:
                               (context, innerBoxIsScrolled) => [
                                 if (_g != null)
-                                  SliverToBoxAdapter(
-                                    child: Padding(
-                                      padding: const EdgeInsets.fromLTRB(
-                                        16,
-                                        8,
-                                        16,
-                                        0,
-                                      ),
-                                      child: Container(
-                                        width: double.infinity,
-                                        decoration: BoxDecoration(
-                                          color: AppColors.text,
-                                          borderRadius: BorderRadius.circular(
-                                            20,
-                                          ),
-                                          boxShadow: AppShadows.elevated,
-                                          border: Border.all(
-                                            color: Colors.white.withValues(
-                                              alpha: 0.05,
-                                            ),
-                                          ),
-                                        ),
-                                        child: Stack(
-                                          children: [
-                                            Positioned.fill(
-                                              child: Container(
-                                                decoration: BoxDecoration(
-                                                  borderRadius:
-                                                      BorderRadius.circular(20),
-                                                  gradient: RadialGradient(
-                                                    center: Alignment.topRight,
-                                                    radius: 0.6,
-                                                    colors: [
-                                                      AppColors.accent
-                                                          .withValues(
-                                                            alpha: 0.04,
-                                                          ),
-                                                      Colors.transparent,
-                                                    ],
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                            Padding(
-                                              padding: const EdgeInsets.all(20),
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  const Text(
-                                                    'Your Net Balance',
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      fontWeight:
-                                                          FontWeight.w500,
-                                                      color: Color(0x99FFFFFF),
-                                                    ),
-                                                  ),
-                                                  const SizedBox(height: 4),
-                                                  Text(
-                                                    '${bal > 0 ? "+" : ""}${_currencySymbol}${bal.abs().toStringAsFixed(2)}',
-                                                    style: const TextStyle(
-                                                      fontSize: 32,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      color: AppColors.accent,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(height: 12),
-                                                  Row(
-                                                    children: [
-                                                      _sc(
-                                                        Icons.arrow_upward,
-                                                        'Paid: ${_currencySymbol}0',
-                                                      ),
-                                                      const SizedBox(width: 12),
-                                                      _sc(
-                                                        Icons.pie_chart,
-                                                        'Share: ${_currencySymbol}0',
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  const SizedBox(height: 16),
-                                                  Row(
-                                                    children: [
-                                                      Expanded(
-                                                        child: GestureDetector(
-                                                          onTap: _addExpense,
-                                                          child: Container(
-                                                            height: 44,
-                                                            decoration: BoxDecoration(
-                                                              color: Colors
-                                                                  .white
-                                                                  .withValues(
-                                                                    alpha: 0.1,
-                                                                  ),
-                                                              borderRadius:
-                                                                  BorderRadius.circular(
-                                                                    16,
-                                                                  ),
-                                                            ),
-                                                            child: const Row(
-                                                              mainAxisAlignment:
-                                                                  MainAxisAlignment
-                                                                      .center,
-                                                              children: [
-                                                                Icon(
-                                                                  Icons.add,
-                                                                  size: 18,
-                                                                  color:
-                                                                      AppColors
-                                                                          .accent,
-                                                                ),
-                                                                SizedBox(
-                                                                  width: 6,
-                                                                ),
-                                                                Text(
-                                                                  'Expense',
-                                                                  style: TextStyle(
-                                                                    fontSize:
-                                                                        13,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                    color:
-                                                                        Colors
-                                                                            .white,
-                                                                  ),
-                                                                ),
-                                                              ],
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                      const SizedBox(width: 12),
-                                                      Expanded(
-                                                        child: GestureDetector(
-                                                          onTap:
-                                                              () => _tc
-                                                                  .animateTo(2),
-                                                          child: Container(
-                                                            height: 44,
-                                                            decoration: BoxDecoration(
-                                                              color: Colors
-                                                                  .white
-                                                                  .withValues(
-                                                                    alpha: 0.1,
-                                                                  ),
-                                                              borderRadius:
-                                                                  BorderRadius.circular(
-                                                                    16,
-                                                                  ),
-                                                            ),
-                                                            child: const Row(
-                                                              mainAxisAlignment:
-                                                                  MainAxisAlignment
-                                                                      .center,
-                                                              children: [
-                                                                Icon(
-                                                                  Icons
-                                                                      .handshake,
-                                                                  size: 18,
-                                                                  color:
-                                                                      AppColors
-                                                                          .accent,
-                                                                ),
-                                                                SizedBox(
-                                                                  width: 6,
-                                                                ),
-                                                                Text(
-                                                                  'Settle Up',
-                                                                  style: TextStyle(
-                                                                    fontSize:
-                                                                        13,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                    color:
-                                                                        Colors
-                                                                            .white,
-                                                                  ),
-                                                                ),
-                                                              ],
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
+                                  SliverToBoxAdapter(child: _buildHero(bal)),
                                 SliverPersistentHeader(
                                   pinned: true,
                                   delegate: _SliverAppBarDelegate(
@@ -2312,14 +2126,14 @@ class _S extends State<SplitGroupDetailScreen>
                                         child: TabBar(
                                           controller: _tc,
                                           indicator: BoxDecoration(
-                                            color: AppColors.surface,
+                                            color: AppColors.dark,
                                             borderRadius: BorderRadius.circular(
                                               14,
                                             ),
                                           ),
                                           indicatorSize:
                                               TabBarIndicatorSize.tab,
-                                          labelColor: AppColors.text,
+                                          labelColor: AppColors.accent,
                                           unselectedLabelColor: AppColors.muted,
                                           labelStyle: const TextStyle(
                                             fontSize: 13,
@@ -2381,10 +2195,18 @@ class _S extends State<SplitGroupDetailScreen>
             ),
             child: Column(
               children: [
-                const Icon(
-                  Icons.mail_outline,
-                  size: 64,
-                  color: AppColors.accent,
+                Container(
+                  width: 88,
+                  height: 88,
+                  decoration: BoxDecoration(
+                    color: AppColors.dark,
+                    borderRadius: BorderRadius.circular(AppRadius.xxxl),
+                  ),
+                  child: const Icon(
+                    Icons.mail_outline,
+                    size: 44,
+                    color: AppColors.accent,
+                  ),
                 ),
                 const SizedBox(height: 24),
                 Text(
@@ -2453,37 +2275,221 @@ class _S extends State<SplitGroupDetailScreen>
     );
   }
 
-  Widget _sc(IconData i, String t) => Row(
-    children: [
-      Container(
-        width: 24,
-        height: 24,
+  Widget _heroChip(IconData i, String t) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    decoration: BoxDecoration(
+      color: Colors.white.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(AppRadius.xl),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(i, size: 14, color: AppColors.accent),
+        const SizedBox(width: 6),
+        Text(t, style: const TextStyle(fontSize: 12, color: Color(0xCCFFFFFF))),
+      ],
+    ),
+  );
+
+  Widget _heroButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    bool primary = false,
+  }) => Expanded(
+    child: GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 46,
         decoration: BoxDecoration(
-          color: AppColors.accent.withValues(alpha: 0.2),
-          shape: BoxShape.circle,
+          color: primary ? AppColors.accent : Colors.white.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(AppRadius.xl),
         ),
-        child: Icon(i, size: 14, color: AppColors.accent),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 18, color: primary ? AppColors.dark : AppColors.accent),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: primary ? AppColors.dark : Colors.white,
+              ),
+            ),
+          ],
+        ),
       ),
-      const SizedBox(width: 6),
-      Text(t, style: const TextStyle(fontSize: 12, color: Color(0xB3FFFFFF))),
-    ],
+    ),
+  );
+
+  /// Group colour chosen by the user (falls back to the app accent).
+  Color _groupColor() {
+    try {
+      return Color(int.parse('FF${(_g!['color'] ?? '#C8E64A').toString().replaceFirst('#', '')}', radix: 16));
+    } catch (_) {
+      return AppColors.accent;
+    }
+  }
+
+  Widget _buildHero(double bal) {
+    final members = (_g!['members'] as List?)?.length ?? 0;
+    final settled = bal.abs() < 0.01;
+    final status = settled
+        ? 'You are all settled up'
+        : bal > 0
+            ? 'You get back'
+            : 'You owe';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: AppColors.dark,
+          borderRadius: BorderRadius.circular(AppRadius.xxxl),
+          boxShadow: AppShadows.elevated,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        status,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0x99FFFFFF),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        settled
+                            ? '${_currencySymbol}0.00'
+                            : '${bal > 0 ? "+" : "-"}${_currencySymbol}${bal.abs().toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.accent,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: _groupColor(),
+                    borderRadius: BorderRadius.circular(AppRadius.xl),
+                  ),
+                  child: Icon(
+                    IconMapper.map((_g!['icon'] ?? 'groups').toString()),
+                    color: AppColors.dark,
+                    size: 24,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _heroChip(Icons.people_alt_outlined, '$members ${members == 1 ? 'member' : 'members'}'),
+              ],
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                _heroButton(
+                  icon: Icons.add,
+                  label: 'Add Expense',
+                  primary: true,
+                  onTap: _addExpense,
+                ),
+                const SizedBox(width: 12),
+                _heroButton(
+                  icon: Icons.handshake_outlined,
+                  label: 'Settle Up',
+                  onTap: () => _tc.animateTo(2),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Empty-state block used by all tabs.
+  Widget _emptyState(IconData icon, String title, String subtitle) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: AppColors.dark,
+              borderRadius: BorderRadius.circular(AppRadius.xxl),
+            ),
+            child: Icon(icon, size: 34, color: AppColors.accent),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: AppColors.text,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: AppColors.muted, height: 1.4),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  /// Pill showing an amount: lime = receives, dark = pays.
+  Widget _amountPill(String text, {bool receive = true}) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    decoration: BoxDecoration(
+      color: receive ? AppColors.accent : AppColors.dark,
+      borderRadius: BorderRadius.circular(AppRadius.md),
+    ),
+    child: Text(
+      text,
+      style: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.bold,
+        color: receive ? AppColors.dark : AppColors.accent,
+      ),
+    ),
   );
 
   Widget _expTab() {
     final l = List<Map<String, dynamic>>.from(_g!['recent_expenses'] ?? []);
     if (l.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.receipt_long, size: 48, color: AppColors.muted),
-            const SizedBox(height: 8),
-            const Text(
-              'No expenses yet. Start adding!',
-              style: TextStyle(color: AppColors.muted),
-            ),
-          ],
-        ),
+      return _emptyState(
+        Icons.receipt_long_rounded,
+        'No expenses yet',
+        'Tap Add Expense to log the first one',
       );
     }
     return RefreshIndicator(
@@ -2501,25 +2507,30 @@ class _S extends State<SplitGroupDetailScreen>
           final paidById = e['paid_by'] != null ? e['paid_by']['id'] : null;
           final canEdit = _myId != null && (creatorId == _myId || paidById == _myId);
 
+          final payer = e['paid_by'] is Map
+              ? (e['paid_by']['display_name'] ?? e['paid_by']['username'])
+              : null;
+          final subtitle = [
+            if (f.isNotEmpty) f,
+            if (payer != null) 'Paid by ${e['paid_by']['id'] == _myId ? 'you' : payer}',
+          ].join(' · ');
+
           Widget cardContent = Container(
             padding: const EdgeInsets.all(14),
-            decoration: const BoxDecoration(
-              color: AppColors.card,
-              // Shadow moved to outer wrapper
-            ),
+            decoration: const BoxDecoration(color: AppColors.card),
             child: Row(
               children: [
                 Container(
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: AppColors.accent,
-                    borderRadius: BorderRadius.circular(12),
+                    color: AppColors.dark,
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
                   ),
                   child: const Icon(
-                    Icons.receipt_long,
+                    Icons.receipt_long_rounded,
                     size: 22,
-                    color: AppColors.dark,
+                    color: AppColors.accent,
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -2537,8 +2548,11 @@ class _S extends State<SplitGroupDetailScreen>
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
+                      const SizedBox(height: 2),
                       Text(
-                        f,
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 12,
                           color: AppColors.muted,
@@ -2547,15 +2561,16 @@ class _S extends State<SplitGroupDetailScreen>
                     ],
                   ),
                 ),
+                const SizedBox(width: 8),
                 Text(
                   '${_currencySymbol}${e['amount']}',
                   style: const TextStyle(
-                    fontSize: 14,
+                    fontSize: 15,
                     fontWeight: FontWeight.bold,
                     color: AppColors.text,
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 4),
                 const Icon(
                   Icons.chevron_right,
                   size: 18,
@@ -2701,7 +2716,7 @@ class _S extends State<SplitGroupDetailScreen>
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w500,
-                              color: AppColors.text,
+                              color: AppColors.muted,
                             ),
                           )
                         else if (b < 0)
@@ -2710,7 +2725,7 @@ class _S extends State<SplitGroupDetailScreen>
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w500,
-                              color: AppColors.text,
+                              color: AppColors.muted,
                             ),
                           )
                         else
@@ -2724,12 +2739,16 @@ class _S extends State<SplitGroupDetailScreen>
                       ],
                     ),
                   ),
-                  // Lock icon if can't be removed
-                  if (!isSettled)
-                    Icon(
-                      Icons.lock_outline,
-                      size: 16,
-                      color: AppColors.muted.withOpacity(0.3),
+                  if (isSettled)
+                    const Icon(
+                      Icons.check_circle,
+                      size: 22,
+                      color: AppColors.accent,
+                    )
+                  else
+                    _amountPill(
+                      '${b > 0 ? "+" : "-"}${_currencySymbol}${b.abs().toStringAsFixed(0)}',
+                      receive: b > 0,
                     ),
                 ],
               ),
@@ -2739,7 +2758,7 @@ class _S extends State<SplitGroupDetailScreen>
             if (canRemove) {
               finalCard = EspereSwipeAction(
                 dismissKey: ValueKey('member_${x['id']}'),
-                direction: DismissDirection.endToStart,
+                direction: DismissDirection.startToEnd,
                 confirmDismiss: (direction) async {
                   _removeMember(x);
                   return false;
@@ -2747,7 +2766,7 @@ class _S extends State<SplitGroupDetailScreen>
                 bgIcon: Icons.person_remove,
                 bgColor: AppColors.dark,
                 bgIconColor: AppColors.accent,
-                bgAlignment: Alignment.centerRight,
+                bgAlignment: Alignment.centerLeft,
                 borderRadius: BorderRadius.circular(20),
                 child: memberCard,
               );
@@ -2755,15 +2774,22 @@ class _S extends State<SplitGroupDetailScreen>
               finalCard = memberCard;
             }
 
-            return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: AppShadows.card,
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: finalCard,
+            final memberKey = _memberSnapKeys.putIfAbsent(
+              x['id'] as int,
+              () => GlobalKey<ThanosSnapWidgetState>(),
+            );
+            return ThanosSnapWidget(
+              key: memberKey,
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(AppRadius.xxl),
+                  boxShadow: AppShadows.card,
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadius.xxl),
+                  child: finalCard,
+                ),
               ),
             );
           }).toList(),
@@ -2807,11 +2833,12 @@ class _S extends State<SplitGroupDetailScreen>
       final groupId = _g!['id'] as int;
       final userId = member['id'] as int;
 
-      setState(() => _ld = true);
+      // Group changes are live: remove on the server first, then play the
+      // Thanos snap (respects the Delete Animation setting) and refresh.
       final res = await ApiService.removeGroupMember(groupId, userId);
-      setState(() => _ld = false);
 
       if (res.isSuccess) {
+        await _memberSnapKeys[userId]?.currentState?.startSnap();
         _showTopMessage('Member removed.');
         _load();
       } else {
@@ -2918,23 +2945,12 @@ class _S extends State<SplitGroupDetailScreen>
             ),
           ),
           if (d.isEmpty)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 40),
-                child: Column(
-                  children: [
-                    const Icon(
-                      Icons.sentiment_satisfied,
-                      size: 48,
-                      color: AppColors.muted,
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'All members are settled up!',
-                      style: TextStyle(color: AppColors.muted),
-                    ),
-                  ],
-                ),
+            SizedBox(
+              height: 280,
+              child: _emptyState(
+                Icons.check_circle_outline_rounded,
+                'All settled up',
+                'Nobody owes anyone in this group',
               ),
             )
           else
@@ -2955,13 +2971,13 @@ class _S extends State<SplitGroupDetailScreen>
                           width: 40,
                           height: 40,
                           decoration: BoxDecoration(
-                            color: AppColors.accent,
-                            borderRadius: BorderRadius.circular(12),
+                            color: AppColors.dark,
+                            borderRadius: BorderRadius.circular(AppRadius.md),
                           ),
                           child: const Icon(
-                            Icons.person,
+                            Icons.arrow_outward_rounded,
                             size: 20,
-                            color: AppColors.dark,
+                            color: AppColors.accent,
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -2987,14 +3003,7 @@ class _S extends State<SplitGroupDetailScreen>
                             ],
                           ),
                         ),
-                        Text(
-                          '${_currencySymbol}${x['amount']}',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.text,
-                          ),
-                        ),
+                        _amountPill('${_currencySymbol}${x['amount']}', receive: _myId == x['to_user_id']),
                       ],
                     ),
                     if (_myId == x['to_user_id']) ...[
@@ -3383,9 +3392,10 @@ class _UserPickerSheetState extends State<_UserPickerSheet> {
                                       borderRadius: BorderRadius.circular(10),
                                       child:
                                           u['avatar_url'] != null
-                                              ? Image.network(
-                                                u['avatar_url'],
-                                                fit: BoxFit.cover,
+                                              ? CachedAvatarImage(
+                                                url: u['avatar_url'],
+                                                size: 40,
+                                                fallback: const SizedBox(),
                                               )
                                               : Center(
                                                 child: Text(
