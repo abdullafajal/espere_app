@@ -7,6 +7,7 @@ import 'package:image/image.dart' as img;
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import '../theme/app_theme.dart';
+import '../utils/avatar_cache.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
@@ -101,10 +102,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
     };
 
     ApiResult result;
+    var savedLocally = false;
+    ApiProbe? probe;
+    result = ApiResult(error: 'offline');
+
     if (ConnectivityService.isOnline) {
-      result = await ApiService.updateProfile(data);
-    } else {
-      // Offline mode: queue operation
+      final probed = await ApiService.probed(() => ApiService.updateProfile(data));
+      result = probed.result;
+      probe = probed.probe;
+    }
+
+    // No usable connection (offline, slow or server hiccup): save locally and
+    // sync in the background - the user should not notice any difference.
+    final unreachable = !ConnectivityService.isOnline ||
+        (!result.isSuccess && probe != null && !probe.permanent);
+    if (unreachable) {
       await SyncService.queueOperation(
         action: 'update',
         entity: 'profile',
@@ -112,7 +124,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         entityId: _user?.id ?? 0,
       );
 
-      // Optimistic Update
       if (_user != null) {
         final newUserJson = _user!.toJson();
         newUserJson['first_name'] = data['first_name'];
@@ -121,12 +132,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         newUserJson['currency'] = data['currency'];
         newUserJson['theme'] = data['theme'];
         newUserJson['email_reminders'] = data['email_reminders'];
-        
+
         await CacheService.cacheUser(newUserJson);
         result = ApiResult(data: UserModel.fromJson(newUserJson));
-      } else {
-        result = ApiResult(data: null);
+        savedLocally = true;
       }
+    } else if (result.isSuccess && result.data != null) {
+      await CacheService.cacheUser((result.data as UserModel).toJson());
     }
 
     if (!mounted) return;
@@ -135,8 +147,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (result.isSuccess && result.data != null) {
         _user = result.data;
         AppToast.success(context, 'Profile updated successfully.');
-      } else if (!ConnectivityService.isOnline) {
-        AppToast.success(context, 'Profile update queued.');
+      } else if (savedLocally) {
+        AppToast.success(context, 'Profile updated successfully.');
       } else {
         AppToast.error(context, result.error ?? 'Error updating profile');
       }
@@ -185,7 +197,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (croppedFile != null && croppedFile.path.isNotEmpty) {
           setState(() => _isLoading = true);
           
+          final oldAvatarUrl = _getAvatarUrl();
           final result = await ApiService.uploadAvatar(croppedFile.path);
+          if (result.isSuccess) {
+            // Same URL may now point to a new image: drop the stale cached copy.
+            await AvatarCache.evict(oldAvatarUrl);
+          }
           if (result.isSuccess && mounted) {
             setState(() {
               _user = result.data;
@@ -594,11 +611,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ),
                                 child: _getAvatarUrl().isNotEmpty
                                     ? ClipOval(
-                                        child: Image.network(
-                                          _getAvatarUrl(),
-                                          fit: BoxFit.cover,
-                                          width: 88,
-                                          height: 88,
+                                        child: CachedAvatarImage(
+                                          url: _getAvatarUrl(),
+                                          size: 88,
+                                          fallback: Center(
+                                            child: Text(
+                                              _user?.initials ?? '?',
+                                              style: const TextStyle(
+                                                fontSize: 32,
+                                                fontWeight: FontWeight.w600,
+                                                color: AppColors.dark,
+                                              ),
+                                            ),
+                                          ),
                                         ),
                                       )
                                     : Center(

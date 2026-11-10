@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Translucent "glass" tokens for the Quick Add home-screen widget (dark) -->
+    <color name="widget_glass_bg">#D9211C1A</color>
+    <color name="widget_glass_stroke">#24FFFFFF</color>
+    <color name="widget_glass_card">#1FFFFFFF</color>
+    <color name="widget_glass_card_stroke">#14FFFFFF</color>
+    <color name="widget_glass_chip">#33FFFFFF</color>
+    <color name="dialog_glass_bg">#F5211C1A</color>
+    <color name="dialog_field_bg">#14FFFFFF</color>
+    <color name="dialog_field_stroke">#1FFFFFFF</color>
+</resources>

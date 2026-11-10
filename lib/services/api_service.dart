@@ -1,4 +1,5 @@
 /// API service — handles all HTTP requests to Django backend.
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'auth_service.dart';
@@ -18,7 +19,80 @@ class ApiResult<T> {
   bool get isSuccess => error == null && errors == null;
 }
 
+
+/// Records how the last request(s) inside a zone ended. Used by the sync
+/// engine to tell "network is slow/down" (retry later, keep data) apart from
+/// "server rejected this request" (move to the failed-items store).
+class ApiProbe {
+  int? status;
+  bool networkError = false;
+
+  /// Server definitively rejected the request (bad data, not found, ...).
+  /// Timeouts, 5xx, 429, 401/403 and unexpected 2xx bodies (captive portals)
+  /// are NOT permanent - they are retried.
+  bool get permanent {
+    final st = status;
+    if (networkError || st == null) return false;
+    if (st == 401 || st == 403 || st == 408 || st == 425 || st == 429) return false;
+    return st >= 400 && st < 500;
+  }
+}
+
+class ProbedResult<R> {
+  final R result;
+  final ApiProbe probe;
+  ProbedResult(this.result, this.probe);
+}
+
+/// Thin wrapper over package:http that adds a timeout (slow connections must
+/// never hang the app) and reports the outcome to the current [ApiProbe].
+class _Http {
+  static const _timeout = Duration(seconds: 20);
+
+  static ApiProbe? get _probe {
+    final p = Zone.current[#apiProbe];
+    return p is ApiProbe ? p : null;
+  }
+
+  static Future<http.Response> _run(Future<http.Response> Function() call) async {
+    try {
+      final r = await call().timeout(_timeout);
+      _probe?.status = r.statusCode;
+      return r;
+    } catch (_) {
+      _probe?.networkError = true;
+      rethrow;
+    }
+  }
+
+  static Future<http.Response> get(Uri url, {Map<String, String>? headers}) =>
+      _run(() => http.get(url, headers: headers));
+
+  static Future<http.Response> post(Uri url,
+          {Map<String, String>? headers, Object? body, Encoding? encoding}) =>
+      _run(() => http.post(url, headers: headers, body: body, encoding: encoding));
+
+  static Future<http.Response> put(Uri url,
+          {Map<String, String>? headers, Object? body, Encoding? encoding}) =>
+      _run(() => http.put(url, headers: headers, body: body, encoding: encoding));
+
+  static Future<http.Response> patch(Uri url,
+          {Map<String, String>? headers, Object? body, Encoding? encoding}) =>
+      _run(() => http.patch(url, headers: headers, body: body, encoding: encoding));
+
+  static Future<http.Response> delete(Uri url,
+          {Map<String, String>? headers, Object? body, Encoding? encoding}) =>
+      _run(() => http.delete(url, headers: headers, body: body, encoding: encoding));
+}
+
 class ApiService {
+  /// Run [call] and learn how the network behaved (see [ApiProbe]).
+  static Future<ProbedResult<R>> probed<R>(Future<R> Function() call) async {
+    final probe = ApiProbe();
+    final r = await runZoned(call, zoneValues: {#apiProbe: probe});
+    return ProbedResult(r, probe);
+  }
+
   /// ─── HTTP Helpers ──────────────────────────────────────────────────────
 
   static Future<Map<String, String>> _headers({bool auth = true}) async {
@@ -44,7 +118,7 @@ class ApiService {
       String username, String password) async {
     try {
       final url = await _url('/api/auth/login/');
-      final response = await http.post(
+      final response = await _Http.post(
         Uri.parse(url),
         headers: await _headers(auth: false),
         body: jsonEncode({'username': username, 'password': password}),
@@ -66,7 +140,7 @@ class ApiService {
       String username, String email, String password, String password2) async {
     try {
       final url = await _url('/api/auth/register/');
-      final response = await http.post(
+      final response = await _Http.post(
         Uri.parse(url),
         headers: await _headers(auth: false),
         body: jsonEncode({
@@ -95,7 +169,7 @@ class ApiService {
   static Future<ApiResult<Map<String, dynamic>>> verifyOtp(String email, String otp) async {
     try {
       final url = await _url('/api/auth/verify-otp/');
-      final response = await http.post(
+      final response = await _Http.post(
         Uri.parse(url),
         headers: await _headers(auth: false),
         body: jsonEncode({
@@ -126,7 +200,7 @@ class ApiService {
   static Future<ApiResult<Map<String, dynamic>>> resendOtp(String email) async {
     try {
       final url = await _url('/api/auth/resend-otp/');
-      final response = await http.post(
+      final response = await _Http.post(
         Uri.parse(url),
         headers: await _headers(auth: false),
         body: jsonEncode({
@@ -149,7 +223,7 @@ class ApiService {
   static Future<ApiResult<Map<String, dynamic>>> googleLogin(String idToken) async {
     try {
       final url = await _url('/api/auth/google/');
-      final response = await http.post(
+      final response = await _Http.post(
         Uri.parse(url),
         headers: await _headers(auth: false),
         body: jsonEncode({'id_token': idToken}),
@@ -169,7 +243,7 @@ class ApiService {
   static Future<ApiResult<UserModel>> getProfile() async {
     try {
       final url = await _url('/api/auth/profile/');
-      final response = await http.get(
+      final response = await _Http.get(
         Uri.parse(url),
         headers: await _headers(),
       );
@@ -189,7 +263,7 @@ class ApiService {
       Map<String, dynamic> updates) async {
     try {
       final url = await _url('/api/auth/profile/');
-      final response = await http.put(
+      final response = await _Http.put(
         Uri.parse(url),
         headers: await _headers(),
         body: jsonEncode(updates),
@@ -209,7 +283,7 @@ class ApiService {
   static Future<ApiResult<Map<String, dynamic>>> forgotPassword(String email) async {
     try {
       final url = await _url('/api/auth/forgot-password/');
-      final response = await http.post(
+      final response = await _Http.post(
         Uri.parse(url),
         headers: await _headers(auth: false),
         body: jsonEncode({'email': email}),
@@ -228,7 +302,7 @@ class ApiService {
   static Future<ApiResult<Map<String, dynamic>>> verifyPasswordResetOtp(String email, String otp) async {
     try {
       final url = await _url('/api/auth/verify-password-reset-otp/');
-      final response = await http.post(
+      final response = await _Http.post(
         Uri.parse(url),
         headers: await _headers(auth: false),
         body: jsonEncode({'email': email, 'otp': otp}),
@@ -247,7 +321,7 @@ class ApiService {
   static Future<ApiResult<Map<String, dynamic>>> resetPassword(String email, String otp, String newPassword) async {
     try {
       final url = await _url('/api/auth/reset-password/');
-      final response = await http.post(
+      final response = await _Http.post(
         Uri.parse(url),
         headers: await _headers(auth: false),
         body: jsonEncode({
@@ -270,7 +344,7 @@ class ApiService {
   static Future<ApiResult> changePassword(String oldPassword, String newPassword) async {
     try {
       final url = await _url('/api/auth/password/change/');
-      final response = await http.post(
+      final response = await _Http.post(
         Uri.parse(url),
         headers: await _headers(),
         body: jsonEncode({
@@ -302,7 +376,7 @@ class ApiService {
       
       request.files.add(await http.MultipartFile.fromPath('image', imagePath));
       
-      final streamedResponse = await request.send();
+      final streamedResponse = await request.send().timeout(const Duration(seconds: 90));
       final response = await http.Response.fromStream(streamedResponse);
       
       final data = jsonDecode(response.body);
@@ -320,7 +394,7 @@ class ApiService {
   static Future<ApiResult<DashboardData>> getDashboard() async {
     try {
       final url = await _url('/api/dashboard/');
-      final response = await http.get(
+      final response = await _Http.get(
         Uri.parse(url),
         headers: await _headers(),
       );
@@ -360,7 +434,7 @@ class ApiService {
 
       final baseUrl = await _url('/api/transactions/');
       final uri = Uri.parse(baseUrl).replace(queryParameters: params);
-      final response = await http.get(uri, headers: await _headers());
+      final response = await _Http.get(uri, headers: await _headers());
 
       final data = jsonDecode(response.body);
       if (response.statusCode == 200) {
@@ -389,7 +463,7 @@ class ApiService {
       Map<String, dynamic> txnData) async {
     try {
       final url = await _url('/api/transactions/');
-      final response = await http.post(
+      final response = await _Http.post(
         Uri.parse(url),
         headers: await _headers(),
         body: jsonEncode(txnData),
@@ -414,7 +488,7 @@ class ApiService {
       int id, Map<String, dynamic> txnData) async {
     try {
       final url = await _url('/api/transactions/$id/');
-      final response = await http.put(
+      final response = await _Http.put(
         Uri.parse(url),
         headers: await _headers(),
         body: jsonEncode(txnData),
@@ -435,7 +509,7 @@ class ApiService {
   static Future<ApiResult<bool>> deleteTransaction(int id) async {
     try {
       final url = await _url('/api/transactions/$id/');
-      final response = await http.delete(
+      final response = await _Http.delete(
         Uri.parse(url),
         headers: await _headers(),
       );
@@ -454,7 +528,7 @@ class ApiService {
   static Future<ApiResult<Map<String, dynamic>>> getCategories() async {
     try {
       final url = await _url('/api/categories/');
-      final response = await http.get(
+      final response = await _Http.get(
         Uri.parse(url),
         headers: await _headers(),
       );
@@ -480,7 +554,7 @@ class ApiService {
       Map<String, dynamic> catData) async {
     try {
       final url = await _url('/api/categories/');
-      final response = await http.post(
+      final response = await _Http.post(
         Uri.parse(url),
         headers: await _headers(),
         body: jsonEncode(catData),
@@ -501,7 +575,7 @@ class ApiService {
       int id, Map<String, dynamic> catData) async {
     try {
       final url = await _url('/api/categories/$id/');
-      final response = await http.put(
+      final response = await _Http.put(
         Uri.parse(url),
         headers: await _headers(),
         body: jsonEncode(catData),
@@ -521,7 +595,7 @@ class ApiService {
   static Future<ApiResult<bool>> deleteCategory(int id) async {
     try {
       final url = await _url('/api/categories/$id/');
-      final response = await http.delete(
+      final response = await _Http.delete(
         Uri.parse(url),
         headers: await _headers(),
       );
@@ -545,7 +619,7 @@ class ApiService {
 
       final baseUrl = await _url('/api/budgets/');
       final uri = Uri.parse(baseUrl).replace(queryParameters: params);
-      final response = await http.get(uri, headers: await _headers());
+      final response = await _Http.get(uri, headers: await _headers());
 
       final data = jsonDecode(response.body);
       if (response.statusCode == 200) {
@@ -560,7 +634,7 @@ class ApiService {
   static Future<ApiResult<Map<String, dynamic>>> createBudget(Map<String, dynamic> body) async {
     try {
       final url = await _url('/api/budgets/');
-      final response = await http.post(
+      final response = await _Http.post(
         Uri.parse(url),
         headers: await _headers(),
         body: jsonEncode(body),
@@ -578,7 +652,7 @@ class ApiService {
   static Future<ApiResult<void>> deleteBudget(int id) async {
     try {
       final url = await _url('/api/budgets/$id/');
-      final response = await http.delete(Uri.parse(url), headers: await _headers());
+      final response = await _Http.delete(Uri.parse(url), headers: await _headers());
       if (response.statusCode == 200 || response.statusCode == 404) {
         return ApiResult(data: null);
       }
@@ -596,7 +670,7 @@ class ApiService {
     try {
       final y = year ?? DateTime.now().year;
       final url = await _url('/api/reports/?year=$y');
-      final response = await http.get(Uri.parse(url), headers: await _headers());
+      final response = await _Http.get(Uri.parse(url), headers: await _headers());
 
       final data = jsonDecode(response.body);
       if (response.statusCode == 200) {
@@ -613,7 +687,7 @@ class ApiService {
   static Future<ApiResult<Map<String, dynamic>>> getSavings() async {
     try {
       final url = await _url('/api/savings/');
-      final response = await http.get(
+      final response = await _Http.get(
         Uri.parse(url),
         headers: await _headers(),
       );
@@ -633,7 +707,7 @@ class ApiService {
       Map<String, dynamic> goalData) async {
     try {
       final url = await _url('/api/savings/');
-      final response = await http.post(
+      final response = await _Http.post(
         Uri.parse(url),
         headers: await _headers(),
         body: jsonEncode(goalData),
@@ -654,7 +728,7 @@ class ApiService {
       int id, Map<String, dynamic> goalData) async {
     try {
       final url = await _url('/api/savings/$id/');
-      final response = await http.put(
+      final response = await _Http.put(
         Uri.parse(url),
         headers: await _headers(),
         body: jsonEncode(goalData),
@@ -675,7 +749,7 @@ class ApiService {
     try {
       final url = await _url('/api/savings/$id/');
       final response =
-          await http.delete(Uri.parse(url), headers: await _headers());
+          await _Http.delete(Uri.parse(url), headers: await _headers());
 
       if (response.statusCode == 200) {
         return ApiResult(data: true);
@@ -691,7 +765,7 @@ class ApiService {
       int id, double amount, {String? notes}) async {
     try {
       final url = await _url('/api/savings/$id/add-money/');
-      final response = await http.post(
+      final response = await _Http.post(
         Uri.parse(url),
         headers: await _headers(),
         body: jsonEncode({
@@ -715,7 +789,7 @@ class ApiService {
   static Future<ApiResult<List<Map<String, dynamic>>>> getSplitGroups() async {
     try {
       final url = await _url('/api/split/groups/');
-      final response = await http.get(
+      final response = await _Http.get(
         Uri.parse(url),
         headers: await _headers(),
       );
@@ -737,7 +811,7 @@ class ApiService {
     try {
       final url = await _url('/api/split/groups/');
       if (localId != null) groupData['local_id'] = localId;
-      final response = await http.post(
+      final response = await _Http.post(
         Uri.parse(url),
         headers: await _headers(),
         body: jsonEncode(groupData),
@@ -758,7 +832,7 @@ class ApiService {
       int id, Map<String, dynamic> groupData) async {
     try {
       final url = await _url('/api/split/groups/$id/');
-      final response = await http.patch(
+      final response = await _Http.patch(
         Uri.parse(url),
         headers: await _headers(),
         body: jsonEncode(groupData),
@@ -778,7 +852,7 @@ class ApiService {
   static Future<ApiResult<void>> leaveSplitGroup(int id) async {
     try {
       final url = await _url('/api/split/groups/$id/leave/');
-      final response = await http.post(
+      final response = await _Http.post(
         Uri.parse(url),
         headers: await _headers(),
       );
@@ -797,7 +871,7 @@ class ApiService {
   static Future<ApiResult<void>> deleteSplitGroup(int id) async {
     try {
       final url = await _url('/api/split/groups/$id/');
-      final response = await http.delete(
+      final response = await _Http.delete(
         Uri.parse(url),
         headers: await _headers(),
       );
@@ -816,7 +890,7 @@ class ApiService {
   static Future<ApiResult<Map<String, dynamic>>> getSplitGroupDetail(int id) async {
     try {
       final url = await _url('/api/split/groups/$id/');
-      final response = await http.get(
+      final response = await _Http.get(
         Uri.parse(url),
         headers: await _headers(),
       );
@@ -837,7 +911,7 @@ class ApiService {
     try {
       final url = await _url('/api/split/groups/$groupId/expenses/');
       if (localId != null) expenseData['local_id'] = localId;
-      final response = await http.post(
+      final response = await _Http.post(
         Uri.parse(url),
         headers: await _headers(),
         body: jsonEncode(expenseData),
@@ -857,7 +931,7 @@ class ApiService {
   static Future<ApiResult<Map<String, dynamic>>> getSplitExpenseDetail(int groupId, int expenseId) async {
     try {
       final url = await _url('/api/split/groups/$groupId/expenses/$expenseId/');
-      final response = await http.get(Uri.parse(url), headers: await _headers());
+      final response = await _Http.get(Uri.parse(url), headers: await _headers());
       final data = jsonDecode(response.body);
       if (response.statusCode == 200) {
         return ApiResult(data: Map<String, dynamic>.from(data['expense']));
@@ -873,7 +947,7 @@ class ApiService {
       int groupId, int expenseId, Map<String, dynamic> expenseData) async {
     try {
       final url = await _url('/api/split/groups/$groupId/expenses/$expenseId/');
-      final response = await http.patch(
+      final response = await _Http.patch(
         Uri.parse(url),
         headers: await _headers(),
         body: jsonEncode(expenseData),
@@ -893,7 +967,7 @@ class ApiService {
   static Future<ApiResult<void>> deleteSplitExpense(int groupId, int expenseId) async {
     try {
       final url = await _url('/api/split/groups/$groupId/expenses/$expenseId/');
-      final response = await http.delete(Uri.parse(url), headers: await _headers());
+      final response = await _Http.delete(Uri.parse(url), headers: await _headers());
       if (response.statusCode == 200) {
         return ApiResult(data: null);
       }
@@ -910,7 +984,7 @@ class ApiService {
     try {
       final url = await _url('/api/split/groups/$groupId/settle/');
       if (localId != null) settleData['local_id'] = localId;
-      final response = await http.post(
+      final response = await _Http.post(
         Uri.parse(url),
         headers: await _headers(),
         body: jsonEncode(settleData),
@@ -930,7 +1004,7 @@ class ApiService {
   static Future<ApiResult<void>> removeGroupMember(int groupId, int userId) async {
     try {
       final url = await _url('/api/split/groups/$groupId/members/$userId/remove/');
-      final res = await http.post(
+      final res = await _Http.post(
         Uri.parse(url),
         headers: await _headers(),
       );
@@ -953,7 +1027,7 @@ class ApiService {
       if (identifier != null) body['identifier'] = identifier;
       if (userIds != null) body['user_ids'] = userIds;
 
-      final response = await http.post(
+      final response = await _Http.post(
         Uri.parse(url),
         headers: await _headers(),
         body: jsonEncode(body),
@@ -972,7 +1046,7 @@ class ApiService {
   static Future<ApiResult<void>> registerDeviceToken(String token) async {
     try {
       final url = await _url('/api/devices/register/');
-      final response = await http.post(
+      final response = await _Http.post(
         Uri.parse(url),
         headers: await _headers(),
         body: jsonEncode({'token': token}),
@@ -990,7 +1064,7 @@ class ApiService {
   static Future<ApiResult<List<Map<String, dynamic>>>> searchUsers(String query) async {
     try {
       final url = await _url('/api/split/users/search/?q=$query');
-      final response = await http.get(Uri.parse(url), headers: await _headers());
+      final response = await _Http.get(Uri.parse(url), headers: await _headers());
       final data = jsonDecode(response.body);
       if (response.statusCode == 200) {
         return ApiResult(data: List<Map<String, dynamic>>.from(data['users']));
@@ -1007,7 +1081,7 @@ class ApiService {
   static Future<ApiResult<Map<String, dynamic>>> getFriends() async {
     try {
       final url = await _url('/api/split/friends/');
-      final response = await http.get(Uri.parse(url), headers: await _headers());
+      final response = await _Http.get(Uri.parse(url), headers: await _headers());
       final data = jsonDecode(response.body);
       if (response.statusCode == 200) {
         return ApiResult(data: Map<String, dynamic>.from(data));
@@ -1022,7 +1096,7 @@ class ApiService {
   static Future<ApiResult<void>> inviteFriend(String email) async {
     try {
       final url = await _url('/api/split/friends/');
-      final response = await http.post(
+      final response = await _Http.post(
         Uri.parse(url),
         headers: await _headers(),
         body: jsonEncode({'email': email}),
@@ -1041,7 +1115,7 @@ class ApiService {
   static Future<ApiResult<void>> handleFriendRequest(dynamic requestId, String action) async {
     try {
       final url = await _url('/api/split/friends/action/');
-      final response = await http.post(
+      final response = await _Http.post(
         Uri.parse(url),
         headers: await _headers(),
         body: jsonEncode({'request_id': requestId, 'action': action}),
@@ -1060,7 +1134,7 @@ class ApiService {
   static Future<ApiResult<void>> removeFriend(int friendId) async {
     try {
       final url = await _url('/api/split/friends/action/');
-      final response = await http.post(
+      final response = await _Http.post(
         Uri.parse(url),
         headers: await _headers(),
         body: jsonEncode({'action': 'remove', 'friend_id': friendId}),
@@ -1079,7 +1153,7 @@ class ApiService {
   static Future<ApiResult<List<Map<String, dynamic>>>> getGroupInvitations() async {
     try {
       final url = await _url('/api/split/invitations/');
-      final response = await http.get(Uri.parse(url), headers: await _headers());
+      final response = await _Http.get(Uri.parse(url), headers: await _headers());
       final data = jsonDecode(response.body);
       if (response.statusCode == 200) {
         return ApiResult(data: List<Map<String, dynamic>>.from(data['invitations']));
@@ -1094,7 +1168,7 @@ class ApiService {
   static Future<ApiResult<void>> handleGroupInvitation(int invitationId, String action) async {
     try {
       final url = await _url('/api/split/invitations/$invitationId/action/');
-      final response = await http.post(
+      final response = await _Http.post(
         Uri.parse(url),
         headers: await _headers(),
         body: jsonEncode({'action': action}),
@@ -1113,7 +1187,7 @@ class ApiService {
   static Future<ApiResult<void>> sendSplitReminder(int groupId, Map<String, dynamic> body) async {
     try {
       final url = await _url('/api/split/groups/$groupId/remind/');
-      final response = await http.post(
+      final response = await _Http.post(
         Uri.parse(url),
         headers: await _headers(),
         body: jsonEncode(body),
@@ -1132,7 +1206,7 @@ class ApiService {
   static Future<void> logout() async {
     try {
       final url = await _url('/api/auth/logout/');
-      await http.post(
+      await _Http.post(
         Uri.parse(url),
         headers: await _headers(),
       );
@@ -1158,7 +1232,7 @@ class ApiService {
     try {
       final url = await getExportUrl(period,
           startDate: startDate, endDate: endDate);
-      final response = await http.get(
+      final response = await _Http.get(
         Uri.parse(url),
         headers: await _headers(),
       );
@@ -1175,7 +1249,7 @@ class ApiService {
   static Future<ApiResult<Map<String, dynamic>>> getSplitInvitations() async {
     try {
       final url = await _url('/api/split/invitations/');
-      final response = await http.get(Uri.parse(url), headers: await _headers());
+      final response = await _Http.get(Uri.parse(url), headers: await _headers());
       final data = jsonDecode(response.body);
       if (response.statusCode == 200) {
         return ApiResult(data: Map<String, dynamic>.from(data));
@@ -1190,7 +1264,7 @@ class ApiService {
   static Future<ApiResult<bool>> handleSplitInvitation(int invitationId, String action) async {
     try {
       final url = await _url('/api/split/invitations/$invitationId/action/');
-      final response = await http.post(
+      final response = await _Http.post(
         Uri.parse(url),
         headers: await _headers(),
         body: jsonEncode({'action': action}),
@@ -1207,7 +1281,7 @@ class ApiService {
   static Future<ApiResult<Map<String, dynamic>>> validateTokenInvite(String token) async {
     try {
       final url = await _url('/api/split/invite/$token/');
-      final response = await http.get(
+      final response = await _Http.get(
         Uri.parse(url),
         headers: await _headers(auth: false),
       );
@@ -1226,7 +1300,7 @@ class ApiService {
     try {
       final url = await _url('/api/split/invite/$token/');
       final body = refUsername != null && refUsername.isNotEmpty ? {'ref': refUsername} : {};
-      final response = await http.post(
+      final response = await _Http.post(
         Uri.parse(url),
         headers: await _headers(),
         body: jsonEncode(body),
@@ -1245,7 +1319,7 @@ class ApiService {
   static Future<ApiResult<Map<String, dynamic>>> checkAppVersion() async {
     try {
       final url = await _url('/api/version/latest/');
-      final response = await http.get(
+      final response = await _Http.get(
         Uri.parse(url),
         headers: await _headers(auth: false),
       );

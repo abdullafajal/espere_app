@@ -400,6 +400,8 @@ class QuickAddWidgetProvider : HomeWidgetProvider() {
                     })
                     put("entityId", tempId)
                     put("createdAt", dateIso)
+                    // The widget POSTs this itself; tells the app not to retry it immediately
+                    put("source", "widget")
                 }
                 queueArray.put(op)
                 flutterPrefs.edit().putString("flutter.sync_queue", queueArray.toString()).commit()
@@ -652,28 +654,76 @@ class QuickAddWidgetProvider : HomeWidgetProvider() {
         widgetData: SharedPreferences
     ) {
         val metrics = getFinancialMetrics(context)
-
         for (appWidgetId in appWidgetIds) {
-            val views = RemoteViews(context.packageName, R.layout.quick_add_widget)
-
-            // Bind 2x2 Financial Metrics
-            views.setTextViewText(R.id.widget_total_spend, metrics.totalSpend)
-            views.setTextViewText(R.id.widget_total_income, metrics.totalIncome)
-            views.setTextViewText(R.id.widget_today_spend, metrics.todaySpend)
-            views.setTextViewText(R.id.widget_avg_daily, metrics.avgDaily)
-
-            // Tint logo icon to exact Add Expense button background color
-            val primaryColor = ContextCompat.getColor(context, R.color.quick_widget_primary)
-            views.setInt(R.id.widget_app_logo, "setColorFilter", primaryColor)
-
-            // 1. Main Action: Tap card or plus to open all-in-one Quick Add Popup
-            val openDialogPendingIntent = createOpenDialogPendingIntent(context, 0.0, 1001)
-            views.setOnClickPendingIntent(R.id.widget_root, openDialogPendingIntent)
-            views.setOnClickPendingIntent(R.id.btn_open_quick_add, openDialogPendingIntent)
-            views.setOnClickPendingIntent(R.id.widget_btn_plus, openDialogPendingIntent)
-
-            appWidgetManager.updateAppWidget(appWidgetId, views)
+            renderWidget(context, appWidgetManager, appWidgetId, metrics)
         }
+    }
+
+    // Re-render with the best-fitting layout whenever the user resizes the widget.
+    override fun onAppWidgetOptionsChanged(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        newOptions: android.os.Bundle
+    ) {
+        super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
+        renderWidget(context, appWidgetManager, appWidgetId, getFinancialMetrics(context))
+    }
+
+    private enum class WidgetSize { STRIP, SMALL, MEDIUM, LARGE }
+
+    private fun resolveSize(options: android.os.Bundle?): WidgetSize {
+        // Worst-case (guaranteed) size in dp for the current orientation.
+        val w = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0) ?: 0
+        val h = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0) ?: 0
+        if (w == 0 || h == 0) return WidgetSize.MEDIUM
+        return when {
+            h < 100 -> WidgetSize.STRIP
+            w < 200 -> WidgetSize.SMALL
+            h >= 230 -> WidgetSize.LARGE
+            else -> WidgetSize.MEDIUM
+        }
+    }
+
+    private fun renderWidget(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        metrics: FinancialMetrics
+    ) {
+        val size = resolveSize(appWidgetManager.getAppWidgetOptions(appWidgetId))
+        val layout = when (size) {
+            WidgetSize.STRIP -> R.layout.quick_add_widget_strip
+            WidgetSize.SMALL -> R.layout.quick_add_widget_small
+            WidgetSize.MEDIUM -> R.layout.quick_add_widget
+            WidgetSize.LARGE -> R.layout.quick_add_widget_large
+        }
+        val views = RemoteViews(context.packageName, layout)
+
+        // Metrics present in each layout
+        views.setTextViewText(R.id.widget_today_spend, metrics.todaySpend)
+        when (size) {
+            WidgetSize.STRIP -> Unit
+            WidgetSize.SMALL ->
+                views.setTextViewText(R.id.widget_total_spend, "This month  " + metrics.totalSpend)
+            else -> {
+                views.setTextViewText(R.id.widget_total_spend, metrics.totalSpend)
+                views.setTextViewText(R.id.widget_total_income, metrics.totalIncome)
+                views.setTextViewText(R.id.widget_avg_daily, metrics.avgDaily)
+            }
+        }
+
+        // Tint logo with accent color
+        val primaryColor = ContextCompat.getColor(context, R.color.quick_widget_primary)
+        views.setInt(R.id.widget_app_logo, "setColorFilter", primaryColor)
+
+        // Same flow as before: any tap opens the Quick Add popup
+        val openDialogPendingIntent = createOpenDialogPendingIntent(context, 0.0, 1001)
+        views.setOnClickPendingIntent(R.id.widget_root, openDialogPendingIntent)
+        views.setOnClickPendingIntent(R.id.btn_open_quick_add, openDialogPendingIntent)
+        views.setOnClickPendingIntent(R.id.widget_btn_plus, openDialogPendingIntent)
+
+        appWidgetManager.updateAppWidget(appWidgetId, views)
     }
 
     private fun createOpenDialogPendingIntent(context: Context, prefillAmount: Double, requestCode: Int): PendingIntent {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 
 class EspereBackButton extends StatelessWidget {
@@ -10,6 +11,7 @@ class EspereBackButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
+        HapticFeedback.mediumImpact();
         if (onPressed != null) {
           onPressed!();
         } else if (Navigator.canPop(context)) {

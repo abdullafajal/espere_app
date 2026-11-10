@@ -17,10 +17,28 @@ class SyncService {
   static Stream<void> get onSyncComplete => _syncController.stream;
 
   /// Process all pending operations and then pull fresh data
-  static Future<void> syncAll() async {
-    if (!ConnectivityService.isOnline) return;
-    await processSyncQueue();
-    await pullData();
+  static Future<void>? _syncRun;
+  static bool _syncAgain = false;
+
+  static Future<void> syncAll() {
+    // Never run two syncs at once (reconnect + resume + pull-to-refresh can
+    // all fire together) - that would POST the same queued item twice.
+    if (_syncRun != null) {
+      _syncAgain = true;
+      return _syncRun!;
+    }
+    final run = _runSync().whenComplete(() => _syncRun = null);
+    _syncRun = run;
+    return run;
+  }
+
+  static Future<void> _runSync() async {
+    do {
+      _syncAgain = false;
+      if (!ConnectivityService.isOnline) return;
+      await processSyncQueue();
+      await pullData();
+    } while (_syncAgain);
   }
 
   /// Pull all necessary offline data from APIs and update cache
@@ -49,6 +67,7 @@ class SyncService {
   }
 
   static Future<void> _pullProfile() async {
+    if (await hasPending('profile')) return;
     final res = await ApiService.getProfile();
     if (res.isSuccess && res.data != null) {
       await CacheService.cacheUser(res.data!.toJson());
@@ -56,6 +75,9 @@ class SyncService {
   }
 
   static Future<void> _pullDashboard() async {
+    // Totals depend on transactions; keep the local (optimistic) numbers
+    // until every queued change reached the server.
+    if (await hasPending('transaction')) return;
     final res = await ApiService.getDashboard();
     if (res.isSuccess && res.data != null) {
       final d = res.data!;
@@ -70,6 +92,7 @@ class SyncService {
   }
 
   static Future<void> _pullCategories() async {
+    if (await hasPending('category')) return;
     final res = await ApiService.getCategories();
     if (res.isSuccess && res.data != null) {
       final cats = List<CategoryModel>.from(res.data!['categories'] ?? []);
@@ -86,6 +109,7 @@ class SyncService {
   }
 
   static Future<void> _pullTransactions() async {
+    if (await hasPending('transaction')) return;
     final res = await ApiService.getTransactions(showAll: true);
     if (res.isSuccess && res.data != null) {
       final txnsJson = (res.data!['transactions'] as List).map((t) => (t as TransactionModel).toJson()).toList();
@@ -103,6 +127,7 @@ class SyncService {
   }
 
   static Future<void> _pullBudgets() async {
+    if (await hasPending('budget')) return;
     final res = await ApiService.getBudgets();
     if (res.isSuccess && res.data != null) {
       await CacheService.cacheBudgets(res.data!);
@@ -110,6 +135,7 @@ class SyncService {
   }
 
   static Future<void> _pullSavings() async {
+    if (await hasPending('saving')) return;
     final res = await ApiService.getSavings();
     if (res.isSuccess && res.data != null) {
       await CacheService.cacheSavings(res.data!);
@@ -117,6 +143,7 @@ class SyncService {
   }
 
   static Future<void> _pullReports() async {
+    if (await hasPending('transaction')) return;
     final res = await ApiService.getReports();
     if (res.isSuccess && res.data != null) {
       await CacheService.cacheReports(res.data!);
@@ -125,16 +152,61 @@ class SyncService {
 
   /// Process all pending operations in the sync queue.
   /// Called when device comes back online.
-  static Future<void> processSyncQueue() async {
-    if (!ConnectivityService.isOnline) return;
+  static bool _processing = false;
 
-    final queue = List<Map<String, dynamic>>.from(await CacheService.getSyncQueue());
-    if (queue.isEmpty) return;
+  /// Temp (offline-created) ids are millisecond timestamps; real server ids are small.
+  static bool _isTempId(int? id) => id != null && id >= 100000000000;
+
+  /// Operations created by the Android home-screen widget are POSTed by the
+  /// widget itself right away. Give it a moment before the app retries them.
+  static const _widgetGrace = Duration(seconds: 90);
+  static const _maxAttempts = 8;
+
+  static Future<void> processSyncQueue() async {
+    if (!ConnectivityService.isOnline || _processing) return;
+    _processing = true;
+    try {
+      await _processSyncQueue();
+    } finally {
+      _processing = false;
+    }
+  }
+
+  static Future<void> _processSyncQueue() async {
+    var queue = List<Map<String, dynamic>>.from(await CacheService.getSyncQueue());
+
+    // Groups are live-only. Anything queued for them by older versions is
+    // set aside (kept, not deleted) instead of being replayed late - members
+    // would otherwise get stale notifications.
+    final legacy = queue.where((o) => (o['entity'] as String?)?.startsWith('split_') ?? false).toList();
+    if (legacy.isNotEmpty) {
+      for (final o in legacy) {
+        await CacheService.addToFailedItems(o, 'Groups are live-only');
+        await CacheService.removeFromSyncQueue(o['id'] as String);
+      }
+      queue = queue.where((o) => !legacy.contains(o)).toList();
+      debugPrint('[SyncService] Set aside ${legacy.length} legacy split operations.');
+    }
+    if (queue.isEmpty) {
+      _retryStep = 0;
+      return;
+    }
 
     debugPrint('[SyncService] Processing ${queue.length} queued operations...');
 
+    var needsRetry = false;
+
     for (int i = 0; i < queue.length; i++) {
       final op = queue[i];
+
+      if (op['source'] == 'widget') {
+        final created = DateTime.tryParse(op['createdAt']?.toString() ?? '');
+        if (created != null && DateTime.now().toUtc().difference(created.toUtc()) < _widgetGrace) {
+          needsRetry = true;
+          continue; // widget's own background sync may still be running
+        }
+      }
+
       try {
         final action = op['action'] as String;
         final entity = op['entity'] as String;
@@ -145,6 +217,7 @@ class SyncService {
         bool success = false;
         dynamic resultData;
 
+        final probed = await ApiService.probed<void>(() async {
         switch (entity) {
           case 'transaction':
             final res = await _syncTransaction(action, data, entityId);
@@ -171,21 +244,37 @@ class SyncService {
             success = res.isSuccess;
             resultData = res.data;
             break;
-          case 'split_group':
-            final res = await ApiService.createSplitGroup(data!, localId: opId);
+          case 'profile':
+            final res = await ApiService.updateProfile(data ?? {});
             success = res.isSuccess;
             resultData = res.data;
             break;
-          case 'split_expense':
-            final res = await ApiService.addSplitExpense(entityId!, data!, localId: opId);
-            success = res.isSuccess;
-            resultData = res.data;
-            break;
-          case 'split_settle':
-            final res = await ApiService.settleDebt(entityId!, data!, localId: opId);
-            success = res.isSuccess;
-            resultData = res.data;
-            break;
+        }
+        });
+        final probe = probed.probe;
+
+        // Deleting something that is already gone on the server is a success.
+        if (!success && action == 'delete' && probe.status == 404) {
+          success = true;
+          resultData = null;
+        }
+
+        if (!success && probe.permanent) {
+          // Server rejected it for good: keep the data aside, never delete it,
+          // and don't block everything queued behind it.
+          await CacheService.addToFailedItems(op, 'Rejected by server (HTTP ${probe.status})');
+          await CacheService.removeFromSyncQueue(opId);
+          debugPrint('[SyncService] Set aside rejected $action $entity (HTTP ${probe.status})');
+          continue;
+        }
+
+        if (!success && (probe.networkError || probe.status != null)) {
+          // Slow / unreachable network or temporary server trouble. Keep
+          // everything, keep the order (later ops may depend on this one) and
+          // try again shortly.
+          needsRetry = true;
+          debugPrint('[SyncService] Network not ready, will retry (${probe.status ?? "no response"})');
+          break;
         }
 
         if (success) {
@@ -308,14 +397,46 @@ class SyncService {
           }
         } else {
           debugPrint('[SyncService] ✗ Failed: $action $entity ${entityId ?? ""}');
+          await _markFailed(op);
         }
       } catch (e) {
         debugPrint('[SyncService] Error processing op: $e');
+        await _markFailed(op);
       }
     }
-    // We don't notify here anymore if we are using syncAll() which will notify after pullData.
-    // But in case processSyncQueue is called alone, we still might want to notify.
-    // _syncController.add(null);
+    if (needsRetry) {
+      _scheduleRetry();
+    } else {
+      _retryStep = 0;
+      _retryTimer?.cancel();
+      _retryTimer = null;
+    }
+  }
+
+  // ─── Retry with backoff (slow / flaky connections) ───────────────────
+
+  static Timer? _retryTimer;
+  static int _retryStep = 0;
+
+  /// Try again after 10s, 20s, 40s ... up to 5 minutes. Nothing is dropped
+  /// meanwhile; the queue simply waits for a usable connection.
+  static void _scheduleRetry() {
+    if (_retryTimer?.isActive ?? false) return;
+    final secs = (10 * (1 << (_retryStep > 5 ? 5 : _retryStep))).clamp(10, 300);
+    _retryStep++;
+    _retryTimer = Timer(Duration(seconds: secs), () {
+      _retryTimer = null;
+      syncAll();
+    });
+  }
+
+  /// True while any queued (not yet synced) operation exists for [entity].
+  /// Server data must not overwrite local data while this is true.
+  static Future<bool> hasPending(String entity) async {
+    final q = await CacheService.getSyncQueue();
+    return q.any((o) =>
+        o['entity'] == entity ||
+        (entity == 'saving' && o['entity'] == 'saving_add_money'));
   }
 
   /// Replace temporary category IDs with real IDs in the sync queue.
@@ -478,23 +599,78 @@ class SyncService {
     );
   }
 
+  /// Count a failed attempt for an operation that failed for an unexpected
+  /// (non-network) reason. After several attempts it is set aside in the
+  /// failed-items store - kept, never deleted - so it can't block forever.
+  static Future<void> _markFailed(Map<String, dynamic> op) async {
+    if (!ConnectivityService.isOnline) return; // network drop, not a bad request
+    try {
+      final queue = await CacheService.getSyncQueue();
+      final i = queue.indexWhere((o) => o['id'] == op['id']);
+      if (i < 0) return;
+      final attempts = ((queue[i]['attempts'] as int?) ?? 0) + 1;
+      if (attempts >= _maxAttempts) {
+        final removed = queue.removeAt(i);
+        await CacheService.addToFailedItems(removed, 'Failed $attempts times');
+        debugPrint('[SyncService] Set aside ${op['action']} ${op['entity']} after $attempts attempts');
+      } else {
+        queue[i]['attempts'] = attempts;
+      }
+      await CacheService.saveSyncQueue(queue);
+    } catch (_) {}
+  }
+
   /// Queue a pending operation for later sync.
+  ///
+  /// Offline-created items (temp ids) that are edited or deleted before they
+  /// ever reached the server are merged / cancelled locally instead of being
+  /// sent as an update/delete for an id the server has never seen.
   static Future<void> queueOperation({
     required String action,
     required String entity,
     Map<String, dynamic>? data,
     int? entityId,
   }) async {
+    if (_isTempId(entityId) && !_processing && (action == 'delete' || action == 'update')) {
+      final queue = await CacheService.getSyncQueue();
+      final createIdx = queue.indexWhere((o) =>
+          o['entity'] == entity && o['action'] == 'create' && o['entityId']?.toString() == entityId.toString());
+      if (createIdx >= 0) {
+        if (action == 'delete') {
+          queue.removeWhere((o) =>
+              o['entityId']?.toString() == entityId.toString() &&
+              (o['entity'] == entity || (entity == 'saving' && o['entity'] == 'saving_add_money')));
+          await CacheService.saveSyncQueue(queue);
+          debugPrint('[SyncService] Cancelled offline-created $entity $entityId (deleted before sync)');
+          return;
+        }
+        if (data != null) {
+          final createData = Map<String, dynamic>.from((queue[createIdx]['data'] as Map?) ?? {});
+          createData.addAll(data);
+          queue[createIdx]['data'] = createData;
+          await CacheService.saveSyncQueue(queue);
+          debugPrint('[SyncService] Merged update into queued create of $entity $entityId');
+          return;
+        }
+      }
+    }
+
     final op = {
       'id': DateTime.now().microsecondsSinceEpoch.toString(),
       'action': action,
       'entity': entity,
       'data': data,
       'entityId': entityId,
-      'createdAt': DateTime.now().toIso8601String(),
+      'createdAt': DateTime.now().toUtc().toIso8601String(),
     };
     await CacheService.addToSyncQueue(op);
     debugPrint('[SyncService] Queued: $action $entity ${entityId ?? "new"}');
+
+    // Sync quietly in the background; if the connection is offline or slow the
+    // operation just stays queued and is retried automatically.
+    if (ConnectivityService.isOnline) {
+      Future.delayed(const Duration(seconds: 1), syncAll);
+    }
   }
 
   /// Get the count of pending operations.

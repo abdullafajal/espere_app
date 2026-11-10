@@ -90,6 +90,7 @@ class QuickAmountDialogActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialog_quick_amount)
+        applyWindowStyle()
 
         bindViews()
         setupStep1Amount()
@@ -106,6 +107,26 @@ class QuickAmountDialogActivity : Activity() {
             val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
             imm?.showSoftInput(step1AmountInput, InputMethodManager.SHOW_IMPLICIT)
         }
+    }
+
+    // Fit any screen: 16dp side margins, capped at 380dp; soft blur behind on Android 12+.
+    private fun applyWindowStyle() {
+        val dm = resources.displayMetrics
+        val maxW = (380 * dm.density).toInt()
+        val avail = dm.widthPixels - (32 * dm.density).toInt()
+        window.setLayout(minOf(maxW, avail), ViewGroup.LayoutParams.WRAP_CONTENT)
+        window.setGravity(android.view.Gravity.CENTER)
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+        window.setDimAmount(0.35f)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+            window.attributes = window.attributes.also { it.blurBehindRadius = 24 }
+        }
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        applyWindowStyle()
     }
 
     private fun bindViews() {
@@ -286,19 +307,11 @@ class QuickAmountDialogActivity : Activity() {
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
 
-        // Quick Top Category Pick Chips (1-tap selection)
-        findViewById<TextView>(R.id.step2_chip_food).setOnClickListener {
-            selectQuickCategory("Food", "restaurant", "#FF9800")
-        }
-        findViewById<TextView>(R.id.step2_chip_grocery).setOnClickListener {
-            selectQuickCategory("Grocery", "shopping_bag", "#4CAF50")
-        }
-        findViewById<TextView>(R.id.step2_chip_transport).setOnClickListener {
-            selectQuickCategory("Transport", "directions_car", "#2196F3")
-        }
-        findViewById<TextView>(R.id.step2_chip_bills).setOnClickListener {
-            selectQuickCategory("Bills", "payments", "#FF5722")
-        }
+        // Quick Top Category Pick Chips (1-tap selection) - shown only if the category exists
+        bindQuickChip(R.id.step2_chip_food, "Food")
+        bindQuickChip(R.id.step2_chip_grocery, "Grocery")
+        bindQuickChip(R.id.step2_chip_transport, "Transport")
+        bindQuickChip(R.id.step2_chip_bills, "Bills")
 
         step2BtnBack.setOnClickListener {
             goToStep(STEP_AMOUNT, isForward = false)
@@ -310,18 +323,23 @@ class QuickAmountDialogActivity : Activity() {
         }
     }
 
-    private fun selectQuickCategory(name: String, icon: String, color: String) {
-        val found = categories.find { it.name.equals(name, ignoreCase = true) }
-        selectedCategory = found ?: CategoryItem(1, name, icon, color)
+    private fun bindQuickChip(chipId: Int, name: String) {
+        val chip = findViewById<TextView>(chipId)
         val idx = categories.indexOfFirst { it.name.equals(name, ignoreCase = true) }
-        if (idx >= 0) {
+        if (idx < 0) {
+            chip.alpha = 0.35f
+            chip.isEnabled = false
+            return
+        }
+        chip.setOnClickListener {
+            selectedCategory = categories[idx]
             isCategorySpinnerInitialized = false
             step2CategorySpinner.setSelection(idx)
             isCategorySpinnerInitialized = true
+            categoryAdapter?.notifyDataSetChanged()
+            QuickAddWidgetProvider.triggerHaptic(this)
+            goToStep(STEP_PAYMENT, isForward = true)
         }
-        categoryAdapter?.notifyDataSetChanged()
-        QuickAddWidgetProvider.triggerHaptic(this)
-        goToStep(STEP_PAYMENT, isForward = true)
     }
 
     private fun setupStep3Payment() {

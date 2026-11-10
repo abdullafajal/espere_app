@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="340dp"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:fillViewport="false"
+    android:overScrollMode="never"
+    android:scrollbars="none">
+
+<LinearLayout
+    android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:padding="18dp"
@@ -15,11 +22,11 @@
 
         <ImageView
             android:id="@+id/btn_header_back"
-            android:layout_width="26dp"
-            android:layout_height="26dp"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
             android:src="@drawable/ic_arrow_back"
             android:tint="@color/quick_widget_text_secondary"
-            android:padding="3dp"
+            android:padding="8dp"
             android:visibility="gone"
             android:layout_marginEnd="6dp" />
 
@@ -50,11 +57,11 @@
 
         <ImageView
             android:id="@+id/btn_dialog_close"
-            android:layout_width="26dp"
-            android:layout_height="26dp"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
             android:src="@drawable/ic_close"
             android:tint="@color/quick_widget_text_secondary"
-            android:padding="4dp" />
+            android:padding="9dp" />
     </LinearLayout>
 
     <!-- ─── 4-SEGMENT PROGRESS BAR ────────────────────────────────────── -->
@@ -157,7 +164,7 @@
             <!-- Quick Preset Chips -->
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="30dp"
+                android:layout_height="34dp"
                 android:orientation="horizontal"
                 android:layout_marginTop="8dp">
 
@@ -294,7 +301,7 @@
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="28dp"
+                android:layout_height="34dp"
                 android:orientation="horizontal"
                 android:layout_marginTop="4dp">
 
@@ -777,7 +784,7 @@
             <!-- Quick Note Chips -->
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="26dp"
+                android:layout_height="34dp"
                 android:orientation="horizontal"
                 android:layout_marginTop="6dp">
 
@@ -899,3 +906,5 @@
     </ViewFlipper>
 
 </LinearLayout>
+
+</ScrollView>

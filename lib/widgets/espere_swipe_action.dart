@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
@@ -44,12 +45,49 @@ class EspereSwipeAction extends StatefulWidget {
 
 class _EspereSwipeActionState extends State<EspereSwipeAction> {
   double _swipeProgress = 0.0;
-  DateTime? _lastVibration;
+  bool _reached = false;
+  Timer? _zigzag;
+  int _zigTick = 0;
+
+  /// Zig-zag haptics while the action is armed: strong / light / strong ...
+  void _startZigzag() {
+    _zigzag?.cancel();
+    _zigTick = 0;
+    _zigzag = Timer.periodic(const Duration(milliseconds: 70), (_) {
+      _zigTick++;
+      _zigTick.isEven
+          ? HapticFeedback.heavyImpact()
+          : HapticFeedback.selectionClick();
+      if (_zigTick > 40) _stopZigzag(); // safety stop
+    });
+  }
+
+  void _stopZigzag() {
+    _zigzag?.cancel();
+    _zigzag = null;
+  }
+
+  @override
+  void dispose() {
+    _stopZigzag();
+    super.dispose();
+  }
+
+  /// Icon fades in while dragging and "pops" once the action is armed.
+  Widget _icon(IconData icon, Color? color) {
+    return AnimatedScale(
+      scale: _reached ? 1.4 : 1.0,
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutBack,
+      child: Opacity(
+        opacity: (0.35 + _swipeProgress * 3.0).clamp(0.35, 1.0),
+        child: Icon(icon, color: color),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final double iconScale = (_swipeProgress * 4.0).clamp(0.8, 1.8);
-
     Widget? bg;
     if (widget.bgIcon != null) {
       bg = Container(
@@ -58,10 +96,7 @@ class _EspereSwipeActionState extends State<EspereSwipeAction> {
         ),
         alignment: widget.bgAlignment ?? Alignment.centerLeft,
         padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Transform.scale(
-          scale: iconScale,
-          child: Icon(widget.bgIcon, color: widget.bgIconColor),
-        ),
+        child: _icon(widget.bgIcon!, widget.bgIconColor),
       );
     }
 
@@ -73,34 +108,43 @@ class _EspereSwipeActionState extends State<EspereSwipeAction> {
         ),
         alignment: widget.secBgAlignment ?? Alignment.centerRight,
         padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Transform.scale(
-          scale: iconScale,
-          child: Icon(widget.secBgIcon, color: widget.secBgIconColor),
-        ),
+        child: _icon(widget.secBgIcon!, widget.secBgIconColor),
       );
     }
 
-    return Dismissible(
+    final dismissible = Dismissible(
       key: widget.dismissKey,
       direction: widget.direction,
       onUpdate: (details) {
-        if (details.reached) {
-          final now = DateTime.now();
-          // Vibrate continuously every 50 milliseconds while held past threshold
-          if (_lastVibration == null || now.difference(_lastVibration!).inMilliseconds > 50) {
+        // One firm tick the moment the action is armed (and a light one when
+        // the user pulls back), instead of buzzing continuously.
+        if (details.reached != _reached) {
+          if (details.reached) {
+            HapticFeedback.mediumImpact();
+            _startZigzag();
+          } else {
+            _stopZigzag();
             HapticFeedback.selectionClick();
-            _lastVibration = now;
           }
-        } else {
-          _lastVibration = null; // Reset when pulled back
         }
-        setState(() => _swipeProgress = details.progress);
+        setState(() {
+          _reached = details.reached;
+          _swipeProgress = details.progress;
+        });
       },
-      confirmDismiss: widget.confirmDismiss,
+      confirmDismiss: (direction) {
+        _stopZigzag(); // finger released
+        return widget.confirmDismiss(direction);
+      },
       background: bg,
       secondaryBackground: secBg,
       child: widget.child,
     );
+
+    // Clip the action backgrounds with the card's own radius so their corners
+    // always match the card, whatever the parent does.
+    if (widget.borderRadius == null) return dismissible;
+    return ClipRRect(borderRadius: widget.borderRadius!, child: dismissible);
   }
 }
 

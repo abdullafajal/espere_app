@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
+import '../widgets/espere_action_button.dart';
+import '../widgets/espere_header.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
 import '../services/api_service.dart';
@@ -15,6 +17,7 @@ import '../services/connectivity_service.dart';
 import '../services/sync_service.dart';
 import '../services/widget_service.dart';
 import '../widgets/transaction_tile.dart';
+import '../widgets/espere_filter_chip.dart';
 import '../widgets/thanos_snap_widget.dart';
 import 'transaction_form_screen.dart';
 import '../utils/icon_mapper.dart';
@@ -302,67 +305,31 @@ class TransactionListScreenState extends State<TransactionListScreen> {
     return Column(
       children: [
         // ─── Top Bar ───────────────────────────────────────────
+        // Header: Back + Title + Add button
+        EspereHeader(
+          title: 'Transactions',
+          onBack: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              widget.onBack?.call();
+            }
+          },
+          trailing: EspereActionButton(
+            icon: Icons.add,
+            primary: true,
+            onPressed: () {
+              TransactionFormScreen.show(
+                context,
+                onSaved: _loadTransactions,
+              );
+            },
+          ),
+        ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
           child: Column(
             children: [
-              // Header: Title + Add button
-              Row(
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      if (Navigator.canPop(context)) {
-                        Navigator.pop(context);
-                      } else {
-                        widget.onBack?.call();
-                      }
-                    },
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: AppColors.card,
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                        boxShadow: AppShadows.soft,
-                      ),
-                      child: const Icon(
-                        Icons.arrow_back,
-                        color: AppColors.text,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  const Text(
-                    'Transactions',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.text,
-                    ),
-                  ),
-                  const Spacer(),
-                  GestureDetector(
-                    onTap: () {
-                      TransactionFormScreen.show(
-                        context,
-                        onSaved: _loadTransactions,
-                      );
-                    },
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: AppColors.accent,
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                        boxShadow: AppShadows.soft,
-                      ),
-                      child: const Icon(Icons.add, color: AppColors.dark),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
               // Search bar — matches the search input from transaction_list.html
               Container(
                 decoration: BoxDecoration(
@@ -402,7 +369,8 @@ class TransactionListScreenState extends State<TransactionListScreen> {
                 child: Row(
                   children: [
                     // Type filter
-                    _FilterChip(
+                    EspereFilterChip(
+                      active: _typeFilter.isNotEmpty,
                       label:
                           _typeFilter.isEmpty
                               ? 'All Types'
@@ -425,7 +393,8 @@ class TransactionListScreenState extends State<TransactionListScreen> {
                     const SizedBox(width: 8),
 
                     // Category filter
-                    _FilterChip(
+                    EspereFilterChip(
+                      active: _categoryFilter != null,
                       label:
                           _categoryFilter == null
                               ? 'All Categories'
@@ -440,10 +409,8 @@ class TransactionListScreenState extends State<TransactionListScreen> {
 
                     // Month navigator
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 6,
-                      ),
+                      height: EspereFilterChip.height,
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
                       decoration: BoxDecoration(
                         color: AppColors.card,
                         borderRadius: BorderRadius.circular(AppRadius.md),
@@ -476,7 +443,7 @@ class TransactionListScreenState extends State<TransactionListScreen> {
                                     'MMMM yyyy',
                                   ).format(_currentMonth),
                               style: const TextStyle(
-                                fontSize: 12,
+                                fontSize: 13,
                                 fontWeight: FontWeight.bold,
                                 color: AppColors.text,
                               ),
@@ -1041,44 +1008,6 @@ class TransactionListScreenState extends State<TransactionListScreen> {
                 ),
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _FilterChip extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
-
-  const _FilterChip({required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: AppColors.card,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(color: AppColors.border),
-          boxShadow: AppShadows.soft,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: AppColors.text,
-              ),
-            ),
-            const SizedBox(width: 4),
-            const Icon(Icons.arrow_drop_down, size: 16, color: AppColors.muted),
           ],
         ),
       ),

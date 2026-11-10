@@ -15,6 +15,7 @@ class CacheService {
   static const _reportsKey = 'cache_reports';
   static const _friendsKey = 'cache_friends';
   static const _syncQueueKey = 'sync_queue';
+  static const _deadLetterKey = 'sync_failed_items';
   static const _pendingFriendInviteKey = 'cache_pending_friend_invite';
   static const _pendingGroupInviteKey = 'cache_pending_group_invite';
   static const _pendingGroupInviteRefKey = 'cache_pending_group_invite_ref';
@@ -878,6 +879,27 @@ class CacheService {
     final queue = await getSyncQueue();
     queue.removeWhere((op) => op['id'] == operationId);
     await saveSyncQueue(queue);
+  }
+
+  /// Operations the server definitively rejected. They are never deleted
+  /// automatically, so no user data is ever silently lost.
+  static Future<List<Map<String, dynamic>>> getFailedItems() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_deadLetterKey);
+    if (raw == null) return [];
+    try {
+      return List<Map<String, dynamic>>.from(jsonDecode(raw));
+    } catch (_) {
+      return [];
+    }
+  }
+
+  static Future<void> addToFailedItems(Map<String, dynamic> op, String reason) async {
+    final list = await getFailedItems();
+    list.add({...op, 'failedAt': DateTime.now().toUtc().toIso8601String(), 'reason': reason});
+    if (list.length > 500) list.removeRange(0, list.length - 500);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_deadLetterKey, jsonEncode(list));
   }
 
   // ─── Split Optimistic Updates ────────────────────────────────────────
