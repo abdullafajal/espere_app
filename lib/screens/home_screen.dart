@@ -14,6 +14,7 @@ import '../services/api_service.dart';
 import '../services/notification_service.dart';
 import '../services/cache_service.dart';
 import '../services/sync_service.dart';
+import '../services/app_navigation.dart';
 import '../utils/update_checker.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -41,9 +42,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _registerDeviceToken();
+    AppNavigation.requestedTab.addListener(_onTabRequested);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       UpdateChecker.check(context);
       _processPendingInvites();
+      _onTabRequested(); // a tab may have been requested before this screen existed (cold start)
     });
     _screens = [
       DashboardScreen(
@@ -73,6 +76,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         onBack: () => setState(() => _currentIndex = 0),
       ),
     ];
+  }
+
+  /// Switch tab when something outside asks for it (e.g. the widget's list button).
+  void _onTabRequested() {
+    final index = AppNavigation.requestedTab.value;
+    if (index == null || !mounted) return;
+    AppNavigation.requestedTab.value = null;
+    setState(() {
+      _currentIndex = index;
+      _isBottomNavVisible = true;
+    });
+    _refreshTab(index);
   }
 
   Future<void> _registerDeviceToken() async {
@@ -140,6 +155,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    AppNavigation.requestedTab.removeListener(_onTabRequested);
     super.dispose();
   }
 

@@ -1,12 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Translucent "glass" tokens for the Quick Add home-screen widget (dark) -->
-    <color name="widget_glass_bg">#D9211C1A</color>
-    <color name="widget_glass_stroke">#24FFFFFF</color>
-    <color name="widget_glass_card">#1FFFFFFF</color>
-    <color name="widget_glass_card_stroke">#14FFFFFF</color>
-    <color name="widget_glass_chip">#33FFFFFF</color>
-    <color name="dialog_glass_bg">#F5211C1A</color>
-    <color name="dialog_field_bg">#14FFFFFF</color>
-    <color name="dialog_field_stroke">#1FFFFFFF</color>
+    <!-- Espere "Lime on Smoke" tokens (dark): smoked glass, light text, lime action -->
+
+    <color name="widget_text_1">#D6DEFF</color>
+    <color name="widget_text_2">#A5B1E6</color>
+
+    <color name="widget_hero_bg">#A9C7FF</color>
+    <color name="widget_on_hero">#0C2A5A</color>
+    <color name="widget_accent_ink">#A9C7FF</color>
 </resources>

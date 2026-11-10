@@ -1,910 +1,905 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/sheet_scroll"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:fillViewport="false"
     android:overScrollMode="never"
     android:scrollbars="none">
 
-<LinearLayout
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:padding="18dp"
-    android:background="@drawable/dialog_rounded_bg">
-
-    <!-- ─── HEADER ────────────────────────────────────────────────────────── -->
+    <!-- Floating bottom sheet -->
     <LinearLayout
+        android:tag="panel"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
+        android:layout_margin="10dp"
+        android:background="@drawable/dialog_rounded_bg"
+        android:orientation="vertical"
+        android:paddingStart="20dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="20dp">
 
-        <ImageView
-            android:id="@+id/btn_header_back"
+        <!-- Grab handle -->
+        <View
             android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:src="@drawable/ic_arrow_back"
-            android:tint="@color/quick_widget_text_secondary"
-            android:padding="8dp"
-            android:visibility="gone"
-            android:layout_marginEnd="6dp" />
+            android:layout_height="4dp"
+            android:layout_gravity="center_horizontal"
+            android:background="@drawable/widget_handle" />
 
-        <TextView
-            android:id="@+id/dialog_title"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Quick Add"
-            android:textColor="@color/quick_widget_text_primary"
-            android:textSize="16sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/dialog_step_badge"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="1 of 4"
-            android:textColor="@color/quick_widget_primary"
-            android:textSize="11sp"
-            android:textStyle="bold"
-            android:background="@drawable/quick_widget_chip"
-            android:paddingStart="10dp"
-            android:paddingEnd="10dp"
-            android:paddingTop="3dp"
-            android:paddingBottom="3dp"
-            android:layout_marginEnd="8dp" />
-
-        <ImageView
-            android:id="@+id/btn_dialog_close"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:src="@drawable/ic_close"
-            android:tint="@color/quick_widget_text_secondary"
-            android:padding="9dp" />
-    </LinearLayout>
-
-    <!-- ─── 4-SEGMENT PROGRESS BAR ────────────────────────────────────── -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="4dp"
-        android:orientation="horizontal"
-        android:layout_marginTop="12dp"
-        android:layout_marginBottom="14dp">
-
-        <FrameLayout
-            android:id="@+id/dot_step_1"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:layout_marginEnd="3dp"
-            android:background="@drawable/quick_widget_progress_active" />
-
-        <FrameLayout
-            android:id="@+id/dot_step_2"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:layout_marginEnd="3dp"
-            android:background="@drawable/quick_widget_progress_inactive" />
-
-        <FrameLayout
-            android:id="@+id/dot_step_3"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:layout_marginEnd="3dp"
-            android:background="@drawable/quick_widget_progress_inactive" />
-
-        <FrameLayout
-            android:id="@+id/dot_step_4"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:background="@drawable/quick_widget_progress_inactive" />
-    </LinearLayout>
-
-    <!-- ─── ANIMATED VIEW FLIPPER ────────────────────────────────────────── -->
-    <ViewFlipper
-        android:id="@+id/view_flipper"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content">
-
-        <!-- ═════════ STEP 1: AMOUNT ═════════ -->
+        <!-- Header -->
         <LinearLayout
-            android:id="@+id/page_step_amount"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:layout_marginTop="14dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Enter Amount"
-                android:textColor="@color/quick_widget_text_secondary"
-                android:textSize="12sp"
-                android:textStyle="bold" />
-
-            <!-- Amount Card -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="58dp"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:background="@drawable/quick_widget_card"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp"
-                android:layout_marginTop="6dp">
-
-                <TextView
-                    android:id="@+id/step1_currency_symbol"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="₹"
-                    android:textColor="@color/quick_widget_primary"
-                    android:textSize="28sp"
-                    android:textStyle="bold" />
-
-                <EditText
-                    android:id="@+id/step1_amount_input"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="@android:color/transparent"
-                    android:hint="0"
-                    android:textColorHint="@color/quick_widget_text_tertiary"
-                    android:textColor="@color/quick_widget_text_primary"
-                    android:textSize="28sp"
-                    android:textStyle="bold"
-                    android:inputType="numberDecimal"
-                    android:imeOptions="actionNext"
-                    android:layout_marginStart="8dp"
-                    android:selectAllOnFocus="true" />
-            </LinearLayout>
-
-            <!-- Quick Preset Chips -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="34dp"
-                android:orientation="horizontal"
-                android:layout_marginTop="8dp">
-
-                <TextView
-                    android:id="@+id/step1_chip_100"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:text="+100"
-                    android:textColor="@color/quick_widget_text_primary"
-                    android:textSize="12sp"
-                    android:textStyle="bold"
-                    android:background="@drawable/quick_widget_chip"
-                    android:layout_marginEnd="3dp" />
-
-                <TextView
-                    android:id="@+id/step1_chip_500"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:text="+500"
-                    android:textColor="@color/quick_widget_text_primary"
-                    android:textSize="12sp"
-                    android:textStyle="bold"
-                    android:background="@drawable/quick_widget_chip"
-                    android:layout_marginEnd="3dp" />
-
-                <TextView
-                    android:id="@+id/step1_chip_1000"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:text="+1k"
-                    android:textColor="@color/quick_widget_text_primary"
-                    android:textSize="12sp"
-                    android:textStyle="bold"
-                    android:background="@drawable/quick_widget_chip"
-                    android:layout_marginEnd="3dp" />
-
-                <TextView
-                    android:id="@+id/step1_chip_2000"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:text="+2k"
-                    android:textColor="@color/quick_widget_text_primary"
-                    android:textSize="12sp"
-                    android:textStyle="bold"
-                    android:background="@drawable/quick_widget_chip" />
-            </LinearLayout>
-
-            <!-- Next Button with Icon -->
-            <LinearLayout
-                android:id="@+id/step1_btn_next"
-                android:layout_width="match_parent"
-                android:layout_height="44dp"
-                android:orientation="horizontal"
-                android:gravity="center"
-                android:background="@drawable/quick_widget_action_btn"
-                android:layout_marginTop="16dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Next"
-                    android:textColor="@color/quick_widget_on_primary"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
+            <FrameLayout
+        android:tag="pill"
+                android:id="@+id/btn_header_back"
+        android:contentDescription="Back"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="10dp"
+                android:background="@drawable/widget_circle_tonal"
+                android:visibility="gone">
 
                 <ImageView
-                    android:layout_width="18dp"
-                    android:layout_height="18dp"
-                    android:src="@drawable/ic_arrow_forward"
-                    android:tint="@color/quick_widget_on_primary"
-                    android:layout_marginStart="6dp" />
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:src="@drawable/ic_arrow_back"
+                    android:tint="@color/widget_text_2"
+                    android:layout_gravity="center" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/dialog_step_badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="STEP 1 OF 4"
+                    android:textColor="@color/widget_accent_ink"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.12" />
+
+                <TextView
+                    android:id="@+id/dialog_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                    android:layout_marginTop="2dp"
+                    android:text="Enter Amount"
+                    android:textColor="@color/widget_text_1"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
             </LinearLayout>
+
+            <FrameLayout
+        android:tag="pill"
+                android:id="@+id/btn_dialog_close"
+        android:contentDescription="Close"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@drawable/widget_circle_tonal">
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_close"
+                    android:tint="@color/widget_text_2"
+                    android:layout_gravity="center" />
+            </FrameLayout>
         </LinearLayout>
 
-        <!-- ═════════ STEP 2: CATEGORY DROPDOWN ═════════ -->
+        <!-- Progress -->
         <LinearLayout
-            android:id="@+id/page_step_category"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:layout_height="4dp"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="18dp"
+            android:orientation="horizontal">
 
-            <!-- Subtitle badge with entered amount -->
-            <TextView
-                android:id="@+id/step2_amount_subtext"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Amount: ₹0"
-                android:textColor="@color/quick_widget_primary"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:background="@drawable/quick_widget_chip"
-                android:paddingStart="10dp"
-                android:paddingEnd="10dp"
-                android:paddingTop="4dp"
-                android:paddingBottom="4dp" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Select Category"
-                android:textColor="@color/quick_widget_text_secondary"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:layout_marginTop="10dp" />
-
-            <!-- Category Spinner Dropdown -->
-            <Spinner
-                android:id="@+id/step2_category_spinner"
-                android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:layout_marginTop="6dp"
-                android:background="@drawable/quick_widget_card"
-                android:spinnerMode="dropdown"
-                android:popupBackground="@drawable/dropdown_popup_bg"
-                android:dropDownVerticalOffset="6dp"
-                android:overlapAnchor="false" />
-
-            <!-- Quick Top Categories (1-tap selection) -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Quick Pick"
-                android:textColor="@color/quick_widget_text_secondary"
-                android:textSize="11sp"
-                android:layout_marginTop="8dp" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="34dp"
-                android:orientation="horizontal"
-                android:layout_marginTop="4dp">
-
-                <TextView
-                    android:id="@+id/step2_chip_food"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:text="Food"
-                    android:textColor="@color/quick_widget_text_primary"
-                    android:textSize="11sp"
-                    android:textStyle="bold"
-                    android:background="@drawable/quick_widget_chip"
-                    android:layout_marginEnd="3dp" />
-
-                <TextView
-                    android:id="@+id/step2_chip_grocery"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:text="Grocery"
-                    android:textColor="@color/quick_widget_text_primary"
-                    android:textSize="11sp"
-                    android:textStyle="bold"
-                    android:background="@drawable/quick_widget_chip"
-                    android:layout_marginEnd="3dp" />
-
-                <TextView
-                    android:id="@+id/step2_chip_transport"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:text="Transport"
-                    android:textColor="@color/quick_widget_text_primary"
-                    android:textSize="11sp"
-                    android:textStyle="bold"
-                    android:background="@drawable/quick_widget_chip"
-                    android:layout_marginEnd="3dp" />
-
-                <TextView
-                    android:id="@+id/step2_chip_bills"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:text="Bills"
-                    android:textColor="@color/quick_widget_text_primary"
-                    android:textSize="11sp"
-                    android:textStyle="bold"
-                    android:background="@drawable/quick_widget_chip" />
-            </LinearLayout>
-
-            <!-- Bottom Actions (with proper icons) -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="44dp"
-                android:orientation="horizontal"
-                android:layout_marginTop="16dp">
-
-                <!-- Back Button -->
-                <LinearLayout
-                    android:id="@+id/step2_btn_back"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:orientation="horizontal"
-                    android:gravity="center"
-                    android:background="@drawable/quick_widget_secondary_btn"
-                    android:layout_marginEnd="4dp">
-
-                    <ImageView
-                        android:layout_width="16dp"
-                        android:layout_height="16dp"
-                        android:src="@drawable/ic_arrow_back"
-                        android:tint="@color/quick_widget_text_secondary"
-                        android:layout_marginEnd="4dp" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Back"
-                        android:textColor="@color/quick_widget_text_secondary"
-                        android:textSize="13sp"
-                        android:textStyle="bold" />
-                </LinearLayout>
-
-                <!-- Next Button -->
-                <LinearLayout
-                    android:id="@+id/step2_btn_next"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:orientation="horizontal"
-                    android:gravity="center"
-                    android:background="@drawable/quick_widget_action_btn"
-                    android:layout_marginStart="4dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Next"
-                        android:textColor="@color/quick_widget_on_primary"
-                        android:textSize="13sp"
-                        android:textStyle="bold" />
-
-                    <ImageView
-                        android:layout_width="16dp"
-                        android:layout_height="16dp"
-                        android:src="@drawable/ic_arrow_forward"
-                        android:tint="@color/quick_widget_on_primary"
-                        android:layout_marginStart="4dp" />
-                </LinearLayout>
-            </LinearLayout>
+            <FrameLayout
+                android:id="@+id/dot_step_1"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:layout_marginEnd="4dp"
+                android:background="@drawable/quick_widget_progress_active" />
+            <FrameLayout
+                android:id="@+id/dot_step_2"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:layout_marginEnd="4dp"
+                android:background="@drawable/quick_widget_progress_inactive" />
+            <FrameLayout
+                android:id="@+id/dot_step_3"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:layout_marginEnd="4dp"
+                android:background="@drawable/quick_widget_progress_inactive" />
+            <FrameLayout
+                android:id="@+id/dot_step_4"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@drawable/quick_widget_progress_inactive" />
         </LinearLayout>
 
-        <!-- ═════════ STEP 3: PAYMENT METHOD ═════════ -->
-        <LinearLayout
-            android:id="@+id/page_step_payment"
+        <ViewFlipper
+            android:id="@+id/view_flipper"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:layout_height="wrap_content">
 
-            <TextView
-                android:id="@+id/step3_summary_subtext"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="₹0 • Food"
-                android:textColor="@color/quick_widget_primary"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:background="@drawable/quick_widget_chip"
-                android:paddingStart="10dp"
-                android:paddingEnd="10dp"
-                android:paddingTop="4dp"
-                android:paddingBottom="4dp" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Payment Method"
-                android:textColor="@color/quick_widget_text_secondary"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:layout_marginTop="10dp" />
-
-            <!-- Payment Options Grid (2x2) with checkmarks -->
+            <!-- ═════════ STEP 1: AMOUNT ═════════ -->
             <LinearLayout
+                android:id="@+id/page_step_amount"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:layout_marginTop="6dp">
+                android:layout_height="match_parent"
+                android:orientation="vertical">
 
-                <!-- Row 1: Cash & UPI -->
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
+                    android:text="How much did you spend?"
+                    android:textColor="@color/widget_text_2"
+                    android:textSize="14sp" />
+
                 <LinearLayout
                     android:layout_width="match_parent"
-                    android:layout_height="44dp"
-                    android:orientation="horizontal"
-                    android:layout_marginBottom="6dp">
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:gravity="center"
+                    android:orientation="horizontal">
 
-                    <LinearLayout
-                        android:id="@+id/step3_pay_cash"
+                    <TextView
+                        android:id="@+id/step1_currency_symbol"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="₹"
+                        android:textColor="@color/widget_accent_ink"
+                        android:textSize="40sp"
+                        android:textStyle="bold" />
+
+                    <EditText
+                        android:id="@+id/step1_amount_input"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:background="@android:color/transparent"
+                        android:gravity="center"
+                        android:hint="0"
+                        android:imeOptions="actionNext"
+                        android:inputType="numberDecimal"
+                        android:maxLength="10"
+                        android:selectAllOnFocus="true"
+                        android:textColor="@color/widget_text_1"
+                        android:textColorHint="@color/widget_text_2"
+                        android:textSize="56sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:layout_marginTop="14dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+        android:tag="pill"
+                        android:id="@+id/step1_chip_100"
                         android:layout_width="0dp"
                         android:layout_height="match_parent"
                         android:layout_weight="1"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:paddingStart="12dp"
-                        android:paddingEnd="10dp"
+                        android:layout_marginEnd="6dp"
+                        android:background="@drawable/quick_widget_chip"
+                        android:gravity="center"
+                        android:text="+100"
+                        android:textColor="@color/widget_text_1"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+        android:tag="pill"
+                        android:id="@+id/step1_chip_500"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="6dp"
+                        android:background="@drawable/quick_widget_chip"
+                        android:gravity="center"
+                        android:text="+500"
+                        android:textColor="@color/widget_text_1"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+        android:tag="pill"
+                        android:id="@+id/step1_chip_1000"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="6dp"
+                        android:background="@drawable/quick_widget_chip"
+                        android:gravity="center"
+                        android:text="+1k"
+                        android:textColor="@color/widget_text_1"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+        android:tag="pill"
+                        android:id="@+id/step1_chip_2000"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:background="@drawable/quick_widget_chip"
+                        android:gravity="center"
+                        android:text="+2k"
+                        android:textColor="@color/widget_text_1"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1" />
+
+                <LinearLayout
+        android:tag="btn"
+                    android:id="@+id/step1_btn_next"
+        android:contentDescription="Continue"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="20dp"
+                    android:background="@drawable/quick_widget_action_btn"
+                    android:gravity="center"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Continue"
+                        android:textColor="@color/widget_on_hero"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- ═════════ STEP 2: CATEGORY ═════════ -->
+            <LinearLayout
+                android:id="@+id/page_step_category"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical">
+
+                <TextView
+        android:tag="accent"
+                    android:id="@+id/step2_amount_subtext"
+                    android:layout_width="wrap_content"
+                android:layout_gravity="start"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/widget_chip_lime"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:paddingTop="5dp"
+                    android:paddingBottom="5dp"
+                    android:text="Amount: ₹0"
+                    android:textColor="@color/widget_on_hero"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="Choose a category"
+                    android:textColor="@color/widget_text_1"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <!-- Search (shown when there are many categories) -->
+                <LinearLayout
+                    android:id="@+id/step2_search_box"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/quick_widget_chip"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="8dp"
+                    android:tag="pill"
+                    android:visibility="gone">
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_search"
+                        android:tint="@color/widget_text_2" />
+
+                    <EditText
+                        android:id="@+id/step2_search_input"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="10dp"
+                        android:layout_weight="1"
+                        android:background="@android:color/transparent"
+                        android:hint="Search categories"
+                        android:imeOptions="actionDone"
+                        android:inputType="text"
+                        android:maxLines="1"
+                        android:textColor="@color/widget_text_1"
+                        android:textColorHint="@color/widget_text_2"
+                        android:textSize="15sp" />
+
+                    <FrameLayout
+                        android:id="@+id/step2_search_clear"
+        android:contentDescription="Clear search"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:visibility="gone">
+
+                        <ImageView
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_close"
+                            android:tint="@color/widget_text_2" />
+                    </FrameLayout>
+                </LinearLayout>
+
+                <!-- Scrolls when there are more categories; the third row peeks out and the bottom fades as a cue -->
+                <ScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="220dp"
+                    android:layout_marginTop="10dp"
+                    android:fadingEdgeLength="32dp"
+                    android:overScrollMode="ifContentScrolls"
+                    android:requiresFadingEdge="vertical"
+                    android:scrollbars="none">
+
+                    <GridLayout
+                        android:id="@+id/step2_category_grid"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:columnCount="4" />
+                </ScrollView>
+
+                <TextView
+                    android:id="@+id/step2_more_hint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:gravity="center"
+                    android:maxLines="1"
+                    android:text="Scroll for more categories"
+                    android:textColor="@color/widget_text_2"
+                    android:textSize="12sp"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/step2_empty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:gravity="center"
+                    android:text="No category found"
+                    android:textColor="@color/widget_text_2"
+                    android:textSize="14sp"
+                    android:visibility="gone" />
+
+                                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <FrameLayout
+        android:tag="pill"
+                        android:id="@+id/step2_btn_back"
+        android:contentDescription="Back"
+                        android:layout_width="56dp"
+                        android:layout_height="56dp"
+                        android:background="@drawable/widget_circle_tonal">
+
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/ic_arrow_back"
+                            android:tint="@color/widget_text_2"
+                            android:layout_gravity="center" />
+                    </FrameLayout>
+
+                    <LinearLayout
+        android:tag="btn"
+                        android:id="@+id/step2_btn_next"
+        android:contentDescription="Continue"
+                        android:layout_width="0dp"
+                        android:layout_height="56dp"
+                        android:layout_marginStart="10dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/quick_widget_action_btn"
+                        android:gravity="center"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Continue"
+                            android:textColor="@color/widget_on_hero"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- ═════════ STEP 3: PAYMENT ═════════ -->
+            <LinearLayout
+                android:id="@+id/page_step_payment"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical">
+
+                <TextView
+        android:tag="accent"
+                    android:id="@+id/step3_summary_subtext"
+                    android:layout_width="wrap_content"
+                android:layout_gravity="start"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/widget_chip_lime"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:paddingTop="5dp"
+                    android:paddingBottom="5dp"
+                    android:text="₹0 • Food"
+                    android:textColor="@color/widget_on_hero"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="How did you pay?"
+                    android:textColor="@color/widget_text_1"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:orientation="horizontal">
+
+                    <LinearLayout
+        android:tag="pill"
+                        android:id="@+id/step3_pay_cash"
+                        android:layout_width="0dp"
+                        android:layout_height="64dp"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="5dp"
                         android:background="@drawable/quick_widget_item_normal"
-                        android:layout_marginEnd="3dp">
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="14dp"
+                        android:paddingEnd="12dp">
 
                         <ImageView
                             android:id="@+id/step3_pay_cash_icon"
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
                             android:src="@drawable/ic_pay_cash"
-                            android:tint="@color/quick_widget_text_primary" />
+                            android:tint="@color/widget_text_1" />
 
                         <TextView
                             android:id="@+id/step3_pay_cash_text"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
+                            android:layout_marginStart="10dp"
                             android:text="Cash"
-                            android:textColor="@color/quick_widget_text_primary"
-                            android:textSize="13sp"
-                            android:textStyle="bold"
-                            android:layout_marginStart="8dp" />
+                            android:textColor="@color/widget_text_1"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
 
                         <ImageView
                             android:id="@+id/step3_pay_cash_check"
-                            android:layout_width="16dp"
-                            android:layout_height="16dp"
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
                             android:src="@drawable/ic_check"
-                            android:tint="@color/quick_widget_primary"
+                            android:tint="@color/widget_accent_ink"
                             android:visibility="gone" />
                     </LinearLayout>
 
                     <LinearLayout
+        android:tag="pill"
                         android:id="@+id/step3_pay_upi"
                         android:layout_width="0dp"
-                        android:layout_height="match_parent"
+                        android:layout_height="64dp"
                         android:layout_weight="1"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:paddingStart="12dp"
-                        android:paddingEnd="10dp"
+                        android:layout_marginStart="5dp"
                         android:background="@drawable/quick_widget_item_selected"
-                        android:layout_marginStart="3dp">
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="14dp"
+                        android:paddingEnd="12dp">
 
                         <ImageView
                             android:id="@+id/step3_pay_upi_icon"
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
                             android:src="@drawable/ic_pay_upi"
-                            android:tint="@color/quick_widget_primary" />
+                            android:tint="@color/widget_accent_ink" />
 
                         <TextView
                             android:id="@+id/step3_pay_upi_text"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
+                            android:layout_marginStart="10dp"
                             android:text="UPI"
-                            android:textColor="@color/quick_widget_primary"
-                            android:textSize="13sp"
-                            android:textStyle="bold"
-                            android:layout_marginStart="8dp" />
+                            android:textColor="@color/widget_accent_ink"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
 
                         <ImageView
                             android:id="@+id/step3_pay_upi_check"
-                            android:layout_width="16dp"
-                            android:layout_height="16dp"
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
                             android:src="@drawable/ic_check"
-                            android:tint="@color/quick_widget_primary"
+                            android:tint="@color/widget_accent_ink"
                             android:visibility="visible" />
                     </LinearLayout>
                 </LinearLayout>
 
-                <!-- Row 2: Card & Bank -->
                 <LinearLayout
                     android:layout_width="match_parent"
-                    android:layout_height="44dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
                     android:orientation="horizontal">
 
                     <LinearLayout
+        android:tag="pill"
                         android:id="@+id/step3_pay_card"
                         android:layout_width="0dp"
-                        android:layout_height="match_parent"
+                        android:layout_height="64dp"
                         android:layout_weight="1"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:paddingStart="12dp"
-                        android:paddingEnd="10dp"
+                        android:layout_marginEnd="5dp"
                         android:background="@drawable/quick_widget_item_normal"
-                        android:layout_marginEnd="3dp">
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="14dp"
+                        android:paddingEnd="12dp">
 
                         <ImageView
                             android:id="@+id/step3_pay_card_icon"
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
                             android:src="@drawable/ic_pay_card"
-                            android:tint="@color/quick_widget_text_primary" />
+                            android:tint="@color/widget_text_1" />
 
                         <TextView
                             android:id="@+id/step3_pay_card_text"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
+                            android:layout_marginStart="10dp"
                             android:text="Card"
-                            android:textColor="@color/quick_widget_text_primary"
-                            android:textSize="13sp"
-                            android:textStyle="bold"
-                            android:layout_marginStart="8dp" />
+                            android:textColor="@color/widget_text_1"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
 
                         <ImageView
                             android:id="@+id/step3_pay_card_check"
-                            android:layout_width="16dp"
-                            android:layout_height="16dp"
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
                             android:src="@drawable/ic_check"
-                            android:tint="@color/quick_widget_primary"
+                            android:tint="@color/widget_accent_ink"
                             android:visibility="gone" />
                     </LinearLayout>
 
                     <LinearLayout
+        android:tag="pill"
                         android:id="@+id/step3_pay_bank"
                         android:layout_width="0dp"
-                        android:layout_height="match_parent"
+                        android:layout_height="64dp"
                         android:layout_weight="1"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:paddingStart="12dp"
-                        android:paddingEnd="10dp"
+                        android:layout_marginStart="5dp"
                         android:background="@drawable/quick_widget_item_normal"
-                        android:layout_marginStart="3dp">
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="14dp"
+                        android:paddingEnd="12dp">
 
                         <ImageView
                             android:id="@+id/step3_pay_bank_icon"
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
                             android:src="@drawable/ic_pay_bank"
-                            android:tint="@color/quick_widget_text_primary" />
+                            android:tint="@color/widget_text_1" />
 
                         <TextView
                             android:id="@+id/step3_pay_bank_text"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
+                            android:layout_marginStart="10dp"
                             android:text="Bank"
-                            android:textColor="@color/quick_widget_text_primary"
-                            android:textSize="13sp"
-                            android:textStyle="bold"
-                            android:layout_marginStart="8dp" />
+                            android:textColor="@color/widget_text_1"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
 
                         <ImageView
                             android:id="@+id/step3_pay_bank_check"
-                            android:layout_width="16dp"
-                            android:layout_height="16dp"
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
                             android:src="@drawable/ic_check"
-                            android:tint="@color/quick_widget_primary"
+                            android:tint="@color/widget_accent_ink"
                             android:visibility="gone" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="24dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <FrameLayout
+        android:tag="pill"
+                        android:id="@+id/step3_btn_back"
+        android:contentDescription="Back"
+                        android:layout_width="56dp"
+                        android:layout_height="56dp"
+                        android:background="@drawable/widget_circle_tonal">
+
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/ic_arrow_back"
+                            android:tint="@color/widget_text_2"
+                            android:layout_gravity="center" />
+                    </FrameLayout>
+
+                    <LinearLayout
+        android:tag="btn"
+                        android:id="@+id/step3_btn_next"
+        android:contentDescription="Continue"
+                        android:layout_width="0dp"
+                        android:layout_height="56dp"
+                        android:layout_marginStart="10dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/quick_widget_action_btn"
+                        android:gravity="center"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Continue"
+                            android:textColor="@color/widget_on_hero"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
                     </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- Bottom Actions (with proper icons) -->
+            <!-- ═════════ STEP 4: REVIEW & SAVE ═════════ -->
             <LinearLayout
+                android:id="@+id/page_step_notes"
                 android:layout_width="match_parent"
-                android:layout_height="44dp"
-                android:orientation="horizontal"
-                android:layout_marginTop="16dp">
-
-                <!-- Back Button -->
-                <LinearLayout
-                    android:id="@+id/step3_btn_back"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:orientation="horizontal"
-                    android:gravity="center"
-                    android:background="@drawable/quick_widget_secondary_btn"
-                    android:layout_marginEnd="4dp">
-
-                    <ImageView
-                        android:layout_width="16dp"
-                        android:layout_height="16dp"
-                        android:src="@drawable/ic_arrow_back"
-                        android:tint="@color/quick_widget_text_secondary"
-                        android:layout_marginEnd="4dp" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Back"
-                        android:textColor="@color/quick_widget_text_secondary"
-                        android:textSize="13sp"
-                        android:textStyle="bold" />
-                </LinearLayout>
-
-                <!-- Next Button -->
-                <LinearLayout
-                    android:id="@+id/step3_btn_next"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:orientation="horizontal"
-                    android:gravity="center"
-                    android:background="@drawable/quick_widget_action_btn"
-                    android:layout_marginStart="4dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Next"
-                        android:textColor="@color/quick_widget_on_primary"
-                        android:textSize="13sp"
-                        android:textStyle="bold" />
-
-                    <ImageView
-                        android:layout_width="16dp"
-                        android:layout_height="16dp"
-                        android:src="@drawable/ic_arrow_forward"
-                        android:tint="@color/quick_widget_on_primary"
-                        android:layout_marginStart="4dp" />
-                </LinearLayout>
-            </LinearLayout>
-        </LinearLayout>
-
-        <!-- ═════════ STEP 4: NOTES & SAVE ═════════ -->
-        <LinearLayout
-            android:id="@+id/page_step_notes"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical">
-
-            <!-- Digital Receipt Summary Card -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:background="@drawable/quick_widget_card"
-                android:padding="12dp">
+                android:layout_height="match_parent"
+                android:orientation="vertical">
 
                 <LinearLayout
+        android:tag="block"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
+                    android:background="@drawable/widget_hero_block"
+                    android:orientation="vertical"
+                    android:padding="18dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:alpha="0.7"
+                        android:text="You're adding"
+                        android:textColor="@color/widget_on_hero"
+                        android:textSize="12sp" />
 
                     <TextView
                         android:id="@+id/step4_summary_amount"
-                        android:layout_width="0dp"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
+                        android:layout_marginTop="2dp"
                         android:text="₹150.00"
-                        android:textColor="@color/quick_widget_primary"
-                        android:textSize="20sp"
+                        android:textColor="@color/widget_on_hero"
+                        android:textSize="40sp"
                         android:textStyle="bold" />
 
                     <TextView
+                        android:id="@+id/step4_summary_details"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Expense"
-                        android:textColor="@color/quick_widget_text_secondary"
-                        android:textSize="11sp"
-                        android:textStyle="bold" />
+                        android:layout_marginTop="2dp"
+                        android:alpha="0.8"
+                        android:text="• Food • UPI"
+                        android:textColor="@color/widget_on_hero"
+                        android:textSize="13sp" />
                 </LinearLayout>
 
-                <TextView
-                    android:id="@+id/step4_summary_details"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="• Food • UPI"
-                    android:textColor="@color/quick_widget_text_secondary"
-                    android:textSize="12sp"
-                    android:layout_marginTop="4dp" />
-            </LinearLayout>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Note (Optional)"
-                android:textColor="@color/quick_widget_text_secondary"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:layout_marginTop="10dp" />
-
-            <!-- Note Input Card with Icon -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="44dp"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:background="@drawable/quick_widget_card"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:layout_marginTop="4dp">
-
-                <ImageView
-                    android:layout_width="18dp"
-                    android:layout_height="18dp"
-                    android:src="@drawable/ic_edit_note"
-                    android:tint="@color/quick_widget_text_secondary" />
-
-                <EditText
-                    android:id="@+id/step4_note_input"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="@android:color/transparent"
-                    android:hint="e.g. Lunch with friends"
-                    android:textColorHint="@color/quick_widget_text_tertiary"
-                    android:textColor="@color/quick_widget_text_primary"
-                    android:textSize="13sp"
-                    android:singleLine="true"
-                    android:layout_marginStart="8dp" />
-            </LinearLayout>
-
-            <!-- Quick Note Chips -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="34dp"
-                android:orientation="horizontal"
-                android:layout_marginTop="6dp">
-
-                <TextView
-                    android:id="@+id/step4_chip_lunch"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:text="Lunch"
-                    android:textColor="@color/quick_widget_text_primary"
-                    android:textSize="11sp"
-                    android:textStyle="bold"
-                    android:background="@drawable/quick_widget_chip"
-                    android:layout_marginEnd="3dp" />
-
-                <TextView
-                    android:id="@+id/step4_chip_coffee"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:text="Coffee"
-                    android:textColor="@color/quick_widget_text_primary"
-                    android:textSize="11sp"
-                    android:textStyle="bold"
-                    android:background="@drawable/quick_widget_chip"
-                    android:layout_marginEnd="3dp" />
-
-                <TextView
-                    android:id="@+id/step4_chip_grocery"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:text="Grocery"
-                    android:textColor="@color/quick_widget_text_primary"
-                    android:textSize="11sp"
-                    android:textStyle="bold"
-                    android:background="@drawable/quick_widget_chip"
-                    android:layout_marginEnd="3dp" />
-
-                <TextView
-                    android:id="@+id/step4_chip_bills"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:text="Bills"
-                    android:textColor="@color/quick_widget_text_primary"
-                    android:textSize="11sp"
-                    android:textStyle="bold"
-                    android:background="@drawable/quick_widget_chip" />
-            </LinearLayout>
-
-            <!-- Bottom Actions (with proper icons) -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="44dp"
-                android:orientation="horizontal"
-                android:layout_marginTop="16dp">
-
-                <!-- Back Button -->
                 <LinearLayout
-                    android:id="@+id/step4_btn_back"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
+        android:tag="pill"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/quick_widget_card"
+                    android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:gravity="center"
-                    android:background="@drawable/quick_widget_secondary_btn"
-                    android:layout_marginEnd="4dp">
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp">
 
                     <ImageView
-                        android:layout_width="16dp"
-                        android:layout_height="16dp"
-                        android:src="@drawable/ic_arrow_back"
-                        android:tint="@color/quick_widget_text_secondary"
-                        android:layout_marginEnd="4dp" />
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:src="@drawable/ic_edit_note"
+                        android:tint="@color/widget_text_2" />
+
+                    <EditText
+                        android:id="@+id/step4_note_input"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="10dp"
+                        android:background="@android:color/transparent"
+                        android:hint="Add a note (optional)"
+                        android:singleLine="true"
+                        android:textColor="@color/widget_text_1"
+                        android:textColorHint="@color/widget_text_2"
+                        android:textSize="15sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="36dp"
+                    android:layout_marginTop="10dp"
+                    android:orientation="horizontal">
 
                     <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Back"
-                        android:textColor="@color/quick_widget_text_secondary"
+        android:tag="pill"
+                        android:id="@+id/step4_chip_lunch"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="6dp"
+                        android:background="@drawable/quick_widget_chip"
+                        android:gravity="center"
+                        android:text="Lunch"
+                        android:textColor="@color/widget_text_1"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+        android:tag="pill"
+                        android:id="@+id/step4_chip_coffee"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="6dp"
+                        android:background="@drawable/quick_widget_chip"
+                        android:gravity="center"
+                        android:text="Coffee"
+                        android:textColor="@color/widget_text_1"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+        android:tag="pill"
+                        android:id="@+id/step4_chip_grocery"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="6dp"
+                        android:background="@drawable/quick_widget_chip"
+                        android:gravity="center"
+                        android:text="Grocery"
+                        android:textColor="@color/widget_text_1"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+        android:tag="pill"
+                        android:id="@+id/step4_chip_bills"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:background="@drawable/quick_widget_chip"
+                        android:gravity="center"
+                        android:text="Bills"
+                        android:textColor="@color/widget_text_1"
                         android:textSize="13sp"
                         android:textStyle="bold" />
                 </LinearLayout>
 
-                <!-- Save Button with Checkmark Icon -->
+                                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1" />
+
                 <LinearLayout
-                    android:id="@+id/step4_btn_save"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="2"
-                    android:orientation="horizontal"
-                    android:gravity="center"
-                    android:background="@drawable/quick_widget_action_btn"
-                    android:layout_marginStart="4dp">
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="18dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
-                    <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:src="@drawable/ic_check"
-                        android:tint="@color/quick_widget_on_primary"
-                        android:layout_marginEnd="6dp" />
+                    <FrameLayout
+        android:tag="pill"
+                        android:id="@+id/step4_btn_back"
+        android:contentDescription="Back"
+                        android:layout_width="56dp"
+                        android:layout_height="56dp"
+                        android:background="@drawable/widget_circle_tonal">
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Save Expense"
-                        android:textColor="@color/quick_widget_on_primary"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/ic_arrow_back"
+                            android:tint="@color/widget_text_2"
+                            android:layout_gravity="center" />
+                    </FrameLayout>
+
+                    <LinearLayout
+        android:tag="btn"
+                        android:id="@+id/step4_btn_save"
+        android:contentDescription="Save expense"
+                        android:layout_width="0dp"
+                        android:layout_height="56dp"
+                        android:layout_marginStart="10dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/quick_widget_action_btn"
+                        android:gravity="center"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Save expense"
+                            android:textColor="@color/widget_on_hero"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
-        </LinearLayout>
-
-    </ViewFlipper>
-
-</LinearLayout>
-
+        </ViewFlipper>
+    </LinearLayout>
 </ScrollView>

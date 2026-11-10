@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Accent comes from the wallpaper (dark theme) -->
+    <color name="widget_hero_bg">@android:color/system_accent1_200</color>
+    <color name="widget_on_hero">@android:color/system_accent1_900</color>
+    <color name="widget_accent_ink">@android:color/system_accent1_200</color>
+    <color name="widget_text_1">@android:color/system_accent1_100</color>
+    <color name="widget_text_2">@android:color/system_accent1_300</color>
+</resources>

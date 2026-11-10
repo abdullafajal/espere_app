@@ -5,6 +5,7 @@ import '../services/auth_service.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
 import '../utils/app_toast.dart';
+import 'app_navigation.dart';
 
 class DeepLinkService {
   static final _appLinks = AppLinks();
@@ -69,6 +70,10 @@ class DeepLinkService {
     } else if (path.startsWith('/transaction/add')) {
       final type = uri.queryParameters['type'];
       navigatorKey.currentState?.pushNamed('/transaction/add', arguments: type);
+    } else if (path == '/transactions' || path.startsWith('/transactions/')) {
+      // Opened from the home-screen widget's list button: show the transaction list.
+      navigatorKey.currentState?.popUntil((route) => route.isFirst);
+      AppNavigation.openTab(AppNavigation.tabTransactions);
     } else if (path.startsWith('/split/invitations')) {
       navigatorKey.currentState?.pushNamed('/split/invitations');
     }

@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Translucent "glass" tokens for the Quick Add home-screen widget (light) -->
-    <color name="widget_glass_bg">#D9FFF9F5</color>
-    <color name="widget_glass_stroke">#80FFFFFF</color>
-    <color name="widget_glass_card">#99FFFFFF</color>
-    <color name="widget_glass_card_stroke">#66FFFFFF</color>
-    <color name="widget_glass_chip">#26000000</color>
+    <!-- Espere "Lime on Smoke" tokens (light): frosted white glass, charcoal text, lime action -->
+
+    <color name="widget_text_1">#0E2A5A</color>
+    <color name="widget_text_2">#1F4E9E</color>
+
+    <!-- Fallback accent (Android 11 and older): Espere lime. Android 12+ takes it from the wallpaper (see values-v31). -->
+    <color name="widget_hero_bg">#1F4E9E</color>
+    <color name="widget_on_hero">#EAF1FF</color>
+    <color name="widget_accent_ink">#1F4E9E</color>
 
     <dimen name="widget_radius">28dp</dimen>
     <dimen name="widget_inner_radius">18dp</dimen>
-    <color name="dialog_glass_bg">#F5FFF9F5</color>
-    <color name="dialog_field_bg">#0F000000</color>
-    <color name="dialog_field_stroke">#1F000000</color>
 </resources>

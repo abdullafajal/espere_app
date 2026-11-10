@@ -846,6 +846,24 @@ class CacheService {
     return await _read(_friendsKey);
   }
 
+  /// Apply a newly chosen currency symbol to every cached payload at once, so the
+  /// app, the home-screen widget and the quick-add popup all show it immediately
+  /// (they read these caches; waiting for the next server pull would show the old one).
+  static Future<void> setCurrencySymbol(String symbol) async {
+    final keys = [
+      _categoriesKey, _transactionsKey, _dashboardKey, _budgetsKey,
+      _savingsKey, _reportsKey, _userKey,
+    ];
+    for (final key in keys) {
+      final m = await _read(key);
+      if (m == null) continue;
+      if (m.containsKey('currency_symbol') || key == _userKey) {
+        m['currency_symbol'] = symbol;
+        await _write(key, m);
+      }
+    }
+  }
+
   // ─── Synchronization & Offline Queue ──────────────────────────────────────────────────────
 
   /// Get pending sync operations

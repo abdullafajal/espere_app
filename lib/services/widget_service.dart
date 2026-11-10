@@ -78,6 +78,16 @@ class WidgetService {
     }
   }
 
+  /// Currency changed in settings: store the new symbol for the native widget and redraw.
+  static Future<void> setCurrencySymbol(String symbol) async {
+    try {
+      await HomeWidget.saveWidgetData<String>('currency_symbol', symbol);
+      await refreshAllWidgets();
+    } catch (e) {
+      debugPrint('[Widget] Currency update failed: $e');
+    }
+  }
+
   /// Refreshes all widgets on the home screen
   static Future<void> refreshAllWidgets() async {
     try {

@@ -15,6 +15,7 @@ import '../services/cache_service.dart';
 import '../services/connectivity_service.dart';
 import '../widgets/espere_back_button.dart';
 import '../services/sync_service.dart';
+import '../services/widget_service.dart';
 import '../widgets/espere_input.dart';
 import '../utils/app_toast.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -139,6 +140,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     } else if (result.isSuccess && result.data != null) {
       await CacheService.cacheUser((result.data as UserModel).toJson());
+    }
+
+    // New currency symbol everywhere (app screens, home widget, quick-add popup).
+    if (result.isSuccess || savedLocally) {
+      final symbol = _currencies
+          .firstWhere((c) => c.$1 == _currency, orElse: () => _currencies.first)
+          .$2;
+      await CacheService.setCurrencySymbol(symbol);
+      await WidgetService.setCurrencySymbol(symbol);
+      SyncService.syncAll(); // pulls fresh numbers formatted by the server (when online)
     }
 
     if (!mounted) return;
