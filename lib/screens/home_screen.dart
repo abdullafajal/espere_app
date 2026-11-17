@@ -14,6 +14,7 @@ import '../services/api_service.dart';
 import '../services/notification_service.dart';
 import '../services/cache_service.dart';
 import '../services/sync_service.dart';
+import '../services/auto_expense_service.dart';
 import '../services/app_navigation.dart';
 import '../utils/update_checker.dart';
 
@@ -149,6 +150,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           SyncService.syncAll();
         }
       });
+      // Pick up payments captured while the app was in the background
+      // (and finish enabling auto-track after the Notification-access screen).
+      AutoExpenseService.onResume();
     }
   }
 

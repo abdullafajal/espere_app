@@ -279,10 +279,12 @@ class TransactionListScreenState extends State<TransactionListScreen> {
         if (cachedTxns != null) {
           final list = List<Map<String, dynamic>>.from(cachedTxns['transactions'] ?? []);
           list.removeWhere((t) => t['id'] == id);
+          // The list already holds every unsynced entry; re-adding "unsynced" items
+          // here would bring back a deleted offline-created transaction.
           await CacheService.cacheTransactions({
             'transactions': list,
             'currency_symbol': cachedTxns['currency_symbol'],
-          });
+          }, preserveUnsynced: false);
         }
         // ───────────────────────────────────────────────────────────────
 

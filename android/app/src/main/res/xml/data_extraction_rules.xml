@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+: keep auto-tracking data out of cloud backups and device transfers.
+     (The encrypted notification queue lives in noBackupFilesDir and is never backed up.) -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="database" path="espere_auto.db" />
+        <exclude domain="database" path="espere_auto.db-journal" />
+        <exclude domain="database" path="espere_auto.db-wal" />
+        <exclude domain="database" path="espere_auto.db-shm" />
+        <exclude domain="sharedpref" path="auto_capture_config.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="database" path="espere_auto.db" />
+        <exclude domain="database" path="espere_auto.db-journal" />
+        <exclude domain="database" path="espere_auto.db-wal" />
+        <exclude domain="database" path="espere_auto.db-shm" />
+        <exclude domain="sharedpref" path="auto_capture_config.xml" />
+    </device-transfer>
+</data-extraction-rules>

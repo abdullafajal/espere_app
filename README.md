@@ -176,26 +176,130 @@ flutter run -d chrome
 
 ## Build for Release
 
-### Android APK
-```bash
-flutter build apk --release
-# Output: build/app/outputs/flutter-apk/app-release.apk
-```
+### Android: with or without "Auto-track payments"
 
-To build the release APK **and** publish it to the website repo in one step, run the
-script from the repository root (the folder that contains `espere_app/` and `espere-pages/`):
+**Auto-track payments** adds expenses automatically from UPI and bank payment notifications. It
+uses a notification listener, and Google Play Protect **blocks installing** any app that declares
+one when the app is downloaded from a browser, WhatsApp or a file manager ("App blocked to protect
+your device"). So there are separate builds:
+
+| Build | Auto-track | Who it's for | How to install |
+|---|---|---|---|
+| **Website APK** | ❌ No | Users who download from espere.in | Normal download and install |
+| **Auto-track APK** | ✅ Yes | Your own phone, testers | USB / Wi-Fi with `adb install` (not from a browser) |
+| **Play Store (AAB)** | ✅ Yes | Play Store users, later | Through Google Play |
+| Debug / `flutter run` | ✅ Yes | Development | `flutter run` |
+
+One Gradle switch controls this: `-P espere.autoTrack=false` removes the listener from the
+release manifest (`android/app/src/sideload/AndroidManifest.xml`). Without the switch the feature
+is included. The app hides the Auto-track option on its own when the listener is missing.
+
+#### 1. Website APK (no auto-track)
+
+Run from the repository root (the folder that contains `espere_app/` and `espere-pages/`):
 
 ```bash
 ./build_and_copy_apk.sh
-# Builds the release APK and copies it to ../espere-pages/espere.apk
+# Runs: flutter build apk --release -P espere.autoTrack=false
+# and copies the APK to ../espere-pages/espere.apk.
 # Then commit and push in espere-pages to publish it.
 ```
 
-### Android App Bundle (Play Store)
+Before publishing, check that the APK has **no** notification listener. This must print `0`:
+
+```bash
+AAPT=$(ls -d ~/Library/Android/sdk/build-tools/*/ | sort -V | tail -1)aapt2
+$AAPT dump xmltree --file AndroidManifest.xml ../espere-pages/espere.apk | grep -c BIND_NOTIFICATION_LISTENER_SERVICE
+```
+
+> Never put an auto-track APK on the website. Play Protect will block it for every user.
+
+#### 2. Auto-track APK for your own phone
+
+```bash
+cd espere_app
+flutter build apk --release
+# Output: build/app/outputs/flutter-apk/app-release.apk (includes auto-track)
+```
+
+Install it with `adb`. Installs from a browser are blocked; `adb` installs are not.
+
+1. On the phone: **Settings → About phone → Build number**, tap it 7 times, then
+   **Developer options → USB debugging** on.
+2. Connect the phone by USB and tap **Allow** on the "Allow USB debugging?" prompt.
+3. On the Mac:
+   ```bash
+   adb devices                     # note your phone's serial, e.g. RZGL80VYKMK
+   adb -s <serial> install -r build/app/outputs/flutter-apk/app-release.apk
+   ```
+   `-s <serial>` picks the phone even when an emulator is also running. `install -r` keeps
+   the login and data. (The website and auto-track APKs are signed with the same key.)
+
+Then switch it on in the app:
+
+1. **Espere → Profile → Auto-track payments** → read the disclosure → **Allow**.
+2. Android opens *Notification read, reply & control*. Turn on **Espere**, then come back.
+   The Auto-track screen must say **On**.
+3. On that Android screen, keep **Conversations** ticked. Bank SMS arrive as conversations;
+   without it they are not seen.
+4. If the switch is greyed out (Samsung / Android 13+): **Settings → Apps → Espere → ⋮ →
+   Allow restricted settings**, then repeat step 2.
+
+> Don't install the website APK over the auto-track one. The Auto-track option disappears
+> (data stays). Reinstall the auto-track APK to get it back.
+
+#### 3. Play Store (App Bundle, includes auto-track)
+
 ```bash
 flutter build appbundle --release
 # Output: build/app/outputs/bundle/release/app-release.aab
 ```
+
+Policy and Data Safety notes for this feature are in [PLAY_STORE_NOTES.md](PLAY_STORE_NOTES.md).
+
+#### Auto-track: how it behaves
+
+- **Added automatically:** payments with an amount, a direction (paid / received) and a
+  reference number (UPI Ref / UTR / Txn ID). The note is just the payee, for example "Swiggy".
+  The category is picked from the payee and from your past choices for that payee.
+- **Review list** (Profile → Auto-track payments → Review list): payments without a reference
+  (most card SMS), NACH / SIP / EMI / insurance debits, ATM withdrawals, refunds. One tap to
+  add or discard.
+- **Never added:** OTPs, payment or collect requests, reminders, "will be debited",
+  mandate / AutoPay setup or cancellation, failed or pending payments, offers, credit-card
+  bill payments, self-transfers, wallet / UPI Lite top-ups, interest, statements, foreign
+  currency, personal SMS and chats.
+- **No duplicates:** the same payment reported by Google Pay, the bank app and the bank SMS is
+  added once. A reversed payment removes its entry. A deleted entry never comes back.
+- **When entries appear:** captured notifications wait (encrypted) on the phone and are added
+  as soon as Espere is open. If the app is closed, they are added the next time it opens.
+- **Only new notifications** after switching it on are read. Older SMS are never picked up.
+
+Full details: [AUTO_TRACK_RESEARCH.md](AUTO_TRACK_RESEARCH.md).
+
+#### Auto-track: nothing was added?
+
+1. Open **Profile → Auto-track payments**. It must say **On**, not "Notification access needed".
+2. Check that **Conversations** is ticked on Android's notification-access screen for Espere.
+3. Open Espere. Entries are added when the app runs.
+4. Check whether the payment belongs in the "never added" list above. Card spends and SMS
+   without a reference go to the **Review list** instead.
+5. Still missing? Copy the SMS / notification text (change the amount) and add it as a case
+   in `test/notification_parser_test.dart`. That is how new bank wordings are supported.
+
+To inspect what happened on a phone, install a **debug** build. Only debug builds allow
+`run-as`:
+
+```bash
+flutter build apk --debug --target-platform android-arm64
+adb -s <serial> install -r build/app/outputs/flutter-apk/app-debug.apk
+# Native listener switch (must be true when Auto-track is On):
+adb -s <serial> exec-out run-as com.example.espere_app cat shared_prefs/auto_capture_config.xml
+# Pending captured events (empty after the app has processed them):
+adb -s <serial> exec-out run-as com.example.espere_app ls no_backup/auto_capture/
+```
+
+Afterwards, reinstall the release auto-track APK (section 2).
 
 ### iOS (macOS only)
 ```bash

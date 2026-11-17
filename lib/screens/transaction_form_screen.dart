@@ -10,6 +10,7 @@ import '../theme/app_theme.dart';
 import '../models/category.dart';
 import '../models/transaction.dart';
 import '../services/api_service.dart';
+import '../services/auto_expense_service.dart';
 import '../services/cache_service.dart';
 import '../services/connectivity_service.dart';
 import '../services/sync_service.dart';
@@ -272,6 +273,11 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
 
     // Refresh home screen widgets
     WidgetService.refreshAllWidgets();
+
+    // Editing the category of an auto-tracked entry teaches the per-payee category.
+    if (isEdit) {
+      AutoExpenseService.learnFromEdit(txnId: widget.transactionId, categoryId: _categoryId);
+    }
 
     if (!mounted) return;
     setState(() => _isSaving = false);

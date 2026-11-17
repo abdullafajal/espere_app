@@ -6,6 +6,13 @@ plugins {
     id("com.google.gms.google-services")
 }
 
+// Auto-track payments needs a NotificationListenerService. Play Protect blocks sideloaded
+// installs (website APK) of apps that declare one, so website builds pass
+//   flutter build apk --release -P espere.autoTrack=false
+// which removes the listener from the release manifest (see src/sideload/AndroidManifest.xml).
+// Play Store builds, debug and `flutter run` keep the feature (default: true).
+val autoTrackEnabled = (project.findProperty("espere.autoTrack") as String?)?.toBoolean() ?: true
+
 android {
     namespace = "com.example.espere_app"
     compileSdk = flutter.compileSdkVersion
@@ -29,6 +36,12 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+    }
+
+    sourceSets {
+        if (!autoTrackEnabled) {
+            getByName("release").manifest.srcFile("src/sideload/AndroidManifest.xml")
+        }
     }
 
     buildTypes {
