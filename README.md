@@ -93,6 +93,64 @@ flutter emulators --launch <emulator_id>
 flutter run
 ```
 
+#### Starting the emulator from the terminal
+
+The window that shows up as **`qemu-system-aarch64`** (in Activity Monitor / Dock) is the
+Android Emulator — it runs on QEMU under the hood. You can start it directly, without
+Android Studio:
+
+```bash
+# Emulator binary from the Android SDK (default SDK location on macOS)
+EMU=~/Library/Android/sdk/emulator/emulator
+
+# 1. See which virtual devices (AVDs) exist
+$EMU -list-avds
+# e.g. Pixel_10_Pro
+
+# 2. Start one (keeps running in the background; window opens in a few seconds)
+$EMU -avd Pixel_10_Pro -no-snapshot-save -no-audio &
+
+# 3. Wait until it has booted
+adb wait-for-device
+until [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1" ]; do sleep 2; done
+
+# 4. Install and launch the app
+flutter run                     # debug build with hot reload
+# or install an APK you already built:
+adb install -r build/app/outputs/flutter-apk/app-debug.apk
+
+# Stop the emulator
+adb emu kill
+```
+
+| Flag | What it does |
+|------|--------------|
+| `-no-snapshot-save` | Don't save state on exit (next start is a clean boot of the last saved snapshot) |
+| `-no-audio` | No audio device (avoids macOS audio warnings) |
+| `-wipe-data` | Factory-reset the emulator (use if it is broken or out of storage) |
+
+> No AVD yet? Create one in Android Studio → **Device Manager** → **Create device**
+> (any Pixel with a recent system image), then use its name with `-avd`.
+
+#### Testing the home-screen widget on the emulator
+
+1. Long-press an empty spot on the home screen → **Widgets** → search **Espere** →
+   tap **Quick Add Expense** → **Add**.
+2. Long-press the widget and drag its handles to try other sizes (2x1, 4x1, 2x2, 4x2, 4x3);
+   the widget picks the layout that fits.
+3. Tap the widget / **+** to open the Quick Add popup.
+
+> Note: data you add from the emulator goes to the real backend if you are logged in to a
+> real account.
+
+**Emulator says `INSTALL_FAILED_INSUFFICIENT_STORAGE`?** A debug APK with every ABI is
+~190 MB. Build only for the emulator's CPU, or wipe the emulator:
+
+```bash
+flutter build apk --debug --target-platform android-arm64   # Apple Silicon emulator
+adb install -r build/app/outputs/flutter-apk/app-debug.apk
+```
+
 ### iOS Simulator (macOS only)
 ```bash
 # Open simulator
@@ -122,6 +180,15 @@ flutter run -d chrome
 ```bash
 flutter build apk --release
 # Output: build/app/outputs/flutter-apk/app-release.apk
+```
+
+To build the release APK **and** publish it to the website repo in one step, run the
+script from the repository root (the folder that contains `espere_app/` and `espere-pages/`):
+
+```bash
+./build_and_copy_apk.sh
+# Builds the release APK and copies it to ../espere-pages/espere.apk
+# Then commit and push in espere-pages to publish it.
 ```
 
 ### Android App Bundle (Play Store)

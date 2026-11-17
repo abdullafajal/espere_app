@@ -4,7 +4,6 @@ import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
-import android.content.res.ColorStateList
 import android.content.Intent
 import android.content.SharedPreferences
 import android.net.ConnectivityManager
@@ -15,7 +14,6 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.widget.RemoteViews
-import androidx.core.content.ContextCompat
 import es.antonborri.home_widget.HomeWidgetProvider
 import org.json.JSONArray
 import org.json.JSONObject
@@ -554,10 +552,15 @@ class QuickAddWidgetProvider : HomeWidgetProvider() {
 
         fun getFinancialMetrics(context: Context): FinancialMetrics {
             val currency = getCurrencySymbol(context)
+            // "₹6,456" / "₹6,456.5" instead of "₹6,456.00"; the daily average in whole rupees.
             val numFormat = NumberFormat.getNumberInstance(Locale.US).apply {
-                minimumFractionDigits = 2
+                minimumFractionDigits = 0
                 maximumFractionDigits = 2
             }
+            val wholeFormat = NumberFormat.getNumberInstance(Locale.US).apply {
+                maximumFractionDigits = 0
+            }
+            val zero = "${currency}0"
 
             val homeWidgetPrefs = context.getSharedPreferences(HOME_WIDGET_PREFS, Context.MODE_PRIVATE)
             val homeSpend = homeWidgetPrefs.getString("widget_total_spend", null)
@@ -615,7 +618,7 @@ class QuickAddWidgetProvider : HomeWidgetProvider() {
                     totalSpend = "$currency${numFormat.format(calculatedTotalSpend)}",
                     totalIncome = "$currency${numFormat.format(calculatedTotalIncome)}",
                     todaySpend = "$currency${numFormat.format(calculatedTodaySpend)}",
-                    avgDaily = "$currency${numFormat.format(calculatedAvgDaily)}",
+                    avgDaily = "$currency${wholeFormat.format(calculatedAvgDaily)}",
                     spendPct = pct(calculatedTotalSpend, calculatedTotalIncome)
                 )
             }
@@ -625,8 +628,8 @@ class QuickAddWidgetProvider : HomeWidgetProvider() {
                 return FinancialMetrics(
                     totalSpend = homeSpend,
                     totalIncome = homeIncome,
-                    todaySpend = homeToday ?: "$currency 0.00",
-                    avgDaily = homeAvg ?: "$currency 0.00",
+                    todaySpend = homeToday ?: zero,
+                    avgDaily = homeAvg ?: zero,
                     spendPct = pct(num(homeSpend), num(homeIncome))
                 )
             }
@@ -643,17 +646,17 @@ class QuickAddWidgetProvider : HomeWidgetProvider() {
                         totalSpend = "$currency${numFormat.format(exp)}",
                         totalIncome = "$currency${numFormat.format(inc)}",
                         todaySpend = "$currency${numFormat.format(0.0)}",
-                        avgDaily = "$currency${numFormat.format(avg)}",
+                        avgDaily = "$currency${wholeFormat.format(avg)}",
                         spendPct = pct(exp, inc)
                     )
                 } catch (_: Exception) {}
             }
 
             return FinancialMetrics(
-                totalSpend = "$currency 0.00",
-                totalIncome = "$currency 0.00",
-                todaySpend = "$currency 0.00",
-                avgDaily = "$currency 0.00"
+                totalSpend = zero,
+                totalIncome = zero,
+                todaySpend = zero,
+                avgDaily = zero
             )
         }
     }
@@ -670,7 +673,8 @@ class QuickAddWidgetProvider : HomeWidgetProvider() {
         }
     }
 
-    // Re-render with the best-fitting layout whenever the user resizes the widget.
+    // Android 11 and older: pick the layout again whenever the user resizes the widget.
+    // (Android 12+ switches between the size-mapped layouts on its own.)
     override fun onAppWidgetOptionsChanged(
         context: Context,
         appWidgetManager: AppWidgetManager,
@@ -678,22 +682,50 @@ class QuickAddWidgetProvider : HomeWidgetProvider() {
         newOptions: android.os.Bundle
     ) {
         super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
-        renderWidget(context, appWidgetManager, appWidgetId, getFinancialMetrics(context))
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            renderWidget(context, appWidgetManager, appWidgetId, getFinancialMetrics(context))
+        }
     }
 
-    private enum class WidgetSize { STRIP, SMALL, MEDIUM, LARGE }
+    /**
+     * Layouts by size. [minW]/[minH] (dp) are the smallest widget size each one is designed
+     * for; on Android 12+ the launcher shows the largest layout that fits the real size.
+     */
+    private enum class WidgetSize(
+        val layout: Int,
+        val minW: Float,
+        val minH: Float,
+        /** Shows "This month" and "Avg / day" */
+        val monthAndAvg: Boolean,
+        /** Shows income, share-of-income text and progress bar */
+        val income: Boolean,
+        /** Add action is the round "+" button (else the "Add an expense" pill) */
+        val plusButton: Boolean,
+        val listButton: Boolean
+    ) {
+        // Sizes in dp. One home-screen row is ~70-100dp tall on most phones, two rows ~140-200dp,
+        // three rows ~230-300dp; widths: 2 columns ~150-180dp, 4 columns ~300-360dp.
+        STRIP(R.layout.quick_add_widget_strip, 100f, 40f, false, false, true, true),
+        STRIP_WIDE(R.layout.quick_add_widget_strip_wide, 240f, 40f, true, false, true, false),
+        SMALL(R.layout.quick_add_widget_small, 100f, 160f, true, false, true, false),
+        MEDIUM_COMPACT(R.layout.quick_add_widget_compact, 240f, 120f, true, false, true, true),
+        MEDIUM(R.layout.quick_add_widget, 240f, 175f, true, false, true, true),
+        LARGE(R.layout.quick_add_widget_large, 240f, 280f, true, true, false, true)
+    }
 
+    /**
+     * Android 11 and older: the same rule Android 12+ applies to the size map - the largest
+     * layout that fits the widget (portrait: full width is the min width, height the max height),
+     * or the smallest layout when nothing fits.
+     */
     private fun resolveSize(options: android.os.Bundle?): WidgetSize {
-        // Worst-case (guaranteed) size in dp for the current orientation.
         val w = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0) ?: 0
-        val h = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0) ?: 0
+        val h = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0) ?: 0
         if (w == 0 || h == 0) return WidgetSize.MEDIUM
-        return when {
-            h < 100 -> WidgetSize.STRIP
-            w < 200 -> WidgetSize.SMALL
-            h >= 250 -> WidgetSize.LARGE
-            else -> WidgetSize.MEDIUM
-        }
+        return WidgetSize.values()
+            .filter { it.minW <= w && it.minH <= h }
+            .maxByOrNull { it.minW * it.minH }
+            ?: WidgetSize.STRIP
     }
 
     private fun renderWidget(
@@ -702,118 +734,56 @@ class QuickAddWidgetProvider : HomeWidgetProvider() {
         appWidgetId: Int,
         metrics: FinancialMetrics
     ) {
-        val size = resolveSize(appWidgetManager.getAppWidgetOptions(appWidgetId))
-        val layout = when (size) {
-            WidgetSize.STRIP -> R.layout.quick_add_widget_strip
-            WidgetSize.SMALL -> R.layout.quick_add_widget_small
-            WidgetSize.MEDIUM -> R.layout.quick_add_widget
-            WidgetSize.LARGE -> R.layout.quick_add_widget_large
+        val views = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            RemoteViews(WidgetSize.values().associate {
+                android.util.SizeF(it.minW, it.minH) to buildViews(context, it, metrics)
+            })
+        } else {
+            buildViews(context, resolveSize(appWidgetManager.getAppWidgetOptions(appWidgetId)), metrics)
         }
-        val views = RemoteViews(context.packageName, layout)
+        appWidgetManager.updateAppWidget(appWidgetId, views)
+    }
 
-        // Metrics present in each layout
+    private fun buildViews(context: Context, size: WidgetSize, metrics: FinancialMetrics): RemoteViews {
+        val views = RemoteViews(context.packageName, size.layout)
+
+        // Only touch views the layout has (a missing view id breaks the widget).
         views.setTextViewText(R.id.widget_today_spend, metrics.todaySpend)
-        when (size) {
-            WidgetSize.STRIP -> Unit
-            WidgetSize.SMALL ->
-                views.setTextViewText(R.id.widget_total_spend, metrics.totalSpend)
-            WidgetSize.MEDIUM -> {
-                views.setTextViewText(R.id.widget_total_spend, metrics.totalSpend)
-                views.setTextViewText(R.id.widget_avg_daily, metrics.avgDaily)
-            }
-            WidgetSize.LARGE -> {
-                views.setTextViewText(R.id.widget_total_spend, metrics.totalSpend)
-                views.setTextViewText(R.id.widget_total_income, metrics.totalIncome)
-                views.setTextViewText(R.id.widget_avg_daily, metrics.avgDaily)
-            }
+        if (size.monthAndAvg) {
+            views.setTextViewText(R.id.widget_total_spend, metrics.totalSpend)
+            views.setTextViewText(R.id.widget_avg_daily, metrics.avgDaily)
         }
-
-        // "Income used" ring (4x2 and larger)
-        if (size == WidgetSize.MEDIUM || size == WidgetSize.LARGE) {
-            views.setProgressBar(R.id.widget_progress, 100, metrics.spendPct, false)
+        if (size.income) {
+            views.setTextViewText(R.id.widget_total_income, metrics.totalIncome)
             views.setTextViewText(R.id.widget_pct, "${metrics.spendPct}%")
+            views.setProgressBar(R.id.widget_progress, 100, metrics.spendPct, false)
         }
 
-        // Brand mark (the real app logo) sits on the coloured block. Its colour follows the
-        // wallpaper too; falls back to the plain "on block" colour.
-        if (size != WidgetSize.STRIP) {
-            val fallback = ContextCompat.getColor(context, R.color.widget_on_hero)
-            val light = WidgetPalettes.get(context, dark = false)
-            val dark = WidgetPalettes.get(context, dark = true)
-            if (Build.VERSION.SDK_INT >= 34 && light != null && dark != null) {
-                views.setColorInt(R.id.widget_app_logo, "setColorFilter", light.onBlock, dark.onBlock)
-            } else {
-                val now = WidgetPalettes.get(context)?.onBlock ?: fallback
-                views.setInt(R.id.widget_app_logo, "setColorFilter", now)
-            }
-        }
+        // Colours come from XML resources tied to the system palette (Samsung "Color palette" /
+        // Material You), so the launcher keeps them in sync with wallpaper and dark mode itself.
 
-        // Colours from several parts of the wallpaper (Android 12+)
-        applyPalette(context, views, size)
+        // Any tap opens the Quick Add popup; the "+" button / "Add an expense" pill does the same.
+        val openDialog = createOpenDialogPendingIntent(context, 0.0, 1001)
+        views.setOnClickPendingIntent(R.id.widget_root, openDialog)
+        views.setOnClickPendingIntent(
+            if (size.plusButton) R.id.widget_btn_plus else R.id.btn_open_quick_add, openDialog
+        )
 
-        // Same flow as before: any tap opens the Quick Add popup
-        val openDialogPendingIntent = createOpenDialogPendingIntent(context, 0.0, 1001)
-        views.setOnClickPendingIntent(R.id.widget_root, openDialogPendingIntent)
-        views.setOnClickPendingIntent(R.id.btn_open_quick_add, openDialogPendingIntent)
-        views.setOnClickPendingIntent(R.id.widget_btn_plus, openDialogPendingIntent)
-
-        // Large layout: the round list button opens the app on the Transactions tab
+        // List button opens the app on the Transactions tab
         // (handled by DeepLinkService via the https://espere.in/transactions link).
-        if (size == WidgetSize.LARGE) {
+        if (size.listButton) {
             val openList = Intent(Intent.ACTION_VIEW, Uri.parse("https://espere.in/transactions")).apply {
                 setPackage(context.packageName)
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             }
-            val openListPending = PendingIntent.getActivity(
-                context, 1002, openList, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            views.setOnClickPendingIntent(R.id.widget_btn_app, openListPending)
-        }
-
-        appWidgetManager.updateAppWidget(appWidgetId, views)
-    }
-
-    private fun applyPalette(context: Context, views: RemoteViews, size: WidgetSize) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
-        val light = WidgetPalettes.get(context, dark = false) ?: return
-        val dark = WidgetPalettes.get(context, dark = true) ?: return
-
-        // Android 14+ switches between the light and dark tint by itself when the
-        // system theme changes; older versions use the colour for the current theme.
-        fun tint(id: Int, solid: Int, pick: (WidgetPalette) -> Int) {
-            views.setInt(id, "setBackgroundResource", solid)
-            if (Build.VERSION.SDK_INT >= 34) {
-                views.setColorStateList(
-                    id, "setBackgroundTintList",
-                    ColorStateList.valueOf(pick(light)), ColorStateList.valueOf(pick(dark))
+            views.setOnClickPendingIntent(
+                R.id.widget_btn_app,
+                PendingIntent.getActivity(
+                    context, 1002, openList, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
-            } else {
-                val now = if (WidgetPalettes.isDark(context)) dark else light
-                views.setColorStateList(id, "setBackgroundTintList", ColorStateList.valueOf(pick(now)))
-            }
+            )
         }
-
-        tint(R.id.widget_root, R.drawable.widget_panel_solid) { it.panel }
-        when (size) {
-            WidgetSize.STRIP -> {
-                tint(R.id.btn_open_quick_add, R.drawable.widget_pill_solid) { it.pill }
-                tint(R.id.widget_btn_plus, R.drawable.widget_circle_solid) { it.accent }
-            }
-            WidgetSize.SMALL, WidgetSize.MEDIUM -> {
-                tint(R.id.btn_open_quick_add, R.drawable.widget_block_solid) { it.block }
-                tint(R.id.widget_pill_a, R.drawable.widget_pill_solid) { it.pill }
-                tint(R.id.widget_btn_plus, R.drawable.widget_circle_solid) { it.accent }
-            }
-            WidgetSize.LARGE -> {
-                tint(R.id.btn_open_quick_add, R.drawable.widget_block_solid) { it.block }
-                tint(R.id.widget_chip, R.drawable.widget_chip_solid) { it.accent }
-                tint(R.id.widget_dial, R.drawable.widget_circle_solid) { it.accent }
-                tint(R.id.widget_pill_a, R.drawable.widget_tile_solid) { it.pill }
-                tint(R.id.widget_btn_plus, R.drawable.widget_pill_solid) { it.pill }
-                tint(R.id.widget_circle_a, R.drawable.widget_circle_solid) { it.accent }
-                tint(R.id.widget_btn_app, R.drawable.widget_circle_solid) { it.accent }
-            }
-        }
+        return views
     }
 
     private fun createOpenDialogPendingIntent(context: Context, prefillAmount: Double, requestCode: Int): PendingIntent {

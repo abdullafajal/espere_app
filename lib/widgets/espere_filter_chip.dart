@@ -14,12 +14,16 @@ class EspereFilterChip extends StatelessWidget {
   /// True when a non-default filter is applied (chip turns dark).
   final bool active;
 
+  /// Fill the available width (label on the left, arrow on the right).
+  final bool expand;
+
   const EspereFilterChip({
     super.key,
     required this.label,
     required this.onTap,
     this.onLongPress,
     this.active = false,
+    this.expand = false,
   });
 
   @override
@@ -34,6 +38,7 @@ class EspereFilterChip extends StatelessWidget {
       onLongPress: onLongPress,
       child: Container(
         height: height,
+        width: expand ? double.infinity : null,
         padding: const EdgeInsets.only(left: 14, right: 8),
         decoration: BoxDecoration(
           color: bg,
@@ -42,14 +47,19 @@ class EspereFilterChip extends StatelessWidget {
           boxShadow: AppShadows.soft,
         ),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
           children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: fg,
+            Flexible(
+              fit: expand ? FlexFit.tight : FlexFit.loose,
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: fg,
+                ),
               ),
             ),
             const SizedBox(width: 2),

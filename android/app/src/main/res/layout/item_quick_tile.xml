@@ -1,29 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Category tile in the Quick Add grid: icon over label -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="0dp"
-    android:layout_height="80dp"
-    android:background="@drawable/quick_widget_item_normal"
-    android:tag="pill"
+    android:layout_height="78dp"
+    android:background="@drawable/qa_tile"
     android:gravity="center"
     android:orientation="vertical"
-    android:padding="6dp">
+    android:paddingStart="4dp"
+    android:paddingEnd="4dp">
 
     <ImageView
-        android:id="@+id/tile_icon"
-        android:layout_width="28dp"
-        android:layout_height="28dp"
+        android:id="@+id/chip_icon"
+        android:layout_width="26dp"
+        android:layout_height="26dp"
+        android:importantForAccessibility="no"
         android:src="@drawable/ic_cat_other" />
 
     <TextView
-        android:id="@+id/tile_name"
+        android:id="@+id/chip_label"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
         android:ellipsize="end"
         android:gravity="center"
         android:maxLines="1"
-        android:text="Food"
         android:textColor="@color/widget_text_1"
-        android:textSize="11sp"
+        android:textSize="12sp"
         android:textStyle="bold" />
 </LinearLayout>

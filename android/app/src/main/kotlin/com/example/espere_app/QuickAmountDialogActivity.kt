@@ -1,582 +1,577 @@
 package com.example.espere_app
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
 import android.app.Activity
 import android.content.Context
+import android.os.Build
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
+import android.view.animation.PathInterpolator
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
-import android.widget.*
-import android.graphics.Color
-import android.graphics.drawable.GradientDrawable
-import android.text.Editable
-import android.text.TextWatcher
-import androidx.core.content.ContextCompat
+import android.widget.EditText
+import android.widget.GridLayout
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
+import android.widget.Toast
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsAnimationCompat
+import androidx.core.view.WindowInsetsCompat
+import org.json.JSONObject
 import java.util.Locale
+import kotlin.math.max
 
+/**
+ * Quick Add popup opened from the home-screen widget. Three steps:
+ *   1. Amount   2. Category   3. Payment method + optional note -> Save
+ *
+ * The category and payment method the user picks most come pre-selected, so the usual
+ * flow is: type amount -> Continue -> tap category (moves on by itself) -> Save.
+ *
+ * Motion: steps use a shared-axis transition (slide a little + fade) while the sheet
+ * height glides to the new size; the progress bar fills, the title cross-fades, and
+ * the sheet rides along with the keyboard instead of jumping.
+ */
 class QuickAmountDialogActivity : Activity() {
 
     companion object {
-        const val STEP_AMOUNT = 0
-        const val STEP_CATEGORY = 1
-        const val STEP_PAYMENT = 2
-        const val STEP_NOTES = 3
+        private const val KEY_LAST_PAYMENT = "qa_last_payment"
+        private const val KEY_LAST_CATEGORY = "qa_last_category"
+        private const val KEY_CATEGORY_USES = "qa_category_uses"
+
+        private const val STEP_AMOUNT = 0
+        private const val STEP_CATEGORY = 1
+        private const val STEP_DETAILS = 2
+
+        private const val STEP_MS = 340L
+        private const val VISIBLE_CATEGORY_ROWS = 3
+
+        private val PAYMENTS = listOf(
+            Triple("upi", "UPI", R.drawable.ic_pay_upi),
+            Triple("cash", "Cash", R.drawable.ic_pay_cash),
+            Triple("card", "Card", R.drawable.ic_pay_card),
+            Triple("bank", "Bank", R.drawable.ic_pay_bank)
+        )
+        private val TITLES = arrayOf("How much?", "What was it for?", "How did you pay?")
     }
 
-    private var currentStep = STEP_AMOUNT
+    /** Material "emphasized" easing: quick start, long soft landing. */
+    private val ease = PathInterpolator(0.2f, 0f, 0f, 1f)
 
-    // Header & Navigation
-    private lateinit var btnHeaderBack: ImageView
-    private lateinit var dialogTitle: TextView
-    private lateinit var dialogStepBadge: TextView
-    private lateinit var btnDialogClose: ImageView
+    private lateinit var root: View
+    private lateinit var sheet: View
+    private lateinit var stepHost: ViewGroup
+    private lateinit var steps: List<View>
+    private lateinit var progress: List<View>
+    private lateinit var headerText: View
+    private lateinit var stepLabel: TextView
+    private lateinit var title: TextView
 
-    // Progress Dots
-    private lateinit var dotStep1: FrameLayout
-    private lateinit var dotStep2: FrameLayout
-    private lateinit var dotStep3: FrameLayout
-    private lateinit var dotStep4: FrameLayout
+    private lateinit var amountInput: EditText
+    private lateinit var amountRow: View
+    private lateinit var amountNext: TextView
+    private lateinit var categoryGrid: GridLayout
+    private lateinit var categoryScroll: ScrollView
+    private lateinit var categorySummary: TextView
+    private lateinit var detailsSummary: TextView
+    private lateinit var paymentRow: LinearLayout
+    private lateinit var noteInput: EditText
+    private lateinit var saveButton: TextView
 
-    // ViewFlipper
-    private lateinit var viewFlipper: ViewFlipper
-
-    // Step 1: Amount
-    private lateinit var step1CurrencySymbol: TextView
-    private lateinit var step1AmountInput: EditText
-    private lateinit var step1BtnNext: View
-
-    // Step 2: Category
-    private lateinit var step2AmountSubtext: TextView
-    private lateinit var step2CategoryGrid: GridLayout
-    private lateinit var step2BtnBack: View
-    private lateinit var step2BtnNext: View
-
-    // Step 3: Payment
-    private lateinit var step3SummarySubtext: TextView
-    private lateinit var step3PayCash: LinearLayout
-    private lateinit var step3PayUpi: LinearLayout
-    private lateinit var step3PayCard: LinearLayout
-    private lateinit var step3PayBank: LinearLayout
-    private lateinit var step3PayCashIcon: ImageView
-    private lateinit var step3PayUpiIcon: ImageView
-    private lateinit var step3PayCardIcon: ImageView
-    private lateinit var step3PayBankIcon: ImageView
-    private lateinit var step3PayCashText: TextView
-    private lateinit var step3PayUpiText: TextView
-    private lateinit var step3PayCardText: TextView
-    private lateinit var step3PayBankText: TextView
-    private lateinit var step3PayCashCheck: ImageView
-    private lateinit var step3PayUpiCheck: ImageView
-    private lateinit var step3PayCardCheck: ImageView
-    private lateinit var step3PayBankCheck: ImageView
-    private lateinit var step3BtnBack: View
-    private lateinit var step3BtnNext: View
-
-    // Step 4: Notes
-    private lateinit var step4SummaryAmount: TextView
-    private lateinit var step4SummaryDetails: TextView
-    private lateinit var step4NoteInput: EditText
-    private lateinit var sheetScroll: ScrollView
-    private lateinit var step4BtnBack: View
-    private lateinit var step4BtnSave: View
-
-    // Wallpaper palette (Android 12+), null = use the resource colours
-    private var palette: WidgetPalette? = null
-
-    // State
-    private var amount: Double = 0.0
+    private var currency = "₹"
     private var categories: List<CategoryItem> = emptyList()
-    private var selectedCategory: CategoryItem = CategoryItem(1, "Food", "restaurant", "#FF9800")
-    private var selectedPaymentMethod = "upi"
-    private var selectedPaymentDisplay = "UPI"
+    private lateinit var selectedCategory: CategoryItem
+    private var selectedPayment = "upi"
+
+    private var step = STEP_AMOUNT
+    private var stepAnimator: ValueAnimator? = null
+    private var imeAnimating = false
+    private var closing = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialog_quick_amount)
         applyWindowStyle()
-        palette = WidgetPalettes.get(this)
-
         bindViews()
-        setupStep1Amount()
-        setupStep2Category()
-        setupStep3Payment()
-        setupStep4Notes()
-        setupNavigation()
+        setupInsets()
 
-        applyPalette(findViewById(android.R.id.content))
-        dialogStepBadge.setTextColor(ink())
-        updateStepIndicators(STEP_AMOUNT)
+        currency = QuickAddWidgetProvider.getCurrencySymbol(this)
+        findViewById<TextView>(R.id.qa_currency).text = currency
 
-        // Focus keyboard automatically on Step 1
-        step1AmountInput.requestFocus()
-        step1AmountInput.post {
-            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
-            imm?.showSoftInput(step1AmountInput, InputMethodManager.SHOW_IMPLICIT)
-        }
+        root.setOnClickListener { close() }                 // tap outside the sheet
+        findViewById<View>(R.id.btn_dialog_close).setOnClickListener { close() }
+
+        setupAmountStep()
+        setupCategoryStep()
+        setupDetailsStep()
+
+        progress.forEach { it.pivotX = 0f }
+        updateProgress(animate = false)
+        playEnterAnimation()
     }
 
-    // Bottom sheet: full width at the bottom, soft dim + blur (Android 12+) behind.
+    // ─── Window ─────────────────────────────────────────────────────────────────
+
+    /** Full-screen transparent window with dim (and blur on Android 12+) behind. */
     private fun applyWindowStyle() {
-        window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-        window.setGravity(android.view.Gravity.BOTTOM)
-        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-        window.setDimAmount(0.3f)
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+        window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+        window.setDimAmount(0.32f)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
             window.attributes = window.attributes.also { it.blurBehindRadius = 28 }
         }
-    }
-
-    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
-        super.onConfigurationChanged(newConfig)
-        applyWindowStyle()
-    }
-
-    /** Quick left-right shake used to say "this needs a value". */
-    private fun shake(view: View) {
-        android.animation.ObjectAnimator.ofFloat(
-            view, "translationX", 0f, 18f, -18f, 12f, -12f, 6f, 0f
-        ).setDuration(320).start()
-    }
-
-    private fun ink(): Int = palette?.block ?: ContextCompat.getColor(this, R.color.widget_accent_ink)
-
-    private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
-
-    /** Replace the fill of a shape background (keeps corners and stroke). */
-    private fun fill(view: View, color: Int) {
-        (view.background?.mutate() as? GradientDrawable)?.setColor(color)
-    }
-
-    private fun applyPalette(root: View) {
-        val p = palette ?: return
-        if (root.tag is String) {
-            when (root.tag as String) {
-                "panel" -> fill(root, p.sheet)
-                "block", "btn" -> fill(root, p.block)
-                "accent" -> fill(root, p.accent)
-                "pill" -> fill(root, p.pill)
-            }
-        }
-        if (root is ViewGroup) for (i in 0 until root.childCount) applyPalette(root.getChildAt(i))
-    }
-
-    /** Tile / option background after a selection change (keeps the wallpaper fill). */
-    private fun styleOption(view: View, selected: Boolean) {
-        view.setBackgroundResource(
-            if (selected) R.drawable.quick_widget_item_selected else R.drawable.quick_widget_item_normal
-        )
-        val p = palette ?: return
-        fill(view, p.pill)
-        if (selected) (view.background as? GradientDrawable)?.setStroke(dp(2), p.block)
+        // We place the sheet above the keyboard / nav bar ourselves (see setupInsets).
+        WindowCompat.setDecorFitsSystemWindows(window, false)
     }
 
     private fun bindViews() {
-        btnHeaderBack = findViewById(R.id.btn_header_back)
-        dialogTitle = findViewById(R.id.dialog_title)
-        dialogStepBadge = findViewById(R.id.dialog_step_badge)
-        btnDialogClose = findViewById(R.id.btn_dialog_close)
+        root = findViewById(R.id.qa_root)
+        sheet = findViewById(R.id.qa_sheet)
+        stepHost = findViewById(R.id.qa_step_host)
+        steps = listOf(
+            findViewById(R.id.qa_step_amount),
+            findViewById(R.id.qa_step_category),
+            findViewById(R.id.qa_step_details)
+        )
+        progress = listOf(
+            findViewById(R.id.qa_progress_1),
+            findViewById(R.id.qa_progress_2),
+            findViewById(R.id.qa_progress_3)
+        )
+        headerText = findViewById(R.id.qa_header_text)
+        stepLabel = findViewById(R.id.qa_step_label)
+        title = findViewById(R.id.qa_title)
 
-        dotStep1 = findViewById(R.id.dot_step_1)
-        dotStep2 = findViewById(R.id.dot_step_2)
-        dotStep3 = findViewById(R.id.dot_step_3)
-        dotStep4 = findViewById(R.id.dot_step_4)
-
-        viewFlipper = findViewById(R.id.view_flipper)
-
-        // Step 1
-        step1CurrencySymbol = findViewById(R.id.step1_currency_symbol)
-        step1AmountInput = findViewById(R.id.step1_amount_input)
-        step1BtnNext = findViewById(R.id.step1_btn_next)
-
-        // Step 2
-        step2AmountSubtext = findViewById(R.id.step2_amount_subtext)
-        step2CategoryGrid = findViewById(R.id.step2_category_grid)
-        step2BtnBack = findViewById(R.id.step2_btn_back)
-        step2BtnNext = findViewById(R.id.step2_btn_next)
-
-        // Step 3
-        step3SummarySubtext = findViewById(R.id.step3_summary_subtext)
-        step3PayCash = findViewById(R.id.step3_pay_cash)
-        step3PayUpi = findViewById(R.id.step3_pay_upi)
-        step3PayCard = findViewById(R.id.step3_pay_card)
-        step3PayBank = findViewById(R.id.step3_pay_bank)
-        step3PayCashIcon = findViewById(R.id.step3_pay_cash_icon)
-        step3PayUpiIcon = findViewById(R.id.step3_pay_upi_icon)
-        step3PayCardIcon = findViewById(R.id.step3_pay_card_icon)
-        step3PayBankIcon = findViewById(R.id.step3_pay_bank_icon)
-        step3PayCashText = findViewById(R.id.step3_pay_cash_text)
-        step3PayUpiText = findViewById(R.id.step3_pay_upi_text)
-        step3PayCardText = findViewById(R.id.step3_pay_card_text)
-        step3PayBankText = findViewById(R.id.step3_pay_bank_text)
-        step3PayCashCheck = findViewById(R.id.step3_pay_cash_check)
-        step3PayUpiCheck = findViewById(R.id.step3_pay_upi_check)
-        step3PayCardCheck = findViewById(R.id.step3_pay_card_check)
-        step3PayBankCheck = findViewById(R.id.step3_pay_bank_check)
-        step3BtnBack = findViewById(R.id.step3_btn_back)
-        step3BtnNext = findViewById(R.id.step3_btn_next)
-
-        // Step 4
-        step4SummaryAmount = findViewById(R.id.step4_summary_amount)
-        step4SummaryDetails = findViewById(R.id.step4_summary_details)
-        step4NoteInput = findViewById(R.id.step4_note_input)
-        sheetScroll = findViewById(R.id.sheet_scroll)
-        step4BtnBack = findViewById(R.id.step4_btn_back)
-        step4BtnSave = findViewById(R.id.step4_btn_save)
+        amountInput = findViewById(R.id.qa_amount)
+        amountRow = findViewById(R.id.qa_amount_row)
+        amountNext = findViewById(R.id.btn_amount_next)
+        categoryGrid = findViewById(R.id.qa_category_grid)
+        categoryScroll = findViewById(R.id.qa_category_scroll)
+        categorySummary = findViewById(R.id.qa_category_summary)
+        detailsSummary = findViewById(R.id.qa_details_summary)
+        paymentRow = findViewById(R.id.qa_payment_row)
+        noteInput = findViewById(R.id.qa_note)
+        saveButton = findViewById(R.id.btn_save)
     }
 
-    private fun setupStep1Amount() {
-        val currency = QuickAddWidgetProvider.getCurrencySymbol(this)
-        step1CurrencySymbol.text = currency
-
-        val prefill = intent.getDoubleExtra(QuickAddWidgetProvider.EXTRA_PREFILL_AMOUNT, 0.0)
-        if (prefill > 0.0) {
-            val formatted = if (prefill % 1.0 == 0.0) prefill.toLong().toString() else String.format(Locale.US, "%.2f", prefill)
-            step1AmountInput.setText(formatted)
-            step1AmountInput.selectAll()
+    /**
+     * Keep the sheet above the keyboard and navigation bar. While the keyboard animates,
+     * the bottom padding follows it frame by frame, so the sheet glides instead of jumping.
+     */
+    private fun setupInsets() {
+        fun apply(insets: WindowInsetsCompat) {
+            val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            root.setPadding(0, bars.top, 0, max(ime.bottom, bars.bottom))
         }
-
-        setupAmountChip(findViewById(R.id.step1_chip_100), 100.0)
-        setupAmountChip(findViewById(R.id.step1_chip_500), 500.0)
-        setupAmountChip(findViewById(R.id.step1_chip_1000), 1000.0)
-        setupAmountChip(findViewById(R.id.step1_chip_2000), 2000.0)
-
-        step1AmountInput.setOnEditorActionListener { _, actionId, _ ->
-            if (actionId == EditorInfo.IME_ACTION_DONE || actionId == EditorInfo.IME_ACTION_NEXT || actionId == EditorInfo.IME_ACTION_GO) {
-                confirmAmountAndAdvance()
-                true
-            } else {
-                false
-            }
+        ViewCompat.setOnApplyWindowInsetsListener(root) { _, insets ->
+            if (!imeAnimating) apply(insets)
+            insets
         }
-
-        step1BtnNext.setOnClickListener {
-            confirmAmountAndAdvance()
-        }
-    }
-
-    private fun setupAmountChip(chip: TextView, add: Double) {
-        chip.setOnClickListener {
-            QuickAddWidgetProvider.triggerHaptic(this)
-            val cur = step1AmountInput.text.toString().toDoubleOrNull() ?: 0.0
-            val total = cur + add
-            val formatted = if (total % 1.0 == 0.0) total.toLong().toString() else String.format(Locale.US, "%.2f", total)
-            step1AmountInput.setText(formatted)
-            step1AmountInput.setSelection(formatted.length)
-        }
-    }
-
-    private fun confirmAmountAndAdvance() {
-        val amountStr = step1AmountInput.text.toString().trim()
-        val parsed = amountStr.toDoubleOrNull() ?: 0.0
-        if (parsed <= 0.0) {
-            step1AmountInput.requestFocus()
-            shake(step1AmountInput)
-            QuickAddWidgetProvider.triggerHaptic(this)
-            return
-        }
-
-        amount = parsed
-        hideKeyboard()
-        QuickAddWidgetProvider.triggerHaptic(this)
-        goToStep(STEP_CATEGORY, isForward = true)
-    }
-
-    private fun setupStep2Category() {
-        categories = QuickAddWidgetProvider.getCategories(this)
-        if (categories.isNotEmpty()) {
-            selectedCategory = categories[0]
-        }
-
-        // Category tiles (icon + name). Tapping one picks it and moves on.
-        val inflater = LayoutInflater.from(this)
-        categories.forEach { cat ->
-            val tile = inflater.inflate(R.layout.item_category_tile, step2CategoryGrid, false)
-            tile.findViewById<ImageView>(R.id.tile_icon)
-                .setImageResource(QuickAddWidgetProvider.getCategoryDrawable(cat.icon, cat.name))
-            tile.findViewById<TextView>(R.id.tile_name).text = cat.name
-            tile.tag = cat.id
-            val lp = GridLayout.LayoutParams(
-                GridLayout.spec(GridLayout.UNDEFINED, 1f),
-                GridLayout.spec(GridLayout.UNDEFINED, 1f)
-            ).apply {
-                width = 0
-                setMargins(4, 4, 4, 4)
-            }
-            tile.layoutParams = lp
-            tile.setOnClickListener {
-                selectedCategory = cat
-                refreshCategoryTiles()
-                QuickAddWidgetProvider.triggerHaptic(this)
-                hideKeyboard()
-                goToStep(STEP_PAYMENT, isForward = true)
-            }
-            step2CategoryGrid.addView(tile)
-        }
-        refreshCategoryTiles()
-
-        // More categories than fit: show a search box and tell the user the list scrolls.
-        if (categories.size > 8) {
-            val hint = findViewById<TextView>(R.id.step2_more_hint)
-            val empty = findViewById<TextView>(R.id.step2_empty)
-            val box = findViewById<View>(R.id.step2_search_box)
-            val input = findViewById<EditText>(R.id.step2_search_input)
-            val clear = findViewById<View>(R.id.step2_search_clear)
-            box.visibility = View.VISIBLE
-            hint.text = "${categories.size} categories · scroll for more"
-            hint.visibility = View.VISIBLE
-
-            input.addTextChangedListener(object : TextWatcher {
-                override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) {}
-                override fun onTextChanged(s: CharSequence?, st: Int, b: Int, c: Int) {}
-                override fun afterTextChanged(s: Editable?) {
-                    val q = s?.toString()?.trim()?.lowercase(Locale.ROOT).orEmpty()
-                    var shown = 0
-                    for (i in 0 until step2CategoryGrid.childCount) {
-                        val tile = step2CategoryGrid.getChildAt(i)
-                        val name = tile.findViewById<TextView>(R.id.tile_name).text.toString()
-                        val match = q.isEmpty() || name.lowercase(Locale.ROOT).contains(q)
-                        tile.visibility = if (match) View.VISIBLE else View.GONE
-                        if (match) shown++
-                    }
-                    clear.visibility = if (q.isEmpty()) View.GONE else View.VISIBLE
-                    hint.visibility = if (q.isEmpty()) View.VISIBLE else View.GONE
-                    empty.visibility = if (shown == 0) View.VISIBLE else View.GONE
+        ViewCompat.setWindowInsetsAnimationCallback(
+            root,
+            object : WindowInsetsAnimationCompat.Callback(DISPATCH_MODE_STOP) {
+                override fun onPrepare(animation: WindowInsetsAnimationCompat) {
+                    if (animation.typeMask and WindowInsetsCompat.Type.ime() != 0) imeAnimating = true
                 }
-            })
-            clear.setOnClickListener {
-                input.setText("")
-                QuickAddWidgetProvider.triggerHaptic(this)
+
+                override fun onProgress(
+                    insets: WindowInsetsCompat,
+                    running: MutableList<WindowInsetsAnimationCompat>
+                ): WindowInsetsCompat {
+                    apply(insets)
+                    return insets
+                }
+
+                override fun onEnd(animation: WindowInsetsAnimationCompat) {
+                    if (animation.typeMask and WindowInsetsCompat.Type.ime() != 0) {
+                        imeAnimating = false
+                        ViewCompat.requestApplyInsets(root)
+                    }
+                }
             }
-            input.setOnEditorActionListener { _, actionId, _ ->
-                if (actionId == EditorInfo.IME_ACTION_DONE) { hideKeyboard(); true } else false
-            }
-        }
-
-        step2BtnBack.setOnClickListener {
-            goToStep(STEP_AMOUNT, isForward = false)
-        }
-
-        step2BtnNext.setOnClickListener {
-            QuickAddWidgetProvider.triggerHaptic(this)
-            goToStep(STEP_PAYMENT, isForward = true)
-        }
-    }
-
-    private fun refreshCategoryTiles() {
-        val ink = ink()
-        val normal = ContextCompat.getColor(this, R.color.widget_text_1)
-        for (i in 0 until step2CategoryGrid.childCount) {
-            val tile = step2CategoryGrid.getChildAt(i)
-            val selected = tile.tag == selectedCategory.id
-            styleOption(tile, selected)
-            val color = if (selected) ink else normal
-            tile.findViewById<ImageView>(R.id.tile_icon).setColorFilter(color)
-            tile.findViewById<TextView>(R.id.tile_name).setTextColor(color)
-        }
-    }
-
-    private fun setupStep3Payment() {
-        selectPayment("upi", "UPI", shouldAdvance = false)
-
-        step3PayCash.setOnClickListener { selectPayment("cash", "Cash", shouldAdvance = true) }
-        step3PayUpi.setOnClickListener { selectPayment("upi", "UPI", shouldAdvance = true) }
-        step3PayCard.setOnClickListener { selectPayment("card", "Card", shouldAdvance = true) }
-        step3PayBank.setOnClickListener { selectPayment("bank", "Bank", shouldAdvance = true) }
-
-        step3BtnBack.setOnClickListener {
-            goToStep(STEP_CATEGORY, isForward = false)
-        }
-
-        step3BtnNext.setOnClickListener {
-            QuickAddWidgetProvider.triggerHaptic(this)
-            goToStep(STEP_NOTES, isForward = true)
-        }
-    }
-
-    private fun selectPayment(method: String, display: String, shouldAdvance: Boolean) {
-        selectedPaymentMethod = method
-        selectedPaymentDisplay = display
-        QuickAddWidgetProvider.triggerHaptic(this)
-
-        val items = listOf(
-            Quadruple(step3PayCash, step3PayCashIcon, step3PayCashText, step3PayCashCheck to ("cash" == method)),
-            Quadruple(step3PayUpi, step3PayUpiIcon, step3PayUpiText, step3PayUpiCheck to ("upi" == method)),
-            Quadruple(step3PayCard, step3PayCardIcon, step3PayCardText, step3PayCardCheck to ("card" == method)),
-            Quadruple(step3PayBank, step3PayBankIcon, step3PayBankText, step3PayBankCheck to ("bank" == method))
         )
+    }
 
-        val primaryColor = ink()
-        val normalTextColor = getColor(R.color.widget_text_1)
+    // ─── Enter / exit ───────────────────────────────────────────────────────────
 
-        for (quad in items) {
-            val (checkView, isSelected) = quad.checkPair
-            if (isSelected) {
-                styleOption(quad.layout, true)
-                quad.icon.setColorFilter(primaryColor)
-                quad.text.setTextColor(primaryColor)
-                checkView.visibility = View.VISIBLE
-            } else {
-                styleOption(quad.layout, false)
-                quad.icon.setColorFilter(normalTextColor)
-                quad.text.setTextColor(normalTextColor)
-                checkView.visibility = View.GONE
-            }
-        }
-
-        if (shouldAdvance) {
-            step3PayCash.postDelayed({
-                goToStep(STEP_NOTES, isForward = true)
-            }, 120)
+    private fun playEnterAnimation() {
+        sheet.alpha = 0f
+        sheet.post {
+            sheet.translationY = sheet.height * 0.6f
+            sheet.animate().translationY(0f).alpha(1f)
+                .setDuration(380).setInterpolator(ease).start()
+            focusAmount()
         }
     }
 
-    private data class Quadruple(
-        val layout: LinearLayout,
-        val icon: ImageView,
-        val text: TextView,
-        val checkPair: Pair<ImageView, Boolean>
-    )
-
-    private fun setupStep4Notes() {
-        // The sheet sits above the keyboard (adjustResize); also scroll the note
-        // field into view once the keyboard is up, so it is never hidden.
-        step4NoteInput.setOnFocusChangeListener { _, hasFocus ->
-            if (hasFocus) sheetScroll.postDelayed({ sheetScroll.fullScroll(View.FOCUS_DOWN) }, 300)
-        }
-
-        setupNoteChip(findViewById(R.id.step4_chip_lunch), "Lunch")
-        setupNoteChip(findViewById(R.id.step4_chip_coffee), "Coffee")
-        setupNoteChip(findViewById(R.id.step4_chip_grocery), "Grocery")
-        setupNoteChip(findViewById(R.id.step4_chip_bills), "Bills")
-
-        step4BtnBack.setOnClickListener {
-            goToStep(STEP_PAYMENT, isForward = false)
-        }
-
-        step4BtnSave.setOnClickListener {
-            saveExpense()
-        }
+    private fun close() {
+        if (closing) return
+        closing = true
+        hideKeyboard()
+        sheet.animate().translationY(sheet.height.toFloat() + dp(24)).alpha(0f)
+            .setDuration(220).setInterpolator(PathInterpolator(0.3f, 0f, 0.8f, 0.15f))
+            .withEndAction { finish() }
+            .start()
     }
 
-    private fun setupNoteChip(chip: TextView, text: String) {
-        chip.setOnClickListener {
-            QuickAddWidgetProvider.triggerHaptic(this)
-            step4NoteInput.setText(text)
-            step4NoteInput.setSelection(text.length)
-        }
-    }
-
-    private fun setupNavigation() {
-        btnDialogClose.setOnClickListener {
-            finish()
-        }
-
-        btnHeaderBack.setOnClickListener {
-            if (currentStep > STEP_AMOUNT) {
-                goToStep(currentStep - 1, isForward = false)
-            } else {
-                finish()
-            }
-        }
-    }
-
-    private fun goToStep(step: Int, isForward: Boolean) {
-        if (step == currentStep) return
-
-        if (isForward) {
-            viewFlipper.setInAnimation(this, R.anim.slide_in_right)
-            viewFlipper.setOutAnimation(this, R.anim.slide_out_left)
-        } else {
-            viewFlipper.setInAnimation(this, R.anim.slide_in_left)
-            viewFlipper.setOutAnimation(this, R.anim.slide_out_right)
-        }
-
-        currentStep = step
-        viewFlipper.displayedChild = step
-        updateStepIndicators(step)
-    }
-
-    private fun updateStepIndicators(step: Int) {
-        val currency = QuickAddWidgetProvider.getCurrencySymbol(this)
-        val formattedAmount = if (amount % 1.0 == 0.0) amount.toLong().toString() else String.format(Locale.US, "%.2f", amount)
-
-        btnHeaderBack.visibility = if (step > STEP_AMOUNT) View.VISIBLE else View.GONE
-        dialogStepBadge.text = "STEP ${step + 1} OF 4"
-
-        val activeRes = R.drawable.quick_widget_progress_active
-        val inactiveRes = R.drawable.quick_widget_progress_inactive
-
-        dotStep1.setBackgroundResource(if (step >= STEP_AMOUNT) activeRes else inactiveRes)
-        dotStep2.setBackgroundResource(if (step >= STEP_CATEGORY) activeRes else inactiveRes)
-        dotStep3.setBackgroundResource(if (step >= STEP_PAYMENT) activeRes else inactiveRes)
-        dotStep4.setBackgroundResource(if (step >= STEP_NOTES) activeRes else inactiveRes)
-        palette?.let { p ->
-            listOf(dotStep1, dotStep2, dotStep3, dotStep4).forEachIndexed { i, dot ->
-                if (step >= i) fill(dot, p.block)
-            }
-        }
-
-        when (step) {
-            STEP_AMOUNT -> {
-                dialogTitle.text = "Enter Amount"
-            }
-            STEP_CATEGORY -> {
-                dialogTitle.text = "Select Category"
-                step2AmountSubtext.text = "Amount: $currency$formattedAmount"
-            }
-            STEP_PAYMENT -> {
-                dialogTitle.text = "Payment Method"
-                step3SummarySubtext.text = "$currency$formattedAmount • ${selectedCategory.name}"
-            }
-            STEP_NOTES -> {
-                dialogTitle.text = "Review & Save"
-                step4SummaryAmount.text = "$currency$formattedAmount"
-                step4SummaryDetails.text = "• ${selectedCategory.name} • $selectedPaymentDisplay"
-            }
-        }
-    }
-
-    private fun saveExpense() {
-        if (amount <= 0.0) {
-            goToStep(STEP_AMOUNT, isForward = false)
-            return
-        }
-
-        val notes = step4NoteInput.text.toString().trim()
-        val currency = QuickAddWidgetProvider.getCurrencySymbol(this)
-        val formattedAmount = String.format(Locale.US, "%.2f", amount)
-
-        QuickAddWidgetProvider.executeSave(
-            context = this,
-            amount = amount,
-            catId = selectedCategory.id,
-            catName = selectedCategory.name,
-            catIcon = selectedCategory.icon,
-            catColor = selectedCategory.color,
-            paymentMethod = selectedPaymentMethod,
-            paymentDisplay = selectedPaymentDisplay,
-            notes = notes
-        )
-
-        Toast.makeText(this, "Added $currency$formattedAmount to ${selectedCategory.name}", Toast.LENGTH_SHORT).show()
-        finish()
-    }
-
-    private fun hideKeyboard() {
-        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
-        val view = currentFocus ?: step1AmountInput
-        imm?.hideSoftInputFromWindow(view.windowToken, 0)
+    override fun finish() {
+        super.finish()
+        // Only the dim fades; the sheet already slid away.
+        @Suppress("DEPRECATION")
+        overridePendingTransition(0, R.anim.qa_fade_out)
     }
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        if (currentStep > STEP_AMOUNT) {
-            goToStep(currentStep - 1, isForward = false)
-        } else {
-            super.onBackPressed()
+        if (step > STEP_AMOUNT) goTo(step - 1) else close()
+    }
+
+    // ─── Step 1: amount ─────────────────────────────────────────────────────────
+
+    private fun setupAmountStep() {
+        val prefill = intent.getDoubleExtra(QuickAddWidgetProvider.EXTRA_PREFILL_AMOUNT, 0.0)
+        if (prefill > 0.0) {
+            amountInput.setText(formatAmount(prefill))
+            amountInput.setSelection(amountInput.text.length)
         }
+        amountInput.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) {}
+            override fun onTextChanged(s: CharSequence?, st: Int, b: Int, c: Int) {}
+            override fun afterTextChanged(s: Editable?) = refreshAmountButtons()
+        })
+        amountInput.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_NEXT || actionId == EditorInfo.IME_ACTION_DONE) {
+                confirmAmount(); true
+            } else false
+        }
+        amountNext.setOnClickListener { confirmAmount() }
+        refreshAmountButtons()
+    }
+
+    private fun amount(): Double = amountInput.text.toString().trim().toDoubleOrNull() ?: 0.0
+
+    private fun formatAmount(v: Double): String =
+        if (v % 1.0 == 0.0) v.toLong().toString() else String.format(Locale.US, "%.2f", v)
+
+    private fun refreshAmountButtons() {
+        amountNext.animate().alpha(if (amount() > 0.0) 1f else 0.5f).setDuration(150).start()
+    }
+
+    private fun confirmAmount() {
+        if (amount() <= 0.0) {
+            amountInput.requestFocus()
+            ObjectAnimator.ofFloat(amountRow, "translationX", 0f, 18f, -18f, 12f, -12f, 6f, 0f)
+                .setDuration(320).start()
+            QuickAddWidgetProvider.triggerHaptic(this)
+            return
+        }
+        QuickAddWidgetProvider.triggerHaptic(this)
+        goTo(STEP_CATEGORY)
+    }
+
+    private fun focusAmount() {
+        amountInput.requestFocus()
+        amountInput.setSelection(amountInput.text.length)
+        (getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager)
+            ?.showSoftInput(amountInput, InputMethodManager.SHOW_IMPLICIT)
+    }
+
+    // ─── Step 2: category (most used first, last used pre-selected) ─────────────
+
+    private fun setupCategoryStep() {
+        val prefs = getSharedPreferences(QuickAddWidgetProvider.PREFS_NAME, MODE_PRIVATE)
+        val uses = readUses()
+        val lastId = prefs.getInt(KEY_LAST_CATEGORY, -1)
+        val history = expenseCountsFromHistory()
+
+        categories = QuickAddWidgetProvider.getCategories(this).withIndex()
+            .sortedWith(compareByDescending<IndexedValue<CategoryItem>> { it.value.id == lastId }
+                .thenByDescending {
+                    uses.optInt(it.value.id.toString(), 0) + (history[it.value.id] ?: 0)
+                }
+                .thenBy { it.index })
+            .map { it.value }
+        selectedCategory = categories.first()
+
+        val inflater = LayoutInflater.from(this)
+        categories.forEach { cat ->
+            val tile = inflater.inflate(R.layout.item_quick_tile, categoryGrid, false)
+            tile.findViewById<ImageView>(R.id.chip_icon)
+                .setImageResource(QuickAddWidgetProvider.getCategoryDrawable(cat.icon, cat.name))
+            tile.findViewById<TextView>(R.id.chip_label).text = cat.name
+            tile.contentDescription = cat.name
+            tile.tag = cat.id
+            tile.layoutParams = GridLayout.LayoutParams(
+                GridLayout.spec(GridLayout.UNDEFINED),
+                GridLayout.spec(GridLayout.UNDEFINED, 1f)
+            ).apply {
+                width = 0
+                height = dp(78)
+                setMargins(dp(4), dp(4), dp(4), dp(4))
+            }
+            tile.setOnClickListener {
+                selectedCategory = cat
+                refreshCategoryTiles()
+                QuickAddWidgetProvider.triggerHaptic(this)
+                // Picking a category is the answer to this step: move on by itself.
+                tile.postDelayed({ if (step == STEP_CATEGORY) goTo(STEP_DETAILS) }, 160)
+            }
+            categoryGrid.addView(tile)
+        }
+        refreshCategoryTiles()
+
+        // More than three rows: fixed height that shows a peek of the next row, rest scrolls.
+        val rows = (categories.size + 3) / 4
+        if (rows > VISIBLE_CATEGORY_ROWS) {
+            categoryScroll.layoutParams.height = dp(86 * VISIBLE_CATEGORY_ROWS + 40)
+        }
+
+        findViewById<View>(R.id.btn_category_back).setOnClickListener { goTo(STEP_AMOUNT) }
+        findViewById<View>(R.id.btn_category_next).setOnClickListener {
+            QuickAddWidgetProvider.triggerHaptic(this)
+            goTo(STEP_DETAILS)
+        }
+    }
+
+    private fun refreshCategoryTiles() {
+        for (i in 0 until categoryGrid.childCount) {
+            val tile = categoryGrid.getChildAt(i)
+            val selected = tile.tag == selectedCategory.id
+            tile.setBackgroundResource(if (selected) R.drawable.qa_tile_selected else R.drawable.qa_tile)
+            tintContent(tile, selected)
+        }
+    }
+
+    /** How often each category appears in the app's cached expenses, so ranking works from day one. */
+    private fun expenseCountsFromHistory(): Map<Int, Int> {
+        val raw = getSharedPreferences(QuickAddWidgetProvider.FLUTTER_PREFS, MODE_PRIVATE)
+            .getString("flutter.cache_transactions", null) ?: return emptyMap()
+        return try {
+            val arr = JSONObject(raw).optJSONArray("transactions") ?: return emptyMap()
+            val counts = HashMap<Int, Int>()
+            for (i in 0 until arr.length()) {
+                val t = arr.optJSONObject(i) ?: continue
+                if (t.optString("type", "expense") != "expense") continue
+                val id = t.optJSONObject("category")?.optInt("id", -1) ?: -1
+                if (id >= 0) counts[id] = (counts[id] ?: 0) + 1
+            }
+            counts
+        } catch (_: Exception) {
+            emptyMap()
+        }
+    }
+
+    // ─── Step 3: payment + note ─────────────────────────────────────────────────
+
+    private fun setupDetailsStep() {
+        val prefs = getSharedPreferences(QuickAddWidgetProvider.PREFS_NAME, MODE_PRIVATE)
+        selectedPayment = prefs.getString(KEY_LAST_PAYMENT, "upi")
+            ?.takeIf { key -> PAYMENTS.any { it.first == key } } ?: "upi"
+
+        val inflater = LayoutInflater.from(this)
+        PAYMENTS.forEachIndexed { i, (key, label, icon) ->
+            val chip = inflater.inflate(R.layout.item_quick_chip, paymentRow, false)
+            chip.findViewById<ImageView>(R.id.chip_icon).setImageResource(icon)
+            chip.findViewById<TextView>(R.id.chip_label).text = label
+            chip.contentDescription = label
+            chip.tag = key
+            chip.setPadding(dp(6), 0, dp(6), 0)
+            chip.layoutParams = LinearLayout.LayoutParams(0, dp(44), 1f).apply {
+                marginEnd = if (i < PAYMENTS.size - 1) dp(8) else 0
+            }
+            chip.setOnClickListener {
+                selectedPayment = key
+                QuickAddWidgetProvider.triggerHaptic(this)
+                refreshPaymentChips()
+            }
+            paymentRow.addView(chip)
+        }
+        refreshPaymentChips()
+
+        noteInput.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_DONE) { save(); true } else false
+        }
+        findViewById<View>(R.id.btn_details_back).setOnClickListener { goTo(STEP_CATEGORY) }
+        saveButton.setOnClickListener { save() }
+    }
+
+    private fun refreshPaymentChips() {
+        for (i in 0 until paymentRow.childCount) {
+            val chip = paymentRow.getChildAt(i)
+            val selected = chip.tag == selectedPayment
+            chip.setBackgroundResource(if (selected) R.drawable.qa_chip_selected else R.drawable.qa_chip)
+            tintContent(chip, selected)
+        }
+    }
+
+    private fun tintContent(item: View, selected: Boolean) {
+        val color = getColor(if (selected) R.color.wp_on_block else R.color.widget_text_1)
+        item.findViewById<ImageView>(R.id.chip_icon).setColorFilter(color)
+        item.findViewById<TextView>(R.id.chip_label).setTextColor(color)
+        item.isSelected = selected
+    }
+
+    // ─── Step transitions ───────────────────────────────────────────────────────
+
+    private fun refreshSummaries() {
+        val amt = "$currency${formatAmount(amount())}"
+        categorySummary.text = amt
+        detailsSummary.text = "$amt · ${selectedCategory.name}"
+        saveButton.text = "Save $amt"
+    }
+
+    /**
+     * Shared-axis step change: the old step drifts out (and fades) in the direction of
+     * travel, the new one drifts in from the other side, and the sheet height glides
+     * from one step's height to the other's - all on one eased timeline.
+     */
+    private fun goTo(target: Int) {
+        if (target == step || closing) return
+        stepAnimator?.end()
+        refreshSummaries()
+
+        val forward = target > step
+        val from = steps[step]
+        val to = steps[target]
+        step = target
+
+        // Keyboard: only the amount step asks for it.
+        if (target == STEP_AMOUNT) focusAmount() else { hideKeyboard(); currentFocus?.clearFocus() }
+
+        val startH = stepHost.height
+        to.visibility = View.VISIBLE
+        to.measure(
+            View.MeasureSpec.makeMeasureSpec(stepHost.width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        )
+        val endH = to.measuredHeight
+        stepHost.layoutParams.height = startH
+        stepHost.requestLayout()
+
+        val shift = dp(48).toFloat() * if (forward) 1 else -1
+        to.alpha = 0f
+        to.translationX = shift
+
+        stepAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = STEP_MS
+            interpolator = ease
+            addUpdateListener {
+                val p = it.animatedValue as Float
+                // Outgoing finishes fading in the first ~35%, incoming starts after ~20%.
+                from.alpha = (1f - p / 0.35f).coerceIn(0f, 1f)
+                from.translationX = -shift * p
+                to.alpha = ((p - 0.2f) / 0.8f).coerceIn(0f, 1f)
+                to.translationX = shift * (1f - p)
+                stepHost.layoutParams.height = (startH + (endH - startH) * p).toInt()
+                stepHost.requestLayout()
+            }
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    from.visibility = View.GONE
+                    from.alpha = 1f
+                    from.translationX = 0f
+                    to.alpha = 1f
+                    to.translationX = 0f
+                    stepHost.layoutParams.height = ViewGroup.LayoutParams.WRAP_CONTENT
+                    stepHost.requestLayout()
+                    stepAnimator = null
+                }
+            })
+            start()
+        }
+
+        crossfadeHeader(forward)
+        updateProgress(animate = true)
+    }
+
+    private fun crossfadeHeader(forward: Boolean) {
+        val d = dp(10).toFloat() * if (forward) 1 else -1
+        headerText.animate().cancel()
+        headerText.animate().alpha(0f).translationX(-d).setDuration(120)
+            .setInterpolator(PathInterpolator(0.3f, 0f, 1f, 1f))
+            .withEndAction {
+                stepLabel.text = "STEP ${step + 1} OF 3"
+                title.text = TITLES[step]
+                headerText.translationX = d
+                headerText.animate().alpha(1f).translationX(0f).setDuration(220)
+                    .setInterpolator(ease).start()
+            }.start()
+    }
+
+    private fun updateProgress(animate: Boolean) {
+        progress.forEachIndexed { i, bar ->
+            val target = if (i <= step) 1f else 0f
+            if (animate) {
+                bar.animate().scaleX(target).setDuration(STEP_MS).setInterpolator(ease).start()
+            } else {
+                bar.scaleX = target
+            }
+        }
+    }
+
+    // ─── Save ───────────────────────────────────────────────────────────────────
+
+    private fun save() {
+        if (closing) return
+        val a = amount()
+        if (a <= 0.0) { goTo(STEP_AMOUNT); return }
+
+        val cat = selectedCategory
+        val paymentLabel = PAYMENTS.first { it.first == selectedPayment }.second
+        QuickAddWidgetProvider.executeSave(
+            context = this,
+            amount = a,
+            catId = cat.id,
+            catName = cat.name,
+            catIcon = cat.icon,
+            catColor = cat.color,
+            paymentMethod = selectedPayment,
+            paymentDisplay = paymentLabel,
+            notes = noteInput.text.toString().trim()
+        )
+        rememberChoices(cat.id)
+
+        Toast.makeText(this, "Added $currency${formatAmount(a)} · ${cat.name}", Toast.LENGTH_SHORT).show()
+        close()
+    }
+
+    private fun readUses(): JSONObject = try {
+        JSONObject(
+            getSharedPreferences(QuickAddWidgetProvider.PREFS_NAME, MODE_PRIVATE)
+                .getString(KEY_CATEGORY_USES, "{}") ?: "{}"
+        )
+    } catch (_: Exception) { JSONObject() }
+
+    private fun rememberChoices(categoryId: Int) {
+        val uses = readUses()
+        val key = categoryId.toString()
+        uses.put(key, uses.optInt(key, 0) + 1)
+        getSharedPreferences(QuickAddWidgetProvider.PREFS_NAME, MODE_PRIVATE).edit()
+            .putString(KEY_CATEGORY_USES, uses.toString())
+            .putInt(KEY_LAST_CATEGORY, categoryId)
+            .putString(KEY_LAST_PAYMENT, selectedPayment)
+            .apply()
+    }
+
+    // ─── Helpers ────────────────────────────────────────────────────────────────
+
+    private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
+
+    private fun hideKeyboard() {
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+        imm?.hideSoftInputFromWindow((currentFocus ?: amountInput).windowToken, 0)
     }
 }

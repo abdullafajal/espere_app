@@ -240,32 +240,27 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
             // ─── Filter Bar ─────────────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    EspereFilterChip(
-                      active: _typeFilter != 'all',
-                      label: _typeFilter == 'all'
-                          ? 'All Types'
-                          : _typeFilter == 'expense'
-                              ? 'Expense'
-                              : 'Income',
-                      onTap: () {
-                        setState(() {
-                          if (_typeFilter == 'all') {
-                            _typeFilter = 'expense';
-                          } else if (_typeFilter == 'expense') {
-                            _typeFilter = 'income';
-                          } else {
-                            _typeFilter = 'all';
-                          }
-                        });
-                      },
-                      onLongPress: _showTypeFilterSheet,
-                    ),
-                  ],
-                ),
+              // Single filter: stretch to the full width (label left, arrow right).
+              child: EspereFilterChip(
+                expand: true,
+                active: _typeFilter != 'all',
+                label: _typeFilter == 'all'
+                    ? 'All Types'
+                    : _typeFilter == 'expense'
+                        ? 'Expense'
+                        : 'Income',
+                onTap: () {
+                  setState(() {
+                    if (_typeFilter == 'all') {
+                      _typeFilter = 'expense';
+                    } else if (_typeFilter == 'expense') {
+                      _typeFilter = 'income';
+                    } else {
+                      _typeFilter = 'all';
+                    }
+                  });
+                },
+                onLongPress: _showTypeFilterSheet,
               ),
             ),
 

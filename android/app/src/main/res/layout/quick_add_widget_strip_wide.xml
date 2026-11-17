@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 4x1: add + today / this month / avg per day - frosted Samsung-style widget -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" 
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/fr_widget_bg"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingStart="8dp"
+    android:paddingTop="8dp"
+    android:paddingEnd="16dp"
+    android:paddingBottom="8dp">
+
+    <FrameLayout
+        android:id="@+id/widget_btn_plus"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:background="@drawable/fr_circle"
+        android:contentDescription="Add expense">
+
+        <ImageView
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_gravity="center"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_plus"
+            android:tint="@color/ou_accent" />
+    </FrameLayout>
+
+    <FrameLayout
+        android:layout_width="14dp"
+        android:layout_height="1dp" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:text="Today"
+            android:textColor="@color/fr_text_2"
+            android:textSize="11sp" />
+
+        <TextView
+            android:id="@+id/widget_today_spend"
+            android:layout_width="match_parent"
+            android:layout_height="24dp"
+            android:autoSizeMaxTextSize="18sp"
+            android:autoSizeMinTextSize="10sp"
+            android:autoSizeStepGranularity="1sp"
+            android:autoSizeTextType="uniform"
+            android:gravity="center_vertical|start"
+            android:maxLines="1"
+            android:text="₹0"
+            android:textColor="@color/fr_text_1"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:layout_width="1dp"
+        android:layout_height="28dp"
+        android:layout_gravity="center_vertical"
+        android:layout_marginStart="10dp"
+        android:layout_marginEnd="10dp"
+        android:layout_marginTop="6dp"
+        android:layout_marginBottom="6dp"
+        android:background="@drawable/fr_divider_line" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:text="This month"
+            android:textColor="@color/fr_text_2"
+            android:textSize="11sp" />
+
+        <TextView
+            android:id="@+id/widget_total_spend"
+            android:layout_width="match_parent"
+            android:layout_height="24dp"
+            android:autoSizeMaxTextSize="18sp"
+            android:autoSizeMinTextSize="10sp"
+            android:autoSizeStepGranularity="1sp"
+            android:autoSizeTextType="uniform"
+            android:gravity="center_vertical|start"
+            android:maxLines="1"
+            android:text="₹0"
+            android:textColor="@color/fr_text_1"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:layout_width="1dp"
+        android:layout_height="28dp"
+        android:layout_gravity="center_vertical"
+        android:layout_marginStart="10dp"
+        android:layout_marginEnd="10dp"
+        android:layout_marginTop="6dp"
+        android:layout_marginBottom="6dp"
+        android:background="@drawable/fr_divider_line" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:text="Avg / day"
+            android:textColor="@color/fr_text_2"
+            android:textSize="11sp" />
+
+        <TextView
+            android:id="@+id/widget_avg_daily"
+            android:layout_width="match_parent"
+            android:layout_height="24dp"
+            android:autoSizeMaxTextSize="18sp"
+            android:autoSizeMinTextSize="10sp"
+            android:autoSizeStepGranularity="1sp"
+            android:autoSizeTextType="uniform"
+            android:gravity="center_vertical|start"
+            android:maxLines="1"
+            android:text="₹0"
+            android:textColor="@color/fr_text_1"
+            android:textStyle="bold" />
+    </LinearLayout>
+</LinearLayout>

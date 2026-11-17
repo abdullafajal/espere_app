@@ -33,4 +33,23 @@
         <item name="android:windowEnterAnimation">@anim/sheet_in</item>
         <item name="android:windowExitAnimation">@anim/sheet_out</item>
     </style>
+
+    <!-- Quick Add sheet: full-screen transparent window; the sheet itself slides and
+         follows the keyboard in code, so every movement can be animated smoothly. -->
+    <style name="Theme.QuickAddSheet" parent="@android:style/Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowAnimationStyle">@style/Animation.QuickFade</item>
+    </style>
+
+    <!-- Only the dim fades; the sheet's slide is done in code -->
+    <style name="Animation.QuickFade" parent="@android:style/Animation">
+        <item name="android:windowEnterAnimation">@anim/qa_fade_in</item>
+        <item name="android:windowExitAnimation">@anim/qa_fade_out</item>
+    </style>
 </resources>
