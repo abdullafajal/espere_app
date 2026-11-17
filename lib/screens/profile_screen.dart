@@ -16,6 +16,8 @@ import '../services/connectivity_service.dart';
 import '../widgets/espere_back_button.dart';
 import '../services/sync_service.dart';
 import '../services/widget_service.dart';
+import '../services/auto_expense_service.dart';
+import 'auto_track_settings_screen.dart';
 import '../widgets/espere_input.dart';
 import '../utils/app_toast.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -40,6 +42,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _theme = 'light';
   bool _emailReminders = true;
   bool _shredderAnimation = true;
+  bool _autoTrackOn = false;
+  bool _autoTrackAvailable = false;
 
   static final _currencies = const [
     ('USD', '\$', 'US Dollar (USD)'),
@@ -58,6 +62,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     _loadProfile();
+    _loadAutoTrack();
+  }
+
+  Future<void> _loadAutoTrack() async {
+    if (!await AutoExpenseService.isAvailable()) return;
+    final s = await AutoExpenseService.settings();
+    if (mounted) {
+      setState(() {
+        _autoTrackAvailable = true;
+        _autoTrackOn = s.enabled;
+      });
+    }
+  }
+
+  Future<void> _openAutoTrack() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AutoTrackSettingsScreen()),
+    );
+    await _loadAutoTrack();
+  }
+
+  Future<void> _toggleAutoTrack() async {
+    if (_autoTrackOn) {
+      // Turning off deletes local data: confirm on the settings screen.
+      await _openAutoTrack();
+      return;
+    }
+    await AutoTrackSettingsScreen.startEnableFlow(context);
+    await _loadAutoTrack();
   }
 
   Future<void> _loadProfile() async {
@@ -167,6 +201,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _logout() async {
+    // Auto-track data belongs to this account and this device only.
+    await AutoExpenseService.turnOffAndDeleteLocalData();
     await ApiService.logout();
     await CacheService.clearAll();
     if (!mounted) return;
@@ -739,6 +775,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                               onTap: _showCurrencyPicker,
                             ),
+                            if (_autoTrackAvailable)
+                              _buildRow(
+                                icon: Icons.bolt,
+                                title: 'Auto-track payments',
+                                subtitle: _autoTrackOn
+                                    ? 'On · from UPI & bank notifications'
+                                    : 'Add expenses from payment notifications',
+                                onTap: _openAutoTrack,
+                                trailing: GestureDetector(
+                                  onTap: _toggleAutoTrack,
+                                  child: Container(
+                                    width: 28,
+                                    height: 28,
+                                    decoration: BoxDecoration(
+                                      color: _autoTrackOn ? AppColors.dark : Colors.transparent,
+                                      border: Border.all(
+                                        color: _autoTrackOn ? AppColors.dark : AppColors.muted,
+                                        width: 1.5,
+                                      ),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: _autoTrackOn
+                                        ? const Icon(Icons.check, size: 18, color: AppColors.accent)
+                                        : null,
+                                  ),
+                                ),
+                              ),
                             _buildRow(
                               icon: Icons.notifications_none,
                               title: 'Daily Reminders',

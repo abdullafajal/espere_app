@@ -18,6 +18,7 @@ import 'services/notification_service.dart';
 import 'services/connectivity_service.dart';
 import 'services/sync_service.dart';
 import 'services/deep_link_service.dart';
+import 'services/auto_expense_service.dart';
 
 final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -38,6 +39,9 @@ void main() async {
 
   // Initialize Deep Linking
   DeepLinkService.init(rootNavigatorKey);
+
+  // Auto-track payments (no-op unless the user turned it on)
+  AutoExpenseService.init();
 
   // Initial sync if online
   if (ConnectivityService.isOnline) {

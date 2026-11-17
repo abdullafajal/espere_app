@@ -11,6 +11,12 @@ import 'dart:async';
 import 'widget_service.dart';
 
 class SyncService {
+  /// Hooks for auto-tracked payments (set by AutoExpenseService.init):
+  /// a deleted transaction must never be re-created from a notification, and fingerprints
+  /// must follow an offline entry when the server gives it its real id.
+  static Future<void> Function(int id)? onTransactionDeleted;
+  static Future<void> Function(int oldId, int newId)? onTransactionIdChanged;
+
   static final _syncController = StreamController<void>.broadcast();
 
   /// Stream that emits when a sync cycle finishes (queue processed).
@@ -298,6 +304,11 @@ class SyncService {
                   txnJson, 
                   oldId: action == 'create' ? entityId : null
                 );
+                if (action == 'create' && entityId != null && txnJson['id'] != entityId) {
+                  try {
+                    await onTransactionIdChanged?.call(entityId, txnJson['id'] as int);
+                  } catch (_) {}
+                }
               }
             } else if (entity == 'category') {
               if (action == 'create' || action == 'update') {
@@ -631,6 +642,11 @@ class SyncService {
     Map<String, dynamic>? data,
     int? entityId,
   }) async {
+    if (entity == 'transaction' && action == 'delete' && entityId != null) {
+      try {
+        await onTransactionDeleted?.call(entityId);
+      } catch (_) {}
+    }
     if (_isTempId(entityId) && !_processing && (action == 'delete' || action == 'update')) {
       final queue = await CacheService.getSyncQueue();
       final createIdx = queue.indexWhere((o) =>

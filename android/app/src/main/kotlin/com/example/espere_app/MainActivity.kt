@@ -3,6 +3,7 @@ package com.example.espere_app
 import android.app.Activity
 import android.content.Intent
 import android.provider.MediaStore
+import com.example.espere_app.autocapture.AutoCaptureBridge
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -17,6 +18,8 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        // Payment-notification auto-tracking (off until the user opts in)
+        AutoCaptureBridge.register(this, flutterEngine.dartExecutor.binaryMessenger) { this }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             if (call.method == "pickImage") {
                 pendingResult = result

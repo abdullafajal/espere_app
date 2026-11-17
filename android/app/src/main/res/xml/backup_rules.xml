@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and older: keep auto-tracking data out of backups. -->
+<full-backup-content>
+    <exclude domain="database" path="espere_auto.db" />
+    <exclude domain="database" path="espere_auto.db-journal" />
+    <exclude domain="database" path="espere_auto.db-wal" />
+    <exclude domain="database" path="espere_auto.db-shm" />
+    <exclude domain="sharedpref" path="auto_capture_config.xml" />
+</full-backup-content>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Website (sideloaded) release builds: Google Play Protect's enhanced fraud protection
+     (India) blocks the install of apps from browsers / messaging apps / file managers that
+     declare a notification listener. These builds therefore drop Auto-track payments; the
+     app hides the feature when the listener is not declared. Play Store builds keep it.
+     Used when building with:  -P espere.autoTrack=false -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <application>
+        <service
+            android:name=".autocapture.PaymentNotificationListener"
+            tools:node="remove" />
+    </application>
+</manifest>
