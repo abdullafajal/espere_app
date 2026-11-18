@@ -81,8 +81,112 @@ Save 19%*''';
       });
     }
 
+    for (final (ocr, expected) in [
+      ('760', 60.0), // what this phone's OCR returns for "₹60"
+      ('7760', 760.0),
+      ('71,200', 1200.0),
+      ('2500', 500.0),
+      ('7120.50', 120.5),
+    ]) {
+      test('"₹" read as a digit: "$ocr" -> $expected', () {
+        final r = ReceiptParser.parse(
+            base.replaceFirst('AMOUNT', ocr).replaceFirst('STATUS', ocr),
+            now: now);
+        expect(r.amount, expected);
+      });
+    }
+
+    test('a digit is not dropped when a symbol was read', () {
+      final r = ReceiptParser.parse(base.replaceFirst('AMOUNT', '*760').replaceFirst('STATUS', '*760'),
+          now: now);
+      expect(r.amount, 760);
+    });
+
     test('battery level, time and date are never taken as the amount', () {
       final r = ReceiptParser.parse('1:30\n82\nThank You\nLITE CAFE\n18 Nov 2026, 1:29 PM', now: now);
+      expect(r.amount, isNull);
+    });
+  });
+
+  group('Google Pay detail screen (OCR text)', () {
+    String screen(String amount) => '''4:19
+To TALIB
+$amount
+Pay again
+Completed
+3 Nov 2026, 1:35 pm
+Punjab National Bank
+9025
+Payment of $amount completed
+Receiver's bank has confirmed
+deposit of money to TALIB's bank
+account
+UPI transaction ID
+Having issues? Share Split expense''';
+
+    for (final (ocr, expected) in [
+      ('₹140', 140.0),
+      ('140', 140.0),
+      ('7140', 140.0),
+      ('Z140', 140.0),
+    ]) {
+      test('"$ocr" -> $expected, payee TALIB', () {
+        final r = ReceiptParser.parse(screen(ocr), now: now);
+        expect(r.amount, expected);
+        expect(r.type, 'expense');
+        expect(r.payee, 'TALIB');
+        expect(r.time, DateTime(2026, 11, 3, 13, 35));
+      });
+    }
+  });
+
+  group('PhonePe transaction screen (OCR text)', () {
+    String screen(String amount) => '''4:22
+59
+Transaction Successful
+08:18 pm on 14 Oct 2026
+Paid to
+FP
+Flipkart Payments $amount
+paytm-56505013@ptybl
+Transfer Details
+PhonePe Transaction ID
+T2610142018372270123469
+Debited from
+XXXXXX9025 $amount
+UTR: 234372128842
+View History Split Expense Share Receipt
+Contact PhonePe Support
+Pay securely with fingerp...
+Enjoy seamless and safer
+payments up to ${amount.replaceAll('1,232', '10,000')}.
+Activate Now
+Powered by''';
+
+    for (final (ocr, expected) in [
+      ('₹1,232', 1232.0),
+      ('71,232', 1232.0),
+      ('1,232', 1232.0),
+    ]) {
+      test('"$ocr" -> $expected, payee, time, ref', () {
+        final r = ReceiptParser.parse(screen(ocr), now: now);
+        expect(r.amount, expected);
+        expect(r.type, 'expense');
+        expect(r.payee, 'Flipkart Payments');
+        expect(r.time, DateTime(2026, 10, 14, 20, 18));
+        expect(r.ref, 'T2610142018372270123469');
+      });
+    }
+
+    test('amount line before the name (OCR order)', () {
+      final r = ReceiptParser.parse(
+          'Paid to\n71,232\nFlipkart Payments\nDebited from\nXXXXXX9025 71,232', now: now);
+      expect(r.amount, 1232);
+      expect(r.payee, 'Flipkart Payments');
+    });
+
+    test('a year printed twice is not an amount', () {
+      final r = ReceiptParser.parse('Paid to\nRaju\n14 Oct 2026\nUpdated 15 Oct 2026', now: now);
       expect(r.amount, isNull);
     });
   });
@@ -123,6 +227,39 @@ Save 19%*''';
       final r = ReceiptParser.parse('You paid Rs. 99 to chaiwala@okaxis', now: now);
       expect(r.amount, 99);
       expect(r.payee, 'chaiwala');
+    });
+  });
+
+  group('share texts with links and phone numbers', () {
+    test('PhonePe-style share text', () {
+      final r = ReceiptParser.parse(
+          'Hi! I paid ₹1,232 to Flipkart Payments using PhonePe.\n'
+          'Transaction ID: T2610142018372270123469\n'
+          'Download PhonePe: https://phon.pe/ru_9xk2/123456',
+          now: now);
+      expect(r.amount, 1232);
+      expect(r.payee, 'Flipkart Payments');
+      expect(r.ref, 'T2610142018372270123469');
+    });
+
+    test('Amazon Pay-style share text', () {
+      final r = ReceiptParser.parse(
+          'I paid ₹60 to LITE CAFE using Amazon Pay UPI on 18 Nov 2026, 1:29 PM.\n'
+          'Pay with Amazon Pay: https://amzn.to/4abc123', now: now);
+      expect(r.amount, 60);
+      expect(r.payee, 'LITE CAFE');
+      expect(r.time, DateTime(2026, 11, 18, 13, 29));
+    });
+
+    test('helpline number is not an amount', () {
+      final r = ReceiptParser.parse('Paid to\nRaju Tea Stall\n₹40\nHelpline +91 80 4567 12345', now: now);
+      expect(r.amount, 40);
+    });
+
+    test('Indian grouping and paise', () {
+      final r = ReceiptParser.parse('Payment of ₹1,25,000.50 to Sai Motors successful', now: now);
+      expect(r.amount, 125000.5);
+      expect(r.payee, 'Sai Motors');
     });
   });
 

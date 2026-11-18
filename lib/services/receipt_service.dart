@@ -72,11 +72,14 @@ class ReceiptService {
 
   // ─── Native calls ─────────────────────────────────────────────────────────
 
-  /// Text on the image at [path] (on-device OCR), or null if it could not be read.
-  static Future<String?> recognizeText(String path) async {
+  /// Text and layout of the image at [path] (on-device OCR), or null if it could not be read.
+  static Future<OcrScan?> recognize(String path) async {
     if (!isSupported) return null;
     try {
-      return await _channel.invokeMethod<String>('recognizeText', {'path': path});
+      final m = await _channel.invokeMethod<Map<dynamic, dynamic>>('recognizeText', {'path': path});
+      if (m == null) return null;
+      final scan = OcrScan.fromMap(m);
+      return scan.lines.isEmpty ? null : scan;
     } on PlatformException catch (e) {
       debugPrint('[Receipt] OCR failed: ${e.code}');
       return null;
@@ -110,27 +113,39 @@ class ReceiptService {
         if ((share['subject'] as String?)?.trim().isNotEmpty ?? false) share['subject'] as String,
         if ((share['text'] as String?)?.trim().isNotEmpty ?? false) share['text'] as String,
       ];
+      OcrScan? scan;
       if (imagePath != null) {
-        final ocr = await recognizeText(imagePath);
+        scan = await recognize(imagePath);
         _deleteQuietly(imagePath);
-        if (ocr != null && ocr.trim().isNotEmpty) parts.add(ocr);
       }
       if (!context.mounted) return;
 
-      if (parts.isEmpty) {
+      if (parts.isEmpty && scan == null) {
         AppToast.error(context, 'Could not read this receipt. Please add it manually.');
         TransactionFormScreen.show(context, prefill: const TransactionPrefill());
         return;
       }
-      await openForm(context, parts.join('\n'));
+      await openForm(context, text: parts.isEmpty ? null : parts.join('\n'), scan: scan);
     } finally {
       _busy = false;
     }
   }
 
-  /// Parses [text] and opens the Add Transaction form with what was found.
-  static Future<void> openForm(BuildContext context, String text) async {
-    final data = ReceiptParser.parse(text);
+  /// Reads a receipt: shared [text] wins, its screenshot [scan] fills the gaps.
+  static ReceiptData read({String? text, OcrScan? scan}) {
+    final fromScan = scan == null ? null : ReceiptParser.parseScan(scan);
+    if (text == null) return fromScan!;
+    return ReceiptParser.parse(text).orElse(fromScan);
+  }
+
+  /// What was read, for "See text read from receipt".
+  static String sourceTextOf({String? text, OcrScan? scan}) =>
+      [if (text != null) text, if (scan != null) scan.text].join('\n\n');
+
+  /// Parses the receipt and opens the Add Transaction form with what was found.
+  static Future<void> openForm(BuildContext context, {String? text, OcrScan? scan}) async {
+    final data = read(text: text, scan: scan);
+    final source = sourceTextOf(text: text, scan: scan);
     if (!context.mounted) return;
 
     if (data.notCompleted) {
@@ -156,7 +171,7 @@ class ReceiptService {
       if (go != true || !context.mounted) return;
     }
 
-    final prefill = await prefillFrom(data, sourceText: text);
+    final prefill = await prefillFrom(data, sourceText: source);
     if (!context.mounted) return;
     if (data.amount == null) {
       AppToast.info(context, 'Could not find the amount. Please enter it.');

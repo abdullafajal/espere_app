@@ -87,8 +87,12 @@ All release APKs (GitHub Actions and laptop builds) are signed with
 
 The fingerprints are registered in two places. Both must stay, or things break:
 
-- **Firebase** → Project settings → Android app `com.example.espere_app` → SHA certificate
-  fingerprints. Without it, **Google Sign-In** fails with "Google Sign-In canceled".
+- **Google Cloud** (project `espere-6e6ac`) → APIs & Services → Credentials → an **Android
+  OAuth client** with package `com.example.espere_app` and this SHA-1. Without it,
+  **Google Sign-In** fails with "Google Sign-In canceled". Adding the fingerprint in Firebase
+  alone was not enough. The app does not need this client's ID or JSON file: Google matches it
+  by package name + SHA-1. (The fingerprints are also in Firebase → Project settings → Android
+  app.)
 - **`espere-pages/.well-known/assetlinks.json`** (`sha256_cert_fingerprints`). Without it,
   espere.in links (invites, verify email) open in the browser instead of the app.
   The old laptop key (`28:9B:58:…`) is kept there too.
@@ -117,16 +121,19 @@ filled in. Nothing is saved until the user taps Save.
 
 | File | What it does |
 |---|---|
-| `android/.../receipt/ReceiptBridge.kt` | Receives the share, copies a shared image to the cache, on-device text recognition (ML Kit via Play services) |
+| `android/.../receipt/ReceiptBridge.kt` | Receives the share, copies a shared image to the cache, on-device text recognition (ML Kit via Play services) with line boxes, measures how the phone's OCR reads "₹" |
 | `lib/services/receipt_service.dart` | Turns a share into the pre-filled form, "Already added?" check |
-| `lib/services/receipt_parser.dart` | Reads amount / payee / reference / date from receipt text; skips cashback and offer lines |
-| `test/receipt_parser_test.dart` | Parser tests (`flutter test test/receipt_parser_test.dart`) |
+| `lib/services/receipt_parser.dart` | Reads amount / payee / reference / date: scores every candidate amount, uses the screenshot layout (biggest font, rows, no status bar) and the phone's measured rupee-sign reading |
+| `test/receipt_parser_test.dart`, `test/receipt_scan_test.dart` | Parser tests: share texts, and real screenshot layouts under every rupee-sign reading |
 
 If a receipt fills the wrong amount or none: in the form tap **See text read from receipt →
 Copy**, then add that text as a new test in `test/receipt_parser_test.dart` and fix
 `receipt_parser.dart` until it passes.
 
 The text-recognition model comes from Google Play services. The first scan needs internet.
+
+How the parser works, the OCR problems it handles and its known limits:
+[RECEIPT_SCAN_RESEARCH.md](../RECEIPT_SCAN_RESEARCH.md).
 
 ## Troubleshooting
 
@@ -137,5 +144,5 @@ The text-recognition model comes from Google Play services. The first scan needs
 | Workflow fails at "no notification listener" | The build was made without `-P espere.autoTrack=false`. Never publish it |
 | Phone: "App not installed" | An Espere signed with another key is installed (laptop debug build or ≤ 1.0.2). Uninstall it, then install |
 | Phone: "App blocked to protect your device" | Play Protect: the APK has auto-track. Use the website APK or the no-autotrack test artifact |
-| "Google Sign-In canceled" | The APK's SHA-1 is not in Firebase. Check the [Signing key](#signing-key) section. After adding a fingerprint, wait 5–10 minutes |
+| "Google Sign-In canceled" | No Android OAuth client in Google Cloud for the APK's SHA-1. See the [Signing key](#signing-key) section. After adding it, wait 5–10 minutes |
 | Espere is missing from the share sheet | Old build installed. **Settings → Apps → Espere** must show version 1.0.3 or later |
