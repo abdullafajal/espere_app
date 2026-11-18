@@ -100,7 +100,7 @@ class ReceiptParser {
   /// Lines that are only promotions; amounts on them are ignored.
   static final _promoLine = RegExp(
       r'\b(cashback|cash back|scratch card|reward|won|congrat|offer|deal|discount|save \d|'
-      r'% off|off|flat|book now|t&c|coupon|voucher|earn|coins?)\b',
+      r'% off|off|flat|book now|t&c|coupon|voucher|earn|coins?|up ?to|enjoy|activate)\b',
       caseSensitive: _ci);
 
   // ─── Status / direction ───────────────────────────────────────────────────
@@ -123,7 +123,7 @@ class ReceiptParser {
 
   static const _name = r"([A-Za-z0-9][A-Za-z0-9 .&'@_-]{1,40}?)";
   static const _end = r'(?=\s+(?:is|was|has|on|via|using|for|successfully|successful|completed)\b|'
-      r'\s*(?:[,;!\n(]|$)|\.\s)';
+      r'\s+(?:₹|rs\.?\s?|inr\s?|[^\s\w])?\d|\s*(?:[,;!\n(]|$)|\.\s)';
 
   static final _payeePatterns = <RegExp>[
     // "Payment of ₹60 to LITE CAFE is successful"
@@ -177,6 +177,11 @@ class ReceiptParser {
 
   /// "18/11/2026 13:29", "18-11-26"
   static final _numeric = RegExp(r'\b(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})' + _time, caseSensitive: _ci);
+
+  /// "08:18 pm on 14 Oct 2026" (PhonePe)
+  static final _timeThenDate = RegExp(
+      r'\b(\d{1,2})[:.](\d{2})\s*([ap]\.?\s?m\.?)?\s*(?:on|,)?\s+(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3,9})\.?,?\s+(\d{4})\b',
+      caseSensitive: _ci);
 
   /// "1:29 PM" alone (date = today).
   static final _timeOnly = RegExp(r'\b(\d{1,2})[:.](\d{2})\s*([ap]\.?\s?m\.?)', caseSensitive: _ci);
@@ -263,7 +268,45 @@ class ReceiptParser {
       if (top >= 2 && winners.length == 1) return winners.first.key;
       return null;
     }
-    return _ocrFallbackAmount(lines);
+    return _ocrFallbackAmount(lines) ?? _standaloneAmount(lines);
+  }
+
+  /// An amount at the end of a line or alone on it, with or without a (misread) "₹":
+  /// "₹1,232", "71,232", "Flipkart Payments 71,232". Group 1: the symbol, group 2: number.
+  static final _lineEndAmount = RegExp(
+      r'(?:^|\s)([^\s\w]|[zZR])?(\d{1,3}(?:,\d{2,3})+(?:\.\d{1,2})?|\d{1,6}\.\d{2}|\d{1,6})\s*$');
+
+  /// Lines whose numbers are ids, accounts, balances or clock times, never the payment.
+  static final _notAmountLine = RegExp(
+      r'\b(id|utr|ref|rrn|a/?c|account|acct|bal|balance|limit|txn|transaction|order|mobile|phone|'
+      r'otp|pin)\b|\d[:]\d|%|k/s|'
+      // a year right after a month ("14 Oct 2026")
+      r'\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?,?\s*$',
+      caseSensitive: _ci);
+
+  /// Receipts without any payment sentence (PhonePe: "Paid to / Flipkart Payments ₹1,232 /
+  /// Debited from XXXX9025 ₹1,232"): take the line-end amount that is printed twice, or the
+  /// only one written with a separator or a symbol (a lone "59" is a battery level).
+  static double? _standaloneAmount(List<String> lines) {
+    final counts = <double, int>{};
+    final formatted = <double>{};
+    for (final line in lines) {
+      if (_promoLine.hasMatch(line)) continue;
+      final m = _lineEndAmount.firstMatch(line);
+      if (m == null) continue;
+      // Only the text before the amount decides ("XXXXXX9025 ₹1,232" is the debit amount).
+      if (_notAmountLine.hasMatch(line.substring(0, m.start))) continue;
+      final symbol = m.group(1) ?? '';
+      final number = _dropMisreadRupee(symbol, m.group(2)!);
+      final v = _toAmount(number);
+      if (v == null) continue;
+      counts[v] = (counts[v] ?? 0) + 1;
+      if (symbol.isNotEmpty || number.contains(',') || number.contains('.')) formatted.add(v);
+    }
+    final repeated = counts.entries.where((e) => e.value >= 2).map((e) => e.key).toList();
+    if (repeated.length == 1) return repeated.first;
+    if (repeated.isEmpty && formatted.length == 1) return formatted.first;
+    return null;
   }
 
   /// No amount with a currency sign at all (OCR often drops or misreads "₹"): accept a
@@ -302,7 +345,34 @@ class ReceiptParser {
     return rest;
   }
 
+  static final _payeeLabelLine =
+      RegExp(r'^\s*(?:paid to|sent to|paying|to|payment to|transferred to)\s*:?\s*$', caseSensitive: _ci);
+  static final _payerLabelLine =
+      RegExp(r'^\s*(?:received from|from|sender)\s*:?\s*$', caseSensitive: _ci);
+
+  /// "Paid to" on its own line: the payee is the next line that has a name, skipping
+  /// amount-only lines and avatar initials ("FP"); a trailing amount is cut off.
+  static String? _payeeAfterLabel(String s, RegExp label) {
+    final lines = s.split('\n');
+    for (var i = 0; i < lines.length; i++) {
+      if (!label.hasMatch(lines[i])) continue;
+      for (var j = i + 1; j < lines.length && j <= i + 4; j++) {
+        var line = lines[j].trim();
+        if (!RegExp(r'[A-Za-z]{2,}').hasMatch(line)) continue; // amount / empty
+        if (RegExp(r'^[A-Z]{1,3}$').hasMatch(line)) continue; // avatar initials
+        final amount = _lineEndAmount.firstMatch(line);
+        if (amount != null && amount.start > 0) line = line.substring(0, amount.start).trim();
+        final p = _clean(line);
+        if (p != null) return p;
+        break;
+      }
+    }
+    return null;
+  }
+
   static String? _extractPayee(String s) {
+    final labelled = _payeeAfterLabel(s, _payeeLabelLine);
+    if (labelled != null) return labelled;
     for (final re in _payeePatterns) {
       for (final m in re.allMatches(s)) {
         final p = _clean(m.group(1));
@@ -313,6 +383,8 @@ class ReceiptParser {
   }
 
   static String? _extractPayer(String s) {
+    final labelled = _payeeAfterLabel(s, _payerLabelLine);
+    if (labelled != null) return labelled;
     for (final re in _payerPatterns) {
       for (final m in re.allMatches(s)) {
         final p = _clean(m.group(1));
@@ -344,6 +416,16 @@ class ReceiptParser {
 
   static DateTime? _extractTime(String s, DateTime now) {
     DateTime? found;
+
+    final tFirst = _timeThenDate.firstMatch(s);
+    if (tFirst != null) {
+      final month = _month(tFirst.group(5)!);
+      if (month != null) {
+        found = _build(int.parse(tFirst.group(6)!), month, int.parse(tFirst.group(4)!),
+            tFirst.group(1), tFirst.group(2), tFirst.group(3));
+      }
+    }
+    if (found != null) return _plausible(found, now);
 
     final dmy = _dmy.firstMatch(s);
     if (dmy != null) {
@@ -379,7 +461,10 @@ class ReceiptParser {
       }
     }
 
-    if (found == null) return null;
+    return found == null ? null : _plausible(found, now);
+  }
+
+  static DateTime? _plausible(DateTime found, DateTime now) {
     // A receipt is never from the future (allow a little clock skew).
     if (found.isAfter(now.add(const Duration(minutes: 10)))) return null;
     // Nor older than a year (most likely a misread).

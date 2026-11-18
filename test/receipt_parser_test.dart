@@ -140,6 +140,57 @@ Having issues? Share Split expense''';
     }
   });
 
+  group('PhonePe transaction screen (OCR text)', () {
+    String screen(String amount) => '''4:22
+59
+Transaction Successful
+08:18 pm on 14 Oct 2026
+Paid to
+FP
+Flipkart Payments $amount
+paytm-56505013@ptybl
+Transfer Details
+PhonePe Transaction ID
+T2610142018372270123469
+Debited from
+XXXXXX9025 $amount
+UTR: 234372128842
+View History Split Expense Share Receipt
+Contact PhonePe Support
+Pay securely with fingerp...
+Enjoy seamless and safer
+payments up to ${amount.replaceAll('1,232', '10,000')}.
+Activate Now
+Powered by''';
+
+    for (final (ocr, expected) in [
+      ('₹1,232', 1232.0),
+      ('71,232', 1232.0),
+      ('1,232', 1232.0),
+    ]) {
+      test('"$ocr" -> $expected, payee, time, ref', () {
+        final r = ReceiptParser.parse(screen(ocr), now: now);
+        expect(r.amount, expected);
+        expect(r.type, 'expense');
+        expect(r.payee, 'Flipkart Payments');
+        expect(r.time, DateTime(2026, 10, 14, 20, 18));
+        expect(r.ref, 'T2610142018372270123469');
+      });
+    }
+
+    test('amount line before the name (OCR order)', () {
+      final r = ReceiptParser.parse(
+          'Paid to\n71,232\nFlipkart Payments\nDebited from\nXXXXXX9025 71,232', now: now);
+      expect(r.amount, 1232);
+      expect(r.payee, 'Flipkart Payments');
+    });
+
+    test('a year printed twice is not an amount', () {
+      final r = ReceiptParser.parse('Paid to\nRaju\n14 Oct 2026\nUpdated 15 Oct 2026', now: now);
+      expect(r.amount, isNull);
+    });
+  });
+
   group('share texts', () {
     test('UPI app share: paid with transaction id', () {
       final r = ReceiptParser.parse(
