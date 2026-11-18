@@ -4,8 +4,8 @@ name: Publish website APK
 # abdullafajal/espere-pages as espere.apk. GitHub Pages then serves it at
 # https://espere.in/espere.apk. See docs/APK_RELEASE.md.
 #
-# Needs the repository secret PAGES_TOKEN: a fine-grained GitHub token with
-# "Contents: Read and write" on abdullafajal/espere-pages only.
+# Needs the secret PAGES_TOKEN (in the environment "PAGES_TOKEN", or as a repository secret):
+# a fine-grained GitHub token with "Contents: Read and write" on abdullafajal/espere-pages only.
 on:
   workflow_dispatch:
   push:
@@ -25,6 +25,9 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    # The token is stored as a secret of this GitHub environment
+    # (Settings -> Environments -> PAGES_TOKEN).
+    environment: PAGES_TOKEN
     steps:
       - name: Check PAGES_TOKEN
         env:

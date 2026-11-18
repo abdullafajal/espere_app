@@ -29,11 +29,17 @@ token once (works from a phone):
 3. **Repository access → Only select repositories → `abdullafajal/espere-pages`**.
 4. **Permissions → Repository permissions → Contents: Read and write**. Nothing else.
 5. **Generate token** and copy it.
-6. Open https://github.com/abdullafajal/espere_app/settings/secrets/actions → **New repository
-   secret**. Name: `PAGES_TOKEN`. Value: the token. **Add secret**.
+6. Open https://github.com/abdullafajal/espere_app/settings/environments → environment
+   **`PAGES_TOKEN`** → **Environment secrets → Add environment secret**. Name: `PAGES_TOKEN`.
+   Value: the token. (The workflow uses `environment: PAGES_TOKEN`; a repository secret with
+   the same name works too.)
 
 When the token expires, the workflow fails with a 403 on "Commit to espere-pages". Create a
 new token the same way and update the `PAGES_TOKEN` secret.
+
+This token is the **only** thing that expires. The signing key is valid until 2054 and its
+fingerprints in Firebase and `assetlinks.json` never need to change, unless the key itself is
+replaced.
 
 ## Releasing a new website APK
 
