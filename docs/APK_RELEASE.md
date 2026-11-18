@@ -87,8 +87,12 @@ All release APKs (GitHub Actions and laptop builds) are signed with
 
 The fingerprints are registered in two places. Both must stay, or things break:
 
-- **Firebase** → Project settings → Android app `com.example.espere_app` → SHA certificate
-  fingerprints. Without it, **Google Sign-In** fails with "Google Sign-In canceled".
+- **Google Cloud** (project `espere-6e6ac`) → APIs & Services → Credentials → an **Android
+  OAuth client** with package `com.example.espere_app` and this SHA-1. Without it,
+  **Google Sign-In** fails with "Google Sign-In canceled". Adding the fingerprint in Firebase
+  alone was not enough. The app does not need this client's ID or JSON file: Google matches it
+  by package name + SHA-1. (The fingerprints are also in Firebase → Project settings → Android
+  app.)
 - **`espere-pages/.well-known/assetlinks.json`** (`sha256_cert_fingerprints`). Without it,
   espere.in links (invites, verify email) open in the browser instead of the app.
   The old laptop key (`28:9B:58:…`) is kept there too.
@@ -137,5 +141,5 @@ The text-recognition model comes from Google Play services. The first scan needs
 | Workflow fails at "no notification listener" | The build was made without `-P espere.autoTrack=false`. Never publish it |
 | Phone: "App not installed" | An Espere signed with another key is installed (laptop debug build or ≤ 1.0.2). Uninstall it, then install |
 | Phone: "App blocked to protect your device" | Play Protect: the APK has auto-track. Use the website APK or the no-autotrack test artifact |
-| "Google Sign-In canceled" | The APK's SHA-1 is not in Firebase. Check the [Signing key](#signing-key) section. After adding a fingerprint, wait 5–10 minutes |
+| "Google Sign-In canceled" | No Android OAuth client in Google Cloud for the APK's SHA-1. See the [Signing key](#signing-key) section. After adding it, wait 5–10 minutes |
 | Espere is missing from the share sheet | Old build installed. **Settings → Apps → Espere** must show version 1.0.3 or later |
