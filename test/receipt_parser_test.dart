@@ -53,6 +53,40 @@ Home Account Transactions Rewards''';
     });
   });
 
+  group('OCR that drops or misreads the rupee sign', () {
+    const base = '''amazon pay
+Thank You
+LITE CAFE
+MAB0450840A0327515@Yesbank
+AMOUNT
+Banking name: LITE CAFE
+Payment of STATUS to LITE CAFE is
+successful
+18 Nov 2026, 1:29 PM
+You've won ₹0.6 cashback
+Save 19%*''';
+
+    for (final (header, status) in [
+      ('60', '60'),
+      ('*60', '*60'),
+      ('R60', 'R60'),
+      ('{60', '{60'),
+    ]) {
+      test('header "$header", status "$status"', () {
+        final r = ReceiptParser.parse(
+            base.replaceFirst('AMOUNT', header).replaceFirst('STATUS', status),
+            now: now);
+        expect(r.amount, 60);
+        expect(r.payee, 'LITE CAFE');
+      });
+    }
+
+    test('battery level, time and date are never taken as the amount', () {
+      final r = ReceiptParser.parse('1:30\n82\nThank You\nLITE CAFE\n18 Nov 2026, 1:29 PM', now: now);
+      expect(r.amount, isNull);
+    });
+  });
+
   group('share texts', () {
     test('UPI app share: paid with transaction id', () {
       final r = ReceiptParser.parse(

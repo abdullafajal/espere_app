@@ -44,11 +44,24 @@ android {
         }
     }
 
+    // Test APKs built on GitHub Actions (-P espere.ciSigning=true) are signed with this fixed
+    // TEST key, so Google Sign-In keeps working across builds once its SHA-1 is added in
+    // Firebase. Never use it for Play Store builds.
+    val ciSigning = (project.findProperty("espere.ciSigning") as String?)?.toBoolean() ?: false
+    signingConfigs {
+        create("ciTest") {
+            storeFile = file("ci-test.keystore")
+            storePassword = "espere-ci-test"
+            keyAlias = "ci-test"
+            keyPassword = "espere-ci-test"
+        }
+    }
+
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName(if (ciSigning) "ciTest" else "debug")
         }
     }
 }

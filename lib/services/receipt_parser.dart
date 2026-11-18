@@ -70,6 +70,18 @@ class ReceiptParser {
         caseSensitive: _ci),
   ];
 
+  /// OCR fallback for "Payment of ₹60 to …" when the "₹" was dropped or misread
+  /// ("Payment of 60 to", "Payment of *60 to", "Paid R60 to"). The "to/from NAME" that
+  /// must follow keeps dates, times and phone numbers out.
+  static final _lenientPhraseAmount = RegExp(
+      r'\b(?:payment of|paid|you paid|sent|you sent|received|you received)\s*:?\s*'
+      r'[^\s\d]{0,2}\s?' '$_num' r'\s+(?:to|from)\s+[A-Za-z]',
+      caseSensitive: _ci);
+
+  /// A line that is only an amount, like the big "₹60" header (symbol optional / misread).
+  static final _amountOnlyLine =
+      RegExp(r'^\s*(?:₹|rs\.?|inr|[^\s\d\w])?\s?' '$_num' r'\s*$', caseSensitive: _ci);
+
   /// Amounts right after these words are cashback, rewards, offers or balances.
   static final _notPaymentAmount = RegExp(
       r'(cashback|cash back|reward|rewards|won|win|earn|earned|save|saved|savings|off|discount|'
@@ -236,11 +248,37 @@ class ReceiptParser {
       final repeated = fromPhrases.where((v) => (counts[v] ?? 0) >= 2).toList();
       return repeated.length == 1 ? repeated.first : null;
     }
-    if (counts.isEmpty) return null;
     if (counts.length == 1) return counts.keys.first;
-    final top = counts.values.reduce((a, b) => a > b ? a : b);
-    final winners = counts.entries.where((e) => e.value == top).toList();
-    return top >= 2 && winners.length == 1 ? winners.first.key : null;
+    if (counts.isNotEmpty) {
+      final top = counts.values.reduce((a, b) => a > b ? a : b);
+      final winners = counts.entries.where((e) => e.value == top).toList();
+      if (top >= 2 && winners.length == 1) return winners.first.key;
+      return null;
+    }
+    return _ocrFallbackAmount(lines);
+  }
+
+  /// No amount with a currency sign at all (OCR often drops or misreads "₹"): accept a
+  /// number inside "Payment of … to NAME". If several, keep the one that is also printed
+  /// alone on a line (the big amount at the top of the receipt).
+  static double? _ocrFallbackAmount(List<String> lines) {
+    final phrase = <double>{};
+    for (final line in lines) {
+      if (_promoLine.hasMatch(line)) continue;
+      for (final m in _lenientPhraseAmount.allMatches(line)) {
+        final v = _toAmount(m.group(1)!);
+        if (v != null) phrase.add(v);
+      }
+    }
+    if (phrase.length == 1) return phrase.first;
+    if (phrase.isEmpty) return null;
+    final alone = <double>{};
+    for (final line in lines) {
+      final m = _amountOnlyLine.firstMatch(line);
+      final v = m == null ? null : _toAmount(m.group(1)!);
+      if (v != null && phrase.contains(v)) alone.add(v);
+    }
+    return alone.length == 1 ? alone.first : null;
   }
 
   static String? _extractPayee(String s) {

@@ -45,14 +45,27 @@ jobs:
       - name: Unit tests
         run: flutter test
 
-      # Website (sideload) build: without the notification listener, so Play Protect lets it
-      # install from a browser / file manager. Share-to-Espere and Scan receipt work here.
-      - name: Build APK (sideload)
-        run: flutter build apk --release --split-per-abi -P espere.autoTrack=false
+      # Full build: auto-track (notification listener) + Share-to-Espere + Scan receipt.
+      # Signed with the fixed test key (android/app/ci-test.keystore) so Google Sign-In works
+      # once its SHA-1 is added in Firebase, and updates install over the previous test APK.
+      - name: Build APK (with auto-track)
+        run: flutter build apk --release --split-per-abi -P espere.ciSigning=true
 
       - uses: actions/upload-artifact@v4
         with:
           name: espere-apk-arm64
+          path: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      # Website (sideload) build without the notification listener, for phones where Play
+      # Protect blocks the full build.
+      - name: Build APK (sideload, no auto-track)
+        run: flutter build apk --release --split-per-abi -P espere.ciSigning=true -P espere.autoTrack=false
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: espere-apk-arm64-no-autotrack
           path: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
           if-no-files-found: error
           retention-days: 14

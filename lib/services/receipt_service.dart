@@ -27,6 +27,9 @@ class TransactionPrefill {
   final String paymentMethod;
   final int? categoryId;
 
+  /// The receipt text that was read (shown on request when something was not found).
+  final String? sourceText;
+
   const TransactionPrefill({
     this.amount,
     this.type = 'expense',
@@ -34,6 +37,7 @@ class TransactionPrefill {
     this.date,
     this.paymentMethod = 'upi',
     this.categoryId,
+    this.sourceText,
   });
 }
 
@@ -152,7 +156,7 @@ class ReceiptService {
       if (go != true || !context.mounted) return;
     }
 
-    final prefill = await prefillFrom(data);
+    final prefill = await prefillFrom(data, sourceText: text);
     if (!context.mounted) return;
     if (data.amount == null) {
       AppToast.info(context, 'Could not find the amount. Please enter it.');
@@ -161,7 +165,7 @@ class ReceiptService {
   }
 
   /// Form values for a parsed receipt (category from the user's past choice / payee words).
-  static Future<TransactionPrefill> prefillFrom(ReceiptData data) async {
+  static Future<TransactionPrefill> prefillFrom(ReceiptData data, {String? sourceText}) async {
     final categoryId = await AutoExpenseService.suggestCategory(payee: data.payee, type: data.type);
     return TransactionPrefill(
       amount: data.amount,
@@ -170,6 +174,7 @@ class ReceiptService {
       date: data.time,
       paymentMethod: 'upi',
       categoryId: categoryId,
+      sourceText: sourceText,
     );
   }
 

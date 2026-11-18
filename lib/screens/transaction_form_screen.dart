@@ -83,6 +83,10 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   bool _isLoading = true;
   bool _isSaving = false;
   bool _isScanning = false;
+
+  /// Text read from a shared / scanned receipt, kept so the user can see it if a field
+  /// could not be filled.
+  String? _receiptText;
   String _currencySymbol = '₹';
 
   // Track old state for offline updates
@@ -114,12 +118,38 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
           p.amount == p.amount!.roundToDouble() ? p.amount!.toStringAsFixed(0) : p.amount!.toStringAsFixed(2);
     }
     if (p.notes != null && p.notes!.trim().isNotEmpty) _notesController.text = p.notes!.trim();
+    _receiptText = p.amount == null ? p.sourceText : null;
     if (widget.presetType == null) _type = p.type;
     if (p.date != null) _date = p.date!;
     _paymentMethod = p.paymentMethod;
     if (p.categoryId != null && (widget.presetType == null || widget.presetType == p.type)) {
       _categoryId = p.categoryId;
     }
+  }
+
+  void _showReceiptText() {
+    final text = _receiptText ?? '';
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Text read from receipt'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(child: SelectableText(text)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: text));
+              Navigator.pop(ctx);
+              AppToast.success(context, 'Copied');
+            },
+            child: const Text('Copy'),
+          ),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+        ],
+      ),
+    );
   }
 
   /// "Scan receipt": pick a payment screenshot, read it on device and fill the form.
@@ -144,7 +174,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
         AppToast.error(context, 'No payment details found in this image.');
         return;
       }
-      final p = await ReceiptService.prefillFrom(data);
+      final p = await ReceiptService.prefillFrom(data, sourceText: text);
       if (!mounted) return;
       setState(() {
         final keepType = widget.presetType != null && widget.presetType != p.type;
@@ -629,6 +659,21 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                           decimal: true,
                                         ),
                                   ),
+                                  if (_receiptText != null &&
+                                      _receiptText!.trim().isNotEmpty)
+                                    Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: TextButton.icon(
+                                        onPressed: _showReceiptText,
+                                        icon: const Icon(Icons.text_snippet_outlined,
+                                            size: 16, color: AppColors.muted),
+                                        label: const Text(
+                                          'See text read from receipt',
+                                          style: TextStyle(
+                                              fontSize: 13, color: AppColors.muted),
+                                        ),
+                                      ),
+                                    ),
                                   const SizedBox(height: 16),
 
                                   // Category
