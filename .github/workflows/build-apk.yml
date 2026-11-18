@@ -27,6 +27,9 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          # Matches the project's Android setup (Gradle 8.14, AGP 8.11.1, Kotlin 2.2.20).
+          # Newer Flutter releases require Gradle 9.
+          flutter-version: 3.47.9
           cache: true
 
       # android/app/google-services.json is git-ignored; the committed copy has the same
