@@ -81,6 +81,27 @@ Save 19%*''';
       });
     }
 
+    for (final (ocr, expected) in [
+      ('760', 60.0), // what this phone's OCR returns for "₹60"
+      ('7760', 760.0),
+      ('71,200', 1200.0),
+      ('2500', 500.0),
+      ('7120.50', 120.5),
+    ]) {
+      test('"₹" read as a digit: "$ocr" -> $expected', () {
+        final r = ReceiptParser.parse(
+            base.replaceFirst('AMOUNT', ocr).replaceFirst('STATUS', ocr),
+            now: now);
+        expect(r.amount, expected);
+      });
+    }
+
+    test('a digit is not dropped when a symbol was read', () {
+      final r = ReceiptParser.parse(base.replaceFirst('AMOUNT', '*760').replaceFirst('STATUS', '*760'),
+          now: now);
+      expect(r.amount, 760);
+    });
+
     test('battery level, time and date are never taken as the amount', () {
       final r = ReceiptParser.parse('1:30\n82\nThank You\nLITE CAFE\n18 Nov 2026, 1:29 PM', now: now);
       expect(r.amount, isNull);

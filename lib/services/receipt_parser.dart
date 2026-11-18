@@ -71,12 +71,17 @@ class ReceiptParser {
   ];
 
   /// OCR fallback for "Payment of ₹60 to …" when the "₹" was dropped or misread
-  /// ("Payment of 60 to", "Payment of *60 to", "Paid R60 to"). The "to/from NAME" that
-  /// must follow keeps dates, times and phone numbers out.
+  /// ("Payment of 60 to", "Payment of *60 to", "Paid R60 to", "Payment of 760 to"). The
+  /// "to/from NAME" that must follow keeps dates, times and phone numbers out.
+  /// Group 1: what stands where the "₹" should be; group 2: the number.
   static final _lenientPhraseAmount = RegExp(
       r'\b(?:payment of|paid|you paid|sent|you sent|received|you received)\s*:?\s*'
-      r'[^\s\d]{0,2}\s?' '$_num' r'\s+(?:to|from)\s+[A-Za-z]',
+      r'([^\s\d]{0,2})\s?' '$_num' r'\s+(?:to|from)\s+[A-Za-z]',
       caseSensitive: _ci);
+
+  /// Digits the on-device OCR reads instead of "₹" (its Latin model has no rupee sign):
+  /// "₹60" comes back as "760", "₹500" as "2500".
+  static const _rupeeAsDigit = {'7', '2'};
 
   /// A line that is only an amount, like the big "₹60" header (symbol optional / misread).
   static final _amountOnlyLine =
@@ -266,7 +271,7 @@ class ReceiptParser {
     for (final line in lines) {
       if (_promoLine.hasMatch(line)) continue;
       for (final m in _lenientPhraseAmount.allMatches(line)) {
-        final v = _toAmount(m.group(1)!);
+        final v = _toAmount(_dropMisreadRupee(m.group(1)!, m.group(2)!));
         if (v != null) phrase.add(v);
       }
     }
@@ -279,6 +284,19 @@ class ReceiptParser {
       if (v != null && phrase.contains(v)) alone.add(v);
     }
     return alone.length == 1 ? alone.first : null;
+  }
+
+  /// "Payment of 760 to X": nothing was read where the "₹" belongs, and the number starts
+  /// with a digit OCR uses for "₹", so that digit is the rupee sign ("760" -> "60",
+  /// "71,200" -> "1,200"). A one-digit amount is left alone.
+  static String _dropMisreadRupee(String prefix, String number) {
+    if (prefix.isNotEmpty || number.length < 2) return number;
+    if (!_rupeeAsDigit.contains(number[0])) return number;
+    var rest = number.substring(1);
+    if (rest.startsWith(',')) return number; // "7,760": a real thousands separator
+    final intPart = rest.split('.').first.replaceAll(',', '');
+    if (intPart.isEmpty || intPart.startsWith('0')) return number; // "70.6", "705"
+    return rest;
   }
 
   static String? _extractPayee(String s) {

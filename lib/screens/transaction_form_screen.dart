@@ -84,8 +84,8 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   bool _isSaving = false;
   bool _isScanning = false;
 
-  /// Text read from a shared / scanned receipt, kept so the user can see it if a field
-  /// could not be filled.
+  /// Text read from a shared / scanned receipt, so the user can check what was read
+  /// (and copy it when a field was filled wrong).
   String? _receiptText;
   String _currencySymbol = '₹';
 
@@ -118,7 +118,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
           p.amount == p.amount!.roundToDouble() ? p.amount!.toStringAsFixed(0) : p.amount!.toStringAsFixed(2);
     }
     if (p.notes != null && p.notes!.trim().isNotEmpty) _notesController.text = p.notes!.trim();
-    _receiptText = p.amount == null ? p.sourceText : null;
+    _receiptText = p.sourceText;
     if (widget.presetType == null) _type = p.type;
     if (p.date != null) _date = p.date!;
     _paymentMethod = p.paymentMethod;
