@@ -71,12 +71,15 @@ class ReceiptParser {
   ];
 
   /// OCR fallback for "Payment of ₹60 to …" when the "₹" was dropped or misread
-  /// ("Payment of 60 to", "Payment of *60 to", "Paid R60 to", "Payment of 760 to"). The
-  /// "to/from NAME" that must follow keeps dates, times and phone numbers out.
+  /// ("Payment of 60 to", "Payment of *60 to", "Paid R60 to", "Payment of 760 to",
+  /// "Payment of 7140 completed"). What must follow ("to/from NAME", "completed", end of
+  /// line) keeps dates, times and phone numbers out.
   /// Group 1: what stands where the "₹" should be; group 2: the number.
   static final _lenientPhraseAmount = RegExp(
       r'\b(?:payment of|paid|you paid|sent|you sent|received|you received)\s*:?\s*'
-      r'([^\s\d]{0,2})\s?' '$_num' r'\s+(?:to|from)\s+[A-Za-z]',
+      r'([^\s\d]{0,2})\s?' '$_num'
+      r'(?:\s+(?:to|from)\s+[A-Za-z]|\s+(?:is\s+|was\s+|has\s+been\s+)?'
+      r'(?:completed|successful|success|done)\b|\s*$)',
       caseSensitive: _ci);
 
   /// Digits the on-device OCR reads instead of "₹" (its Latin model has no rupee sign):

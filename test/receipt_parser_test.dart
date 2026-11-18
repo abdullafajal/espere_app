@@ -108,6 +108,38 @@ Save 19%*''';
     });
   });
 
+  group('Google Pay detail screen (OCR text)', () {
+    String screen(String amount) => '''4:19
+To TALIB
+$amount
+Pay again
+Completed
+3 Nov 2026, 1:35 pm
+Punjab National Bank
+9025
+Payment of $amount completed
+Receiver's bank has confirmed
+deposit of money to TALIB's bank
+account
+UPI transaction ID
+Having issues? Share Split expense''';
+
+    for (final (ocr, expected) in [
+      ('₹140', 140.0),
+      ('140', 140.0),
+      ('7140', 140.0),
+      ('Z140', 140.0),
+    ]) {
+      test('"$ocr" -> $expected, payee TALIB', () {
+        final r = ReceiptParser.parse(screen(ocr), now: now);
+        expect(r.amount, expected);
+        expect(r.type, 'expense');
+        expect(r.payee, 'TALIB');
+        expect(r.time, DateTime(2026, 11, 3, 13, 35));
+      });
+    }
+  });
+
   group('share texts', () {
     test('UPI app share: paid with transaction id', () {
       final r = ReceiptParser.parse(
