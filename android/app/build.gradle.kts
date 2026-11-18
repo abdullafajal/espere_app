@@ -44,10 +44,12 @@ android {
         }
     }
 
-    // Test APKs built on GitHub Actions (-P espere.ciSigning=true) are signed with this fixed
-    // TEST key, so Google Sign-In keeps working across builds once its SHA-1 is added in
-    // Firebase. Never use it for Play Store builds.
-    val ciSigning = (project.findProperty("espere.ciSigning") as String?)?.toBoolean() ?: false
+    // Release APKs (website, GitHub Actions and laptop builds alike) are signed with the key in
+    // android/app/ci-test.keystore, so every APK can be installed over the website one and
+    // Google Sign-In works (its SHA-1 is registered in Firebase). Pass
+    // -P espere.ciSigning=false to sign with the local debug key instead.
+    // The key is in the repository: never use it as the Play Store upload key.
+    val ciSigning = (project.findProperty("espere.ciSigning") as String?)?.toBoolean() ?: true
     signingConfigs {
         create("ciTest") {
             storeFile = file("ci-test.keystore")

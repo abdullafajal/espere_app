@@ -1,0 +1,94 @@
+name: Publish website APK
+
+# Builds the website APK (every ABI, no auto-track, shared release key) and commits it to
+# abdullafajal/espere-pages as espere.apk. GitHub Pages then serves it at
+# https://espere.in/espere.apk. See docs/APK_RELEASE.md.
+#
+# Needs the repository secret PAGES_TOKEN: a fine-grained GitHub token with
+# "Contents: Read and write" on abdullafajal/espere-pages only.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'lib/**'
+      - 'android/**'
+      - 'assets/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+
+concurrency:
+  group: publish-apk
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check PAGES_TOKEN
+        env:
+          PAGES_TOKEN: ${{ secrets.PAGES_TOKEN }}
+        run: |
+          if [ -z "$PAGES_TOKEN" ]; then
+            echo "::error::Secret PAGES_TOKEN is missing. See docs/APK_RELEASE.md (one-time setup)."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          # Matches the project's Android setup (Gradle 8.14, AGP 8.11.1, Kotlin 2.2.20).
+          flutter-version: 3.47.9
+          cache: true
+
+      - name: Firebase config
+        run: |
+          if [ ! -f android/app/google-services.json ]; then
+            cp android/app/google-services_copy.json android/app/google-services.json
+          fi
+
+      - run: flutter pub get
+
+      - name: Unit tests
+        run: flutter test
+
+      - name: Build website APK
+        run: flutter build apk --release -P espere.autoTrack=false
+
+      # Play Protect blocks browser installs of apps with a notification listener, so the
+      # website APK must never contain one.
+      - name: Check the APK has no notification listener
+        run: |
+          AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)aapt2
+          APK=build/app/outputs/flutter-apk/app-release.apk
+          COUNT=$("$AAPT2" dump xmltree --file AndroidManifest.xml "$APK" | grep -c BIND_NOTIFICATION_LISTENER_SERVICE || true)
+          echo "listener entries: $COUNT"
+          [ "$COUNT" = "0" ]
+          "$AAPT2" dump badging "$APK" | head -1
+
+      - name: Commit to espere-pages
+        env:
+          PAGES_TOKEN: ${{ secrets.PAGES_TOKEN }}
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}')
+          git clone --depth 1 "https://x-access-token:${PAGES_TOKEN}@github.com/abdullafajal/espere-pages.git" /tmp/pages
+          cp build/app/outputs/flutter-apk/app-release.apk /tmp/pages/espere.apk
+          cd /tmp/pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add espere.apk
+          if git diff --cached --quiet; then
+            echo "APK unchanged, nothing to publish."
+            exit 0
+          fi
+          git commit -m "Update APK to ${VERSION}" -m "Built by espere_app ${GITHUB_SHA::7} (${GITHUB_REF_NAME}), run ${GITHUB_RUN_ID}."
+          git push origin HEAD:main
+          echo "### Published espere.apk ${VERSION}" >> "$GITHUB_STEP_SUMMARY"
