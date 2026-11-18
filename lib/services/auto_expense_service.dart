@@ -333,6 +333,19 @@ class AutoExpenseService {
     );
   }
 
+  /// Category for a payment the user is adding from a shared / scanned receipt: their past
+  /// choice for this payee, else payee keywords, else "Other".
+  static Future<int?> suggestCategory({required String? payee, required String type}) async {
+    final store = await _storeIfUsed();
+    final remembered = payee == null ? null : await store?.categoryForPayee(payee);
+    return AutoCategoryRules.pick(
+      payee: payee,
+      type: type,
+      categories: await _categories(),
+      rememberedId: remembered,
+    );
+  }
+
   /// The user edited an entry: if it was auto-tracked, remember its category for the payee.
   static Future<void> learnFromEdit({required int? txnId, required int? categoryId}) async {
     if (txnId == null || categoryId == null) return;

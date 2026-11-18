@@ -1,0 +1,71 @@
+name: Build test APK
+
+# Builds an installable APK on GitHub, so a change can be tried on a phone without a laptop.
+# Download it from the run's "Artifacts" section (Actions tab).
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'ccr-**'
+
+concurrency:
+  group: build-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          # Matches the project's Android setup (Gradle 8.14, AGP 8.11.1, Kotlin 2.2.20).
+          # Newer Flutter releases require Gradle 9.
+          flutter-version: 3.47.9
+          cache: true
+
+      # android/app/google-services.json is git-ignored; the committed copy has the same
+      # Firebase project and package name.
+      - name: Firebase config
+        run: |
+          if [ ! -f android/app/google-services.json ]; then
+            cp android/app/google-services_copy.json android/app/google-services.json
+          fi
+
+      - run: flutter pub get
+
+      - name: Unit tests
+        run: flutter test
+
+      # Full build: auto-track (notification listener) + Share-to-Espere + Scan receipt.
+      # Signed with the fixed test key (android/app/ci-test.keystore) so Google Sign-In works
+      # once its SHA-1 is added in Firebase, and updates install over the previous test APK.
+      - name: Build APK (with auto-track)
+        run: flutter build apk --release --split-per-abi -P espere.ciSigning=true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: espere-apk-arm64
+          path: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      # Website (sideload) build without the notification listener, for phones where Play
+      # Protect blocks the full build.
+      - name: Build APK (sideload, no auto-track)
+        run: flutter build apk --release --split-per-abi -P espere.ciSigning=true -P espere.autoTrack=false
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: espere-apk-arm64-no-autotrack
+          path: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+          if-no-files-found: error
+          retention-days: 14

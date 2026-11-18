@@ -15,6 +15,7 @@ import '../services/notification_service.dart';
 import '../services/cache_service.dart';
 import '../services/sync_service.dart';
 import '../services/auto_expense_service.dart';
+import '../services/receipt_service.dart';
 import '../services/app_navigation.dart';
 import '../utils/update_checker.dart';
 
@@ -48,6 +49,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       UpdateChecker.check(context);
       _processPendingInvites();
       _onTabRequested(); // a tab may have been requested before this screen existed (cold start)
+      ReceiptService.attachHome(context); // opens a receipt shared to Espere, if any
     });
     _screens = [
       DashboardScreen(
@@ -160,6 +162,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     AppNavigation.requestedTab.removeListener(_onTabRequested);
+    ReceiptService.detachHome(context);
     super.dispose();
   }
 

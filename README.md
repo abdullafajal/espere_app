@@ -196,6 +196,10 @@ is included. The app hides the Auto-track option on its own when the listener is
 
 #### 1. Website APK (no auto-track)
 
+> **Without a laptop:** merging to `main` builds and publishes the website APK automatically
+> (GitHub Actions → espere-pages). Signing, test APKs and troubleshooting:
+> [docs/APK_RELEASE.md](docs/APK_RELEASE.md).
+
 Run from the repository root (the folder that contains `espere_app/` and `espere-pages/`):
 
 ```bash

@@ -44,17 +44,38 @@ android {
         }
     }
 
+    // Release APKs (website, GitHub Actions and laptop builds alike) are signed with the key in
+    // android/app/ci-test.keystore, so every APK can be installed over the website one and
+    // Google Sign-In works (its SHA-1 is registered in Firebase). Pass
+    // -P espere.ciSigning=false to sign with the local debug key instead.
+    // The key is in the repository: never use it as the Play Store upload key.
+    val ciSigning = (project.findProperty("espere.ciSigning") as String?)?.toBoolean() ?: true
+    signingConfigs {
+        create("ciTest") {
+            storeFile = file("ci-test.keystore")
+            storePassword = "espere-ci-test"
+            keyAlias = "ci-test"
+            keyPassword = "espere-ci-test"
+        }
+    }
+
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName(if (ciSigning) "ciTest" else "debug")
         }
     }
 }
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // On-device text recognition for shared receipt screenshots (model via Play services,
+    // so the APK stays small). Images never leave the phone.
+    implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")
 }
 
 configurations.all {
