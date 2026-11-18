@@ -230,6 +230,39 @@ Powered by''';
     });
   });
 
+  group('share texts with links and phone numbers', () {
+    test('PhonePe-style share text', () {
+      final r = ReceiptParser.parse(
+          'Hi! I paid ₹1,232 to Flipkart Payments using PhonePe.\n'
+          'Transaction ID: T2610142018372270123469\n'
+          'Download PhonePe: https://phon.pe/ru_9xk2/123456',
+          now: now);
+      expect(r.amount, 1232);
+      expect(r.payee, 'Flipkart Payments');
+      expect(r.ref, 'T2610142018372270123469');
+    });
+
+    test('Amazon Pay-style share text', () {
+      final r = ReceiptParser.parse(
+          'I paid ₹60 to LITE CAFE using Amazon Pay UPI on 18 Nov 2026, 1:29 PM.\n'
+          'Pay with Amazon Pay: https://amzn.to/4abc123', now: now);
+      expect(r.amount, 60);
+      expect(r.payee, 'LITE CAFE');
+      expect(r.time, DateTime(2026, 11, 18, 13, 29));
+    });
+
+    test('helpline number is not an amount', () {
+      final r = ReceiptParser.parse('Paid to\nRaju Tea Stall\n₹40\nHelpline +91 80 4567 12345', now: now);
+      expect(r.amount, 40);
+    });
+
+    test('Indian grouping and paise', () {
+      final r = ReceiptParser.parse('Payment of ₹1,25,000.50 to Sai Motors successful', now: now);
+      expect(r.amount, 125000.5);
+      expect(r.payee, 'Sai Motors');
+    });
+  });
+
   group('safety', () {
     test('failed payment is flagged', () {
       final r = ReceiptParser.parse('Payment of ₹60 to LITE CAFE failed\nMoney will be refunded',

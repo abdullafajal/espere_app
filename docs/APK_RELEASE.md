@@ -121,16 +121,19 @@ filled in. Nothing is saved until the user taps Save.
 
 | File | What it does |
 |---|---|
-| `android/.../receipt/ReceiptBridge.kt` | Receives the share, copies a shared image to the cache, on-device text recognition (ML Kit via Play services) |
+| `android/.../receipt/ReceiptBridge.kt` | Receives the share, copies a shared image to the cache, on-device text recognition (ML Kit via Play services) with line boxes, measures how the phone's OCR reads "₹" |
 | `lib/services/receipt_service.dart` | Turns a share into the pre-filled form, "Already added?" check |
-| `lib/services/receipt_parser.dart` | Reads amount / payee / reference / date from receipt text; skips cashback and offer lines |
-| `test/receipt_parser_test.dart` | Parser tests (`flutter test test/receipt_parser_test.dart`) |
+| `lib/services/receipt_parser.dart` | Reads amount / payee / reference / date: scores every candidate amount, uses the screenshot layout (biggest font, rows, no status bar) and the phone's measured rupee-sign reading |
+| `test/receipt_parser_test.dart`, `test/receipt_scan_test.dart` | Parser tests: share texts, and real screenshot layouts under every rupee-sign reading |
 
 If a receipt fills the wrong amount or none: in the form tap **See text read from receipt →
 Copy**, then add that text as a new test in `test/receipt_parser_test.dart` and fix
 `receipt_parser.dart` until it passes.
 
 The text-recognition model comes from Google Play services. The first scan needs internet.
+
+How the parser works, the OCR problems it handles and its known limits:
+[RECEIPT_SCAN_RESEARCH.md](../RECEIPT_SCAN_RESEARCH.md).
 
 ## Troubleshooting
 

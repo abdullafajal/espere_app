@@ -7,7 +7,6 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import io.flutter.plugin.common.BinaryMessenger
@@ -112,15 +111,21 @@ object ReceiptBridge {
             val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
             recognizer.process(image)
                 .addOnSuccessListener { visionText ->
-                    // One line per text line, top to bottom, so "label / value" pairs stay together.
-                    val lines = visionText.textBlocks
-                        .flatMap { it.lines }
-                        .sortedWith(
-                            compareBy<Text.Line>({ it.boundingBox?.top ?: 0 }, { it.boundingBox?.left ?: 0 })
-                        )
-                        .joinToString("\n") { it.text }
-                    result.success(lines)
-                    recognizer.close()
+                    val lines = visionText.textBlocks.flatMap { it.lines }.mapNotNull { line ->
+                        val b = line.boundingBox ?: return@mapNotNull null
+                        mapOf("t" to line.text, "l" to b.left, "tp" to b.top, "r" to b.right, "b" to b.bottom)
+                    }
+                    val payload = mapOf(
+                        "w" to image.width,
+                        "h" to image.height,
+                        "lines" to lines
+                    )
+                    // How this phone's OCR model writes the rupee sign (it has no "₹"): learned once
+                    // from a bitmap we draw ourselves, then cached.
+                    rupeeReading(context, recognizer) { rupee ->
+                        result.success(payload + ("rupee" to rupee))
+                        recognizer.close()
+                    }
                 }
                 .addOnFailureListener { e ->
                     result.error("OCR", e.javaClass.simpleName, e.message)
@@ -129,5 +134,83 @@ object ReceiptBridge {
         } catch (e: Exception) {
             result.error("OCR", e.javaClass.simpleName, e.message)
         }
+    }
+
+    // ─── Rupee-sign calibration ───────────────────────────────────────────────
+
+    private const val PREFS = "receipt_ocr"
+    private const val KEY_RUPEE = "rupee_reading"
+    private const val KEY_RUPEE_AT = "rupee_reading_at"
+    private const val RUPEE_MAX_AGE_MS = 14L * 24 * 3600 * 1000 // models update via Play services
+
+    /** Known amounts drawn on the probe bitmap, one per row. */
+    private val PROBE = listOf("60", "140", "1,232", "85")
+
+    /**
+     * Returns how the OCR model reads "₹": "keep" (reads ₹), "drop" (leaves it out), a single
+     * character such as "7" or "2" (reads it as that character), or null if unknown.
+     */
+    private fun rupeeReading(
+        context: Context,
+        recognizer: com.google.mlkit.vision.text.TextRecognizer,
+        done: (String?) -> Unit
+    ) {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val cached = prefs.getString(KEY_RUPEE, null)
+        val at = prefs.getLong(KEY_RUPEE_AT, 0L)
+        if (cached != null && System.currentTimeMillis() - at < RUPEE_MAX_AGE_MS) {
+            done(cached.ifEmpty { null })
+            return
+        }
+        try {
+            val rowH = 170
+            val bmp = android.graphics.Bitmap.createBitmap(900, rowH * PROBE.size + 40, android.graphics.Bitmap.Config.ARGB_8888)
+            val canvas = android.graphics.Canvas(bmp)
+            canvas.drawColor(android.graphics.Color.WHITE)
+            val faces = listOf(
+                android.graphics.Typeface.DEFAULT_BOLD,
+                android.graphics.Typeface.DEFAULT,
+                android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL),
+                android.graphics.Typeface.DEFAULT_BOLD
+            )
+            PROBE.forEachIndexed { i, amount ->
+                val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                    color = android.graphics.Color.BLACK
+                    textSize = 110f
+                    typeface = faces[i % faces.size]
+                }
+                canvas.drawText("\u20B9$amount", 60f, (rowH * (i + 1)).toFloat() - 30f, paint)
+            }
+            recognizer.process(InputImage.fromBitmap(bmp, 0))
+                .addOnSuccessListener { text ->
+                    val reading = classifyRupee(text.textBlocks.flatMap { it.lines }.map { it.text })
+                    prefs.edit().putString(KEY_RUPEE, reading ?: "")
+                        .putLong(KEY_RUPEE_AT, System.currentTimeMillis()).apply()
+                    done(reading)
+                }
+                .addOnFailureListener { done(null) }
+        } catch (_: Exception) {
+            done(null)
+        }
+    }
+
+    private fun classifyRupee(lines: List<String>): String? {
+        val votes = mutableMapOf<String, Int>()
+        for (amount in PROBE) {
+            val digits = amount.replace(",", "")
+            val line = lines.firstOrNull { it.replace(",", "").replace(" ", "").contains(digits) } ?: continue
+            val t = line.replace(" ", "")
+            val idx = t.replace(",", "").indexOf(digits)
+            val prefix = t.replace(",", "").substring(0, idx)
+            val vote = when {
+                t.contains('\u20B9') -> "keep"
+                prefix.isEmpty() -> "drop"
+                prefix.length == 1 -> prefix
+                else -> null
+            } ?: continue
+            votes[vote] = (votes[vote] ?: 0) + 1
+        }
+        val best = votes.maxByOrNull { it.value } ?: return null
+        return if (best.value >= 2) best.key else null
     }
 }
