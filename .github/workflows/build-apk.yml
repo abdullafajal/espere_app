@@ -15,6 +15,8 @@ concurrency:
 jobs:
   apk:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # pushes the public APK to the apk-builds branch
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
@@ -69,3 +71,20 @@ jobs:
           path: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
           if-no-files-found: error
           retention-days: 14
+
+      # Public website APK (espere.in/espere.apk): every ABI in one file, no auto-track, test
+      # key. Force-pushed as a single commit to the apk-builds branch (no history kept), from
+      # where it is copied into the espere-pages repository.
+      - name: Build public APK (universal, no auto-track)
+        run: flutter build apk --release -P espere.ciSigning=true -P espere.autoTrack=false
+
+      - name: Publish public APK to apk-builds branch
+        run: |
+          mkdir -p /tmp/out && cp build/app/outputs/flutter-apk/app-release.apk /tmp/out/espere.apk
+          cd /tmp/out
+          echo "Built from ${GITHUB_SHA} (${GITHUB_REF_NAME})" > SOURCE.txt
+          git init -q -b apk-builds
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A && git commit -qm "Public APK from ${GITHUB_SHA::7}"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" apk-builds
