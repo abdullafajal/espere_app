@@ -1,0 +1,55 @@
+name: Build test APK
+
+# Builds an installable APK on GitHub, so a change can be tried on a phone without a laptop.
+# Download it from the run's "Artifacts" section (Actions tab).
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'ccr-**'
+
+concurrency:
+  group: build-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      # android/app/google-services.json is git-ignored; the committed copy has the same
+      # Firebase project and package name.
+      - name: Firebase config
+        run: |
+          if [ ! -f android/app/google-services.json ]; then
+            cp android/app/google-services_copy.json android/app/google-services.json
+          fi
+
+      - run: flutter pub get
+
+      - name: Unit tests
+        run: flutter test
+
+      # Website (sideload) build: without the notification listener, so Play Protect lets it
+      # install from a browser / file manager. Share-to-Espere and Scan receipt work here.
+      - name: Build APK (sideload)
+        run: flutter build apk --release --split-per-abi -P espere.autoTrack=false
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: espere-apk-arm64
+          path: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+          if-no-files-found: error
+          retention-days: 14

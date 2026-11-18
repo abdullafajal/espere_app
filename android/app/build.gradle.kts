@@ -57,6 +57,12 @@ flutter {
     source = "../.."
 }
 
+dependencies {
+    // On-device text recognition for shared receipt screenshots (model via Play services,
+    // so the APK stays small). Images never leave the phone.
+    implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")
+}
+
 configurations.all {
     resolutionStrategy.eachDependency {
         if (requested.group == "androidx.glance" && requested.name == "glance-appwidget") {

@@ -37,6 +37,17 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Share a payment receipt (text or screenshot) from a UPI app to Espere -->
+            <intent-filter android:label="Add to Espere">
+                <action android:name="android.intent.action.SEND"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="text/plain"/>
+            </intent-filter>
+            <intent-filter android:label="Add to Espere">
+                <action android:name="android.intent.action.SEND"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="image/*"/>
+            </intent-filter>
             <!-- Deep Linking -->
             <intent-filter
                 android:autoVerify="true">
@@ -107,6 +118,12 @@
             android:exported="false"
             android:theme="@style/Theme.QuickAddDialog"
             android:windowSoftInputMode="stateVisible|adjustResize"/>
+
+        <!-- On-device text recognition for shared receipt screenshots: ask Play services to
+             download the model at install time, so the first scan also works offline. -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="ocr"/>
 
         <!-- Auto-track payments: reads payment notifications from allow-listed UPI/bank
              apps on device. Only the system (holding BIND_NOTIFICATION_LISTENER_SERVICE)

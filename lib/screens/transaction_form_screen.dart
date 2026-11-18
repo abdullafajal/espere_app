@@ -5,12 +5,15 @@
 import 'package:flutter/material.dart';
 import '../utils/app_toast.dart';
 import 'package:intl/intl.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../models/category.dart';
 import '../models/transaction.dart';
 import '../services/api_service.dart';
 import '../services/auto_expense_service.dart';
+import '../services/receipt_parser.dart';
+import '../services/receipt_service.dart';
 import '../services/cache_service.dart';
 import '../services/connectivity_service.dart';
 import '../services/sync_service.dart';
@@ -28,11 +31,15 @@ class TransactionFormScreen extends StatefulWidget {
   /// Callback when transaction is saved
   final VoidCallback? onSaved;
 
+  /// Starting values for a new entry (from a shared / scanned payment receipt).
+  final TransactionPrefill? prefill;
+
   const TransactionFormScreen({
     super.key,
     this.transactionId,
     this.presetType,
     this.onSaved,
+    this.prefill,
   });
 
   /// Helper to show this form as a bottom sheet
@@ -41,6 +48,7 @@ class TransactionFormScreen extends StatefulWidget {
     int? transactionId,
     String? presetType,
     VoidCallback? onSaved,
+    TransactionPrefill? prefill,
   }) {
     showModalBottomSheet(
       context: context,
@@ -53,6 +61,7 @@ class TransactionFormScreen extends StatefulWidget {
         transactionId: transactionId,
         presetType: presetType,
         onSaved: onSaved,
+        prefill: prefill,
       ),
     );
   }
@@ -73,6 +82,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   List<CategoryModel> _categories = [];
   bool _isLoading = true;
   bool _isSaving = false;
+  bool _isScanning = false;
   String _currencySymbol = '₹';
 
   // Track old state for offline updates
@@ -94,7 +104,61 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     if (widget.presetType != null) {
       _type = widget.presetType!;
     }
+    if (widget.prefill != null && !isEdit) _applyPrefill(widget.prefill!);
     _loadData();
+  }
+
+  void _applyPrefill(TransactionPrefill p) {
+    if (p.amount != null) {
+      _amountController.text =
+          p.amount == p.amount!.roundToDouble() ? p.amount!.toStringAsFixed(0) : p.amount!.toStringAsFixed(2);
+    }
+    if (p.notes != null && p.notes!.trim().isNotEmpty) _notesController.text = p.notes!.trim();
+    if (widget.presetType == null) _type = p.type;
+    if (p.date != null) _date = p.date!;
+    _paymentMethod = p.paymentMethod;
+    if (p.categoryId != null && (widget.presetType == null || widget.presetType == p.type)) {
+      _categoryId = p.categoryId;
+    }
+  }
+
+  /// "Scan receipt": pick a payment screenshot, read it on device and fill the form.
+  Future<void> _scanReceipt() async {
+    if (_isScanning) return;
+    final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
+    if (picked == null || !mounted) return;
+    setState(() => _isScanning = true);
+    try {
+      final text = await ReceiptService.recognizeText(picked.path);
+      if (!mounted) return;
+      if (text == null || text.trim().isEmpty) {
+        AppToast.error(context, 'Could not read text from this image.');
+        return;
+      }
+      final data = ReceiptParser.parse(text);
+      if (data.notCompleted) {
+        AppToast.error(context, 'This payment failed or is still pending.');
+        return;
+      }
+      if (data.isEmpty) {
+        AppToast.error(context, 'No payment details found in this image.');
+        return;
+      }
+      final p = await ReceiptService.prefillFrom(data);
+      if (!mounted) return;
+      setState(() {
+        final keepType = widget.presetType != null && widget.presetType != p.type;
+        if (!keepType && _type != p.type) _categoryId = null;
+        _applyPrefill(p);
+      });
+      if (p.amount == null) {
+        AppToast.info(context, 'Could not find the amount. Please enter it.');
+      } else {
+        AppToast.success(context, 'Filled from receipt. Please check and save.');
+      }
+    } finally {
+      if (mounted) setState(() => _isScanning = false);
+    }
   }
 
   Future<void> _loadData() async {
@@ -354,7 +418,28 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
               child: Row(
                 children: [
-                  const SizedBox(width: 40), // Spacer for balance
+                  if (!isEdit && ReceiptService.isSupported)
+                    SizedBox(
+                      width: 40,
+                      height: 40,
+                      child: _isScanning
+                          ? const Padding(
+                              padding: EdgeInsets.all(10),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.text,
+                              ),
+                            )
+                          : IconButton(
+                              padding: EdgeInsets.zero,
+                              tooltip: 'Scan receipt',
+                              icon: const Icon(Icons.document_scanner_outlined,
+                                  color: AppColors.text),
+                              onPressed: _scanReceipt,
+                            ),
+                    )
+                  else
+                    const SizedBox(width: 40), // Spacer for balance
                   const Spacer(),
                   Text(
                     isEdit ? 'Edit Transaction' : 'Add Transaction',

@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.provider.MediaStore
 import com.example.espere_app.autocapture.AutoCaptureBridge
+import com.example.espere_app.receipt.ReceiptBridge
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -20,6 +21,9 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         // Payment-notification auto-tracking (off until the user opts in)
         AutoCaptureBridge.register(this, flutterEngine.dartExecutor.binaryMessenger) { this }
+        // Receipts shared from UPI apps / screenshots (Share -> Espere)
+        ReceiptBridge.register(this, flutterEngine.dartExecutor.binaryMessenger)
+        ReceiptBridge.handleIntent(this, intent)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             if (call.method == "pickImage") {
                 pendingResult = result
@@ -30,6 +34,12 @@ class MainActivity : FlutterActivity() {
                 result.notImplemented()
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        ReceiptBridge.handleIntent(this, intent)
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

@@ -84,6 +84,11 @@ payment. Everything else is **LOW** and waits in the Review list for one tap.
 - **Small UPI payments may have no bank SMS.** HDFC Bank, for example, stopped SMS alerts for
   UPI debits up to ₹100 (from June 2024). Those payments can only be captured from the UPI
   app's own notification.
+- **Some apps post no notification at all.** Amazon Pay, for example, only shows an in-app
+  "Thank You" screen after a UPI payment. For these, the user taps **Share** on the success
+  screen and picks **Espere** (text or screenshot), or uses **Scan receipt** in the Add
+  Transaction form. Screenshots are read on device (ML Kit) and parsed by
+  `lib/services/receipt_parser.dart`; the result always opens in the form for a check.
 - **Missing references.** Many card-spend and some bank SMS carry no reference, so they go to
   Review. This is the price of never guessing.
 - **Missed on purpose:** foreign-currency spends, card bill payments, "refund initiated",

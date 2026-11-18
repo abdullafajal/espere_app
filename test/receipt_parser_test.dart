@@ -1,0 +1,128 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:espere_app/services/receipt_parser.dart';
+
+/// All samples were written for Espere (own names, amounts and ids), modelled on the layout
+/// of UPI apps' success screens and share texts.
+void main() {
+  final now = DateTime(2026, 11, 18, 14, 0);
+
+  group('Amazon Pay success screen (OCR text)', () {
+    const ocr = '''
+1:30
+amazon pay
+Thank You
+LC
+LITE CAFE
+MAB0450840A0327515@Yesbank
+₹60
+Banking name: LITE CAFE
+Payment of ₹60 to LITE CAFE is
+successful
+18 Nov 2026, 1:29 PM
+View Details
+Pay Again
+Congratulations!
+You've won ₹0.6 cashback
+View rewards details at Amazon Pay > Rewards
+You've won a Scratch Card
+IMPOSSIBLE TRAVEL DEALS
+Congrats!
+You unlocked flight offers
+Save 19%*
+Includes flat 9% instant discount
+with Amazon Pay UPI
+Book now
+*T&C apply
+Home Account Transactions Rewards''';
+
+    test('amount, payee, time; cashback ignored', () {
+      final r = ReceiptParser.parse(ocr, now: now);
+      expect(r.amount, 60);
+      expect(r.type, 'expense');
+      expect(r.payee, 'LITE CAFE');
+      expect(r.time, DateTime(2026, 11, 18, 13, 29));
+      expect(r.notCompleted, isFalse);
+    });
+
+    test('OCR misreading ₹ as % inside the status line still works', () {
+      final r = ReceiptParser.parse(
+          'LITE CAFE\nPayment of %60 to LITE CAFE is successful\nYou\'ve won ₹0.6 cashback',
+          now: now);
+      expect(r.amount, 60);
+      expect(r.payee, 'LITE CAFE');
+    });
+  });
+
+  group('share texts', () {
+    test('UPI app share: paid with transaction id', () {
+      final r = ReceiptParser.parse(
+          'Paid ₹250 to Annapurna Tiffins\nUPI transaction ID: 431298765012\n17 Nov 2026, 8:05 pm',
+          now: now);
+      expect(r.amount, 250);
+      expect(r.type, 'expense');
+      expect(r.payee, 'Annapurna Tiffins');
+      expect(r.ref, '431298765012');
+      expect(r.time, DateTime(2026, 11, 17, 20, 5));
+    });
+
+    test('label on one line, value on the next', () {
+      final r = ReceiptParser.parse(
+          'Paid to\nRahul Verma\n₹1,200\nTransaction ID\nT2611181329004455667788\nNov 18, 2026 11:10 AM',
+          now: now);
+      expect(r.amount, 1200);
+      expect(r.payee, 'Rahul Verma');
+      expect(r.ref, 'T2611181329004455667788');
+      expect(r.time, DateTime(2026, 11, 18, 11, 10));
+    });
+
+    test('money received', () {
+      final r = ReceiptParser.parse(
+          'Received ₹500 from Neha Kapoor\nUPI Ref No: 612345678901\n18/11/2026 09:15',
+          now: now);
+      expect(r.amount, 500);
+      expect(r.type, 'income');
+      expect(r.payee, 'Neha Kapoor');
+      expect(r.time, DateTime(2026, 11, 18, 9, 15));
+    });
+
+    test('VPA payee shows the handle', () {
+      final r = ReceiptParser.parse('You paid Rs. 99 to chaiwala@okaxis', now: now);
+      expect(r.amount, 99);
+      expect(r.payee, 'chaiwala');
+    });
+  });
+
+  group('safety', () {
+    test('failed payment is flagged', () {
+      final r = ReceiptParser.parse('Payment of ₹60 to LITE CAFE failed\nMoney will be refunded',
+          now: now);
+      expect(r.notCompleted, isTrue);
+    });
+
+    test('pending payment is flagged', () {
+      final r = ReceiptParser.parse('Payment pending\n₹300 to Gupta Stores', now: now);
+      expect(r.notCompleted, isTrue);
+    });
+
+    test('two different payment amounts: amount left empty', () {
+      final r = ReceiptParser.parse('Paid ₹100 to A\nPaid ₹200 to B', now: now);
+      expect(r.amount, isNull);
+    });
+
+    test('only promo amounts: no amount', () {
+      final r = ReceiptParser.parse('You\'ve won ₹10 cashback\nGet flat ₹50 off', now: now);
+      expect(r.amount, isNull);
+      expect(r.isEmpty, isTrue);
+    });
+
+    test('future date is not used', () {
+      final r = ReceiptParser.parse('Paid ₹40 to Tea Point\n20 Dec 2026, 1:00 PM', now: now);
+      expect(r.time, isNull);
+    });
+
+    test('time only means today', () {
+      final r = ReceiptParser.parse('Paid ₹40 to Tea Point\n1:29 PM', now: now);
+      expect(r.time, DateTime(2026, 11, 18, 13, 29));
+    });
+  });
+}

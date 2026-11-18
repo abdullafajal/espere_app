@@ -19,6 +19,7 @@ import 'services/connectivity_service.dart';
 import 'services/sync_service.dart';
 import 'services/deep_link_service.dart';
 import 'services/auto_expense_service.dart';
+import 'services/receipt_service.dart';
 
 final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -42,6 +43,9 @@ void main() async {
 
   // Auto-track payments (no-op unless the user turned it on)
   AutoExpenseService.init();
+
+  // Payment receipts shared to Espere (Share -> Espere) open the Add Transaction form
+  ReceiptService.init();
 
   // Initial sync if online
   if (ConnectivityService.isOnline) {
