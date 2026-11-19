@@ -10,6 +10,7 @@
 ///   (the nav pill's spring), with one light tick when the end is reached (see main.dart).
 library;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
@@ -32,11 +33,27 @@ enum HapticKind { none, tap, press, confirm, warn }
 class AppHaptics {
   AppHaptics._();
 
-  static void tap() => HapticFeedback.selectionClick();
-  static void press() => HapticFeedback.lightImpact();
-  static void confirm() => HapticFeedback.mediumImpact();
-  static void warn() => HapticFeedback.heavyImpact();
-  static void land() => HapticFeedback.lightImpact();
+  /// Android: played on the vibrator directly (Haptics.kt), because many phones ignore
+  /// some of the system "touch feedback" kinds. Elsewhere: Flutter's HapticFeedback.
+  static const _channel = MethodChannel('com.example.espere_app/haptics');
+  static bool _native = !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+
+  static void _play(String kind, Future<void> Function() fallback) {
+    if (_native) {
+      _channel.invokeMethod('play', kind).catchError((_) {
+        _native = false; // no native side (tests, older build): use the fallback from now on
+        fallback();
+      });
+    } else {
+      fallback();
+    }
+  }
+
+  static void tap() => _play('tap', HapticFeedback.selectionClick);
+  static void press() => _play('press', HapticFeedback.lightImpact);
+  static void confirm() => _play('confirm', HapticFeedback.mediumImpact);
+  static void warn() => _play('warn', HapticFeedback.heavyImpact);
+  static void land() => _play('land', HapticFeedback.lightImpact);
 
   static void of(HapticKind kind) {
     switch (kind) {

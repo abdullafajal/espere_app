@@ -93,6 +93,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
     if (ok != true || !mounted) return;
     AppHaptics.confirm();
+    // Let the dialog close so the card is fully visible before it breaks apart.
+    await Future.delayed(const Duration(milliseconds: 120));
+    if (!mounted) return;
     await _snapKeys[i.id]?.currentState?.startSnap();
     if (!mounted) return;
     setState(() => _items = _items.where((x) => x.id != i.id).toList());
@@ -267,8 +270,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         child: Icon(Icons.delete_outline_rounded, color: AppColors.accent),
       ),
       // Ask first, then play the delete animation (if it is on) instead of sliding away.
+      // The card slides back first, then the confirmation and the delete animation run
+      // on the card itself (not on the dark swipe background).
       confirmDismiss: (_) async {
-        await _delete(i);
+        Future.delayed(const Duration(milliseconds: 280), () => _delete(i));
         return false;
       },
       child: ThanosSnapWidget(

@@ -90,5 +90,10 @@ Friends is inside Split (`SplitSwitcher`: Groups | Friends).
   `land` (light tick when the nav pill arrives). Never call `HapticFeedback` directly.
 - Scrolling: `EspereScrollBehavior` (set on MaterialApp) makes every list bounce at its
   ends on `AppMotion.move`; main.dart gives one `land` tick when a list reaches its end.
-- Tab lists end with `NavBottomSpace` instead of a fixed bottom padding: room for the nav
-  bar while it shows, a small margin while it is hidden.
+- Tab lists end with `NavBottomSpace` (fixed room for the nav bar); the home shell always
+  shows the bar at the top and the end of a list. Never animate a list's length while it
+  scrolls: the bounce stutters.
+- Haptics on Android go to the vibrator directly (`haptics/Haptics.kt`): the system
+  touch-feedback kinds are ignored on many phones.
+- ⋮ menus are `SpringMenuButton` (`lib/widgets/spring_menu.dart`): press spring + haptic,
+  the menu grows out of the button on `AppMotion.move`, Delete/Leave last.

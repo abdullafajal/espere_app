@@ -188,21 +188,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         children: [
           NotificationListener<ScrollNotification>(
             onNotification: (notification) {
-              if (notification is ScrollUpdateNotification) {
-                final currentOffset = notification.metrics.pixels;
-                final velocity = notification.scrollDelta ?? 0;
-
-                if (currentOffset <= 0) {
-                  if (!_isBottomNavVisible)
-                    setState(() => _setNav(true));
-                } else if (velocity > 10 &&
-                    _isBottomNavVisible &&
-                    currentOffset > 80) {
-                  // Scrolling down
+              if (notification is ScrollUpdateNotification && notification.metrics.axis == Axis.vertical) {
+                final m = notification.metrics;
+                final delta = notification.scrollDelta ?? 0;
+                // At the top or the end of a list the bar always shows (the list keeps
+                // room for it there); it hides only while scrolling down in between.
+                final atEdge = m.pixels <= 0 || m.extentAfter < 24;
+                if (atEdge || delta < -10) {
+                  if (!_isBottomNavVisible) setState(() => _setNav(true));
+                } else if (delta > 10 && _isBottomNavVisible && m.pixels > 80) {
                   setState(() => _setNav(false));
-                } else if (velocity < -10 && !_isBottomNavVisible) {
-                  // Scrolling up
-                  setState(() => _setNav(true));
                 }
               }
               return false;

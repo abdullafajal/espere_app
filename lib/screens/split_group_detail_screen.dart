@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../widgets/espere_header.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
+import '../widgets/spring_menu.dart';
 import '../utils/icon_mapper.dart';
 import '../utils/avatar_cache.dart';
 import '../services/api_service.dart';
@@ -1992,87 +1993,42 @@ class _S extends State<SplitGroupDetailScreen>
                 title: widget.groupName,
                 onBack: () => Navigator.pop(context),
                 trailing: _g != null
-                    ? Theme(
-                        data: Theme.of(context).copyWith(
-                          splashColor: Colors.transparent,
-                          highlightColor: Colors.transparent,
-                        ),
-                        child: PopupMenuButton<String>(
-                          offset: const Offset(0, 48),
-                          onOpened: AppHaptics.confirm,
-                          color: AppColors.card,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          icon: Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: AppColors.surface,
-                              shape: BoxShape.circle,
-                              boxShadow: AppShadows.soft,
-                            ),
-                            child: const Icon(Icons.more_vert_rounded, color: AppColors.dark, size: 20),
+                    ? SpringMenuButton<String>(
+                        tooltip: 'Group options',
+                        items: [
+                          if (_g!['created_by_id'] == _myId)
+                            const SpringMenuItem('edit', Icons.edit_rounded, 'Edit group'),
+                          if (_g!['members_can_invite'] == true || _g!['created_by_id'] == _myId)
+                            const SpringMenuItem('share', Icons.share_rounded, 'Share invite'),
+                          const SpringMenuItem('add', Icons.person_add_rounded, 'Add member'),
+                          const SpringMenuItem('leave', Icons.exit_to_app_rounded, 'Leave group', destructive: true),
+                        ],
+                        onSelected: (val) {
+                          if (val == 'edit') {
+                            _editGroup();
+                          } else if (val == 'share') {
+                            final token = _g!['invite_token'];
+                            final me = _g!['members'].firstWhere((m) => m['id'] == _myId,
+                                orElse: () => {'username': '', 'display_name': 'Someone'});
+                            final myUsername = me['username'];
+                            final myName = me['display_name'];
+                            final url = 'https://espere.in/invite/$token?ref=$myUsername';
+                            Share.share('Join $myName\'s split group on Espere! $url');
+                          } else if (val == 'add') {
+                            _addMember();
+                          } else if (val == 'leave') {
+                            _leaveGroup();
+                          }
+                        },
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: AppColors.card,
+                            shape: BoxShape.circle,
+                            boxShadow: AppShadows.soft,
                           ),
-                          onSelected: (val) {
-                            AppHaptics.confirm();
-                            if (val == 'edit') {
-                              _editGroup();
-                            } else if (val == 'share') {
-                              final token = _g!['invite_token'];
-                              final me = _g!['members'].firstWhere((m) => m['id'] == _myId, orElse: () => {'username': '', 'display_name': 'Someone'});
-                              final myUsername = me['username'];
-                              final myName = me['display_name'];
-                              final url = 'https://espere.in/invite/$token?ref=$myUsername';
-                              Share.share('Join $myName\'s split group on Espere! $url');
-                            } else if (val == 'add') {
-                              _addMember();
-                            } else if (val == 'leave') {
-                              _leaveGroup();
-                            }
-                          },
-                          itemBuilder: (ctx) => [
-                            if (_g!['created_by_id'] == _myId)
-                              const PopupMenuItem(
-                                value: 'edit',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.edit_rounded, color: AppColors.text, size: 20),
-                                    SizedBox(width: 12),
-                                    Text('Edit Group', style: TextStyle(color: AppColors.text, fontWeight: FontWeight.bold)),
-                                  ],
-                                ),
-                              ),
-                            if (_g!['members_can_invite'] == true || _g!['created_by_id'] == _myId)
-                              const PopupMenuItem(
-                                value: 'share',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.share_rounded, color: AppColors.text, size: 20),
-                                    SizedBox(width: 12),
-                                    Text('Share Invite', style: TextStyle(color: AppColors.text, fontWeight: FontWeight.bold)),
-                                  ],
-                                ),
-                              ),
-                            const PopupMenuItem(
-                              value: 'add',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.person_add_rounded, color: AppColors.text, size: 20),
-                                  SizedBox(width: 12),
-                                  Text('Add Member', style: TextStyle(color: AppColors.text, fontWeight: FontWeight.bold)),
-                                ],
-                              ),
-                            ),
-                            const PopupMenuItem(
-                              value: 'leave',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.exit_to_app, color: AppColors.text, size: 20),
-                                  SizedBox(width: 12),
-                                  Text('Leave Group', style: TextStyle(color: AppColors.text, fontWeight: FontWeight.bold)),
-                                ],
-                              ),
-                            ),
-                          ],
+                          child: const Icon(Icons.more_vert_rounded, color: AppColors.dark, size: 20),
                         ),
                       )
                     : const SizedBox(),

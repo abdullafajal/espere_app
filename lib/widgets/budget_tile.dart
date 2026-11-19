@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
+import 'spring_menu.dart';
 import 'espere_swipe_action.dart';
 import '../utils/icon_mapper.dart';
 
@@ -74,17 +75,12 @@ class _BudgetTileState extends State<BudgetTile> {
                   ],
                 ),
               ),
-              PopupMenuButton<String>(
-                tooltip: 'More',
-                icon: const Icon(Icons.more_vert_rounded, size: 20, color: AppColors.muted),
+              SpringMenuButton<String>(
+                items: SpringMenuButton.editDelete(),
                 onSelected: (v) {
                   if (v == 'edit') widget.onEdit?.call();
                   if (v == 'delete') widget.onDelete?.call();
                 },
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_rounded, size: 20), SizedBox(width: 10), Text('Edit')])),
-                  PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline_rounded, size: 20), SizedBox(width: 10), Text('Delete')])),
-                ],
               ),
             ],
           ),
