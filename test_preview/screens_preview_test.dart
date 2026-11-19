@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
 import 'package:espere_app/theme/app_theme.dart';
 
 import 'package:espere_app/screens/dashboard_screen.dart';
+import 'package:espere_app/screens/notifications_screen.dart';
 import 'package:espere_app/screens/quick_add_screen.dart';
 import 'package:espere_app/screens/transaction_list_screen.dart';
 import 'package:espere_app/services/receipt_service.dart';
@@ -23,6 +25,16 @@ void main() {
   });
 
   testWidgets('home', (t) => shot(t, 'home', const DashboardScreen()));
+  testWidgets('notifications', (t) => shot(t, 'notifications', const NotificationsScreen(), scaffold: false));
+  testWidgets('home_past_month', (t) => shot(t, 'home_past_month', const DashboardScreen(), act: (t) async {
+        await t.tap(find.byIcon(Icons.expand_more_rounded).first);
+        await t.pumpAndSettle();
+        final last = DateTime(DateTime.now().year, DateTime.now().month - 1);
+        await t.tap(find.text(last.year == DateTime.now().year
+            ? DateFormat('MMMM').format(last)
+            : DateFormat('MMM yyyy').format(last)));
+        await t.pumpAndSettle();
+      }));
   testWidgets('home_sky', (t) async {
     AppAccent.debugIndex = 2;
     try {

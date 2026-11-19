@@ -5,6 +5,7 @@ import android.content.Intent
 import android.provider.MediaStore
 import com.example.espere_app.autocapture.AutoCaptureBridge
 import com.example.espere_app.receipt.ReceiptBridge
+import com.example.espere_app.reminders.DailyReminder
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -24,6 +25,8 @@ class MainActivity : FlutterActivity() {
         // Receipts shared from UPI apps / screenshots (Share -> Espere)
         ReceiptBridge.register(this, flutterEngine.dartExecutor.binaryMessenger)
         ReceiptBridge.handleIntent(this, intent)
+        // Morning / night reminders scheduled on the phone (Settings -> Reminders)
+        DailyReminder.register(this, flutterEngine.dartExecutor.binaryMessenger)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             if (call.method == "pickImage") {
                 pendingResult = result

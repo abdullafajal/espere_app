@@ -1,5 +1,6 @@
-/// Home: greeting → spend hero card (this month, last 7 days) → Add expense / Scan →
-/// one-tap repeats → payments to review → recent → budget, insights, charts → shortcuts.
+/// Home: greeting + notifications bell → spend hero card (pick a month; last 7 days for
+/// this month, weeks for an earlier one; average per day) → Add expense / Scan →
+/// one-tap repeats → payments to review + recent.
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -17,6 +18,10 @@ import '../services/widget_service.dart';
 import 'transaction_form_screen.dart';
 import 'quick_add_screen.dart';
 import 'auto_track_review_screen.dart';
+import 'notifications_screen.dart';
+import '../services/notification_inbox.dart';
+import '../services/api_service.dart';
+import '../models/transaction.dart';
 import '../models/category.dart';
 import '../services/auto_expense_service.dart';
 import '../services/receipt_service.dart';
@@ -32,7 +37,7 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => DashboardScreenState();
 }
 
-class DashboardScreenState extends State<DashboardScreen> {
+class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObserver {
   DashboardData? _data;
   bool _isLoading = true;
   StreamSubscription<void>? _syncSub;
@@ -47,9 +52,27 @@ class DashboardScreenState extends State<DashboardScreen> {
   int _reviewCount = 0;
   StreamSubscription<void>? _autoSub;
 
+  /// Unread notifications (daily reminders, split updates).
+  int _unread = 0;
+  StreamSubscription<void>? _inboxSub;
+
+  /// Month shown in the hero card; [_past] holds its numbers when it is not this month.
+  DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
+  _MonthView? _past;
+
+  bool get _isThisMonth {
+    final now = DateTime.now();
+    return _month.year == now.year && _month.month == now.month;
+  }
+
+  @override
   void initState() {
     super.initState();
     _loadDashboard();
+    _loadUnread();
+    NotificationInbox.refresh();
+    _inboxSub = NotificationInbox.changes.listen((_) => _loadUnread());
+    WidgetsBinding.instance.addObserver(this);
 
     // Listen for background sync completions to refresh UI immediately
     _syncSub = SyncService.onSyncComplete.listen((_) {
@@ -63,11 +86,118 @@ class DashboardScreenState extends State<DashboardScreen> {
   void dispose() {
     _syncSub?.cancel();
     _autoSub?.cancel();
+    _inboxSub?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
   /// Public method for parent to trigger a data reload.
-  void reload() => _loadDashboard();
+  void reload() {
+    _loadDashboard();
+    if (!_isThisMonth) _loadMonth(_month);
+  }
+
+  /// A reminder may have arrived while the app was in the background.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _loadUnread();
+  }
+
+  Future<void> _loadUnread() async {
+    final n = await NotificationInbox.unreadCount();
+    if (mounted && n != _unread) setState(() => _unread = n);
+  }
+
+  Future<void> _openNotifications() async {
+    HapticFeedback.selectionClick();
+    await NotificationsScreen.open(context);
+    _loadUnread();
+    _loadExtras();
+  }
+
+  /// Month picker: this month and the 11 before it.
+  Future<void> _pickMonth() async {
+    HapticFeedback.selectionClick();
+    final now = DateTime.now();
+    final months = List.generate(12, (i) => DateTime(now.year, now.month - i));
+    final picked = await showModalBottomSheet<DateTime>(
+      context: context,
+      backgroundColor: AppColors.card,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Show month', style: AppText.section),
+              const SizedBox(height: 14),
+              GridView.count(
+                crossAxisCount: 3,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
+                childAspectRatio: 2.4,
+                children: [
+                  for (final m in months)
+                    Builder(builder: (_) {
+                      final on = m.year == _month.year && m.month == _month.month;
+                      return Material(
+                        color: on ? AppColors.dark : AppColors.surface,
+                        borderRadius: BorderRadius.circular(16),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: () => Navigator.pop(ctx, m),
+                          child: Center(
+                            child: Text(
+                              m.year == now.year ? DateFormat('MMMM').format(m) : DateFormat('MMM yyyy').format(m),
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: on ? Colors.white : AppColors.text,
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _month = picked;
+      _past = null;
+    });
+    if (!_isThisMonth) _loadMonth(picked);
+  }
+
+  /// Numbers for an earlier month: from the transactions on this phone first, then from
+  /// the server (which also knows the budget and older entries).
+  Future<void> _loadMonth(DateTime month) async {
+    final key = DateFormat('yyyy-MM').format(month);
+    final cached = await CacheService.getCachedTransactions();
+    final txns = ((cached?['transactions'] as List?) ?? const [])
+        .whereType<Map>()
+        .map((t) => TransactionModel.fromJson(Map<String, dynamic>.from(t)))
+        .where((t) => DateFormat('yyyy-MM').format(t.date.toLocal()) == key)
+        .toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+    final local = _MonthView.fromTransactions(month, txns);
+    if (!mounted || month != _month) return;
+    setState(() => _past = local);
+
+    final r = await ApiService.getDashboard(month: key);
+    if (!mounted || month != _month || !r.isSuccess || r.data == null) return;
+    final d = r.data!;
+    if (d.month != key) return; // older server ignores ?month: keep the phone's numbers
+    setState(() => _past = _MonthView.fromServer(month, d, local));
+  }
 
   Future<void> _loadDashboard() async {
     final cached = await CacheService.getCachedDashboard();
@@ -247,21 +377,10 @@ class DashboardScreenState extends State<DashboardScreen> {
             ),
             Semantics(
               button: true,
-              label: _reviewCount > 0 ? '$_reviewCount payments to review' : 'Notifications',
+              label: _unread + _reviewCount > 0 ? 'Notifications, ${_unread + _reviewCount} new' : 'Notifications',
               excludeSemantics: true,
               child: GestureDetector(
-                onTap: () {
-                  if (_reviewCount > 0) {
-                    _openReview();
-                  } else {
-                    ScaffoldMessenger.of(context)
-                      ..hideCurrentSnackBar()
-                      ..showSnackBar(const SnackBar(
-                        content: Text('You are all caught up'),
-                        margin: EdgeInsets.fromLTRB(16, 0, 16, 96),
-                      ));
-                  }
-                },
+                onTap: _openNotifications,
                 child: Container(
                   width: 44,
                   height: 44,
@@ -270,17 +389,17 @@ class DashboardScreenState extends State<DashboardScreen> {
                     alignment: Alignment.center,
                     children: [
                       const Icon(Icons.notifications_rounded, size: 22, color: AppColors.dark),
-                      if (_reviewCount > 0)
+                      if (_unread + _reviewCount > 0)
                         Positioned(
-                          top: 11,
-                          right: 12,
+                          top: 9,
+                          right: 10,
                           child: Container(
-                            width: 10,
-                            height: 10,
+                            width: 12,
+                            height: 12,
                             decoration: BoxDecoration(
                               color: AppColors.accent,
                               shape: BoxShape.circle,
-                              border: Border.all(color: AppColors.card, width: 2),
+                              border: Border.all(color: AppColors.dark, width: 2),
                             ),
                           ),
                         ),
@@ -296,10 +415,22 @@ class DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _hero(DashboardData d) {
-    final spent = _num(d.monthlyExpenses);
-    final income = _num(d.monthlyIncome);
-    final limit = d.monthlyBudgetLimit;
-    final maxDay = _week.fold<double>(0, math.max);
+    final past = _isThisMonth ? null : _past;
+    final now = DateTime.now();
+    final spent = past?.spent ?? _num(d.monthlyExpenses);
+    final income = past?.income ?? _num(d.monthlyIncome);
+    final limit = past?.limit ?? d.monthlyBudgetLimit;
+    final avgDaily = past?.avgDaily ?? spent / now.day;
+    final bars = past?.bars ?? _week;
+    final labels = past?.barLabels ?? _weekDays;
+    final highlight = past?.highlight ?? 6;
+    final maxBar = bars.fold<double>(0, math.max);
+    final loading = !_isThisMonth && past == null;
+    final title = _isThisMonth ? 'Spent this month' : 'Spent in ${DateFormat('MMMM').format(_month)}';
+    final chip = _isThisMonth || _month.year == now.year
+        ? DateFormat('MMMM').format(_month)
+        : DateFormat('MMM yyyy').format(_month);
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -312,44 +443,50 @@ class DashboardScreenState extends State<DashboardScreen> {
         children: [
           Row(
             children: [
-              const Expanded(
-                child: Text('Spent this month', style: TextStyle(fontSize: 13, color: AppColors.darkMuted)),
+              Expanded(
+                child: Text(title, style: const TextStyle(fontSize: 13, color: AppColors.darkMuted)),
               ),
-              GestureDetector(
-                onTap: () => widget.onTabChange?.call(1),
-                child: Container(
-                  height: 30,
-                  padding: const EdgeInsets.only(left: 12, right: 8),
-                  decoration: BoxDecoration(color: AppColors.darkCardRaised, borderRadius: BorderRadius.circular(15)),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        DateFormat('MMMM').format(DateTime.now()),
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white),
-                      ),
-                      const Icon(Icons.expand_more_rounded, size: 18, color: Colors.white),
-                    ],
+              Semantics(
+                button: true,
+                label: 'Month: $chip. Change month',
+                excludeSemantics: true,
+                child: GestureDetector(
+                  onTap: _pickMonth,
+                  child: Container(
+                    height: 32,
+                    padding: const EdgeInsets.only(left: 12, right: 8),
+                    decoration: BoxDecoration(color: AppColors.darkCardRaised, borderRadius: BorderRadius.circular(16)),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(chip, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
+                        const Icon(Icons.expand_more_rounded, size: 18, color: Colors.white),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
-              children: [
-                Text(_money(spent, d.currencySymbol), style: AppText.hero.copyWith(color: Colors.white)),
-                if (limit > 0) ...[
-                  const SizedBox(width: 8),
-                  Text('of ${_money(limit, d.currencySymbol)}',
-                      style: const TextStyle(fontSize: 13, color: AppColors.darkMuted)),
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 200),
+            opacity: loading ? 0.4 : 1,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(_money(spent, d.currencySymbol), style: AppText.hero.copyWith(color: Colors.white)),
+                  if (limit > 0) ...[
+                    const SizedBox(width: 8),
+                    Text('of ${_money(limit, d.currencySymbol)}',
+                        style: const TextStyle(fontSize: 13, color: AppColors.darkMuted)),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
           const SizedBox(height: 18),
@@ -357,12 +494,12 @@ class DashboardScreenState extends State<DashboardScreen> {
             height: 74,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
-              children: List.generate(7, (i) {
-                final today = i == 6;
-                final h = maxDay <= 0 ? 6.0 : math.max(6.0, 52 * (_week[i] / maxDay));
+              children: List.generate(bars.length, (i) {
+                final on = i == highlight;
+                final h = maxBar <= 0 ? 6.0 : math.max(6.0, 52 * (bars[i] / maxBar));
                 return Expanded(
                   child: Tooltip(
-                    message: _money(_week[i], d.currencySymbol),
+                    message: _money(bars[i], d.currencySymbol),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       child: Column(
@@ -373,17 +510,18 @@ class DashboardScreenState extends State<DashboardScreen> {
                             curve: Curves.easeOutCubic,
                             height: h,
                             decoration: BoxDecoration(
-                              color: today ? AppColors.accent : AppColors.darkCardRaised,
+                              color: on ? AppColors.accent : AppColors.darkCardRaised,
                               borderRadius: BorderRadius.circular(8),
                             ),
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            _weekDays[i],
+                            i < labels.length ? labels[i] : '',
+                            maxLines: 1,
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
-                              color: today ? AppColors.accent : AppColors.darkFaint,
+                              color: on ? AppColors.accent : AppColors.darkFaint,
                             ),
                           ),
                         ],
@@ -397,12 +535,22 @@ class DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 16),
           Row(
             children: [
+              Expanded(child: _heroStat('Avg / day', _money(avgDaily.roundToDouble(), d.currencySymbol), Colors.white)),
+              const SizedBox(width: 8),
               Expanded(
-                child: _heroStat(
-                  limit > 0 ? 'Left to spend' : 'Balance',
-                  limit > 0 ? _money(math.max(0, limit - spent), d.currencySymbol) : _money(_num(d.totalBalance), d.currencySymbol),
-                  Colors.white,
-                ),
+                child: _isThisMonth
+                    ? _heroStat(
+                        limit > 0 ? 'Left to spend' : 'Balance',
+                        limit > 0
+                            ? _money(math.max(0, limit - spent), d.currencySymbol)
+                            : _money(_num(d.totalBalance), d.currencySymbol),
+                        Colors.white,
+                      )
+                    : _heroStat(
+                        income >= spent ? 'Saved' : 'Overspent',
+                        _money((income - spent).abs(), d.currencySymbol),
+                        Colors.white,
+                      ),
               ),
               const SizedBox(width: 8),
               Expanded(child: _heroStat('Money in', '+${_money(income, d.currencySymbol)}', AppColors.accent)),
@@ -414,17 +562,17 @@ class DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _heroStat(String label, String value, Color color) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         decoration: BoxDecoration(color: AppColors.darkCard, borderRadius: BorderRadius.circular(16)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: const TextStyle(fontSize: 11, color: AppColors.darkMuted)),
+            Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: AppColors.darkMuted)),
             const SizedBox(height: 2),
             FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
-              child: Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: color)),
+              child: Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: color)),
             ),
           ],
         ),
@@ -544,7 +692,9 @@ class DashboardScreenState extends State<DashboardScreen> {
 
   /// One white card: payments to review, then "Recent" with the latest entries.
   Widget _recentCard(DashboardData d) {
-    final list = d.recentTransactions.take(4).toList();
+    final past = _isThisMonth ? null : _past;
+    final list = (past?.recent ?? d.recentTransactions).take(4).toList();
+    final title = _isThisMonth ? 'Recent' : 'In ${DateFormat('MMMM').format(_month)}';
     return Padding(
       padding: const EdgeInsets.only(top: 16),
       child: Container(
@@ -557,7 +707,7 @@ class DashboardScreenState extends State<DashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (_reviewCount > 0) ...[
+            if (_reviewCount > 0 && _isThisMonth) ...[
               InkWell(
                 onTap: _openReview,
                 child: Padding(
@@ -594,7 +744,7 @@ class DashboardScreenState extends State<DashboardScreen> {
               padding: const EdgeInsets.fromLTRB(16, 8, 8, 0),
               child: Row(
                 children: [
-                  const Expanded(child: Text('Recent', style: AppText.section)),
+                  Expanded(child: Text(title, style: AppText.section)),
                   TextButton(
                     onPressed: () => widget.onTabChange?.call(1),
                     child: const Text(
@@ -606,9 +756,14 @@ class DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
             if (list.isEmpty)
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 4, 16, 20),
-                child: Text('No transactions yet. Tap “Add expense” to log your first one.', style: AppText.rowSub),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+                child: Text(
+                  _isThisMonth
+                      ? 'No transactions yet. Tap “Add expense” to log your first one.'
+                      : 'Nothing was logged in ${DateFormat('MMMM').format(_month)}.',
+                  style: AppText.rowSub,
+                ),
               )
             else
               for (final txn in list)
@@ -736,4 +891,99 @@ class _Again {
   final CategoryModel? category;
   final int count;
   const _Again({required this.label, required this.amount, required this.note, required this.category, required this.count});
+}
+
+/// Hero numbers for a month other than this one.
+class _MonthView {
+  final double spent;
+  final double income;
+  final double limit;
+  final double avgDaily;
+  final List<double> bars;
+  final List<String> barLabels;
+  final int highlight;
+  final List<TransactionModel> recent;
+
+  const _MonthView({
+    required this.spent,
+    required this.income,
+    required this.limit,
+    required this.avgDaily,
+    required this.bars,
+    required this.barLabels,
+    required this.highlight,
+    required this.recent,
+  });
+
+  static int _days(DateTime m) => DateTime(m.year, m.month + 1, 0).day;
+
+  static (List<double>, List<String>) _weeks(DateTime m, List<double> daily) {
+    final days = _days(m);
+    final values = <double>[];
+    final labels = <String>[];
+    for (var start = 1; start <= days; start += 7) {
+      final end = math.min(start + 6, days);
+      var sum = 0.0;
+      for (var d = start; d <= end; d++) {
+        sum += daily[d - 1];
+      }
+      values.add(sum);
+      labels.add('$start–$end');
+    }
+    return (values, labels);
+  }
+
+  static int _maxIndex(List<double> v) {
+    var best = -1;
+    var max = 0.0;
+    for (var i = 0; i < v.length; i++) {
+      if (v[i] > max) {
+        max = v[i];
+        best = i;
+      }
+    }
+    return best;
+  }
+
+  /// From the transactions saved on this phone.
+  factory _MonthView.fromTransactions(DateTime month, List<TransactionModel> txns) {
+    final daily = List<double>.filled(_days(month), 0);
+    var spent = 0.0, income = 0.0;
+    for (final t in txns) {
+      final v = double.tryParse(t.amount) ?? 0;
+      if (t.isIncome) {
+        income += v;
+      } else {
+        spent += v;
+        daily[t.date.toLocal().day - 1] += v;
+      }
+    }
+    final (bars, labels) = _weeks(month, daily);
+    return _MonthView(
+      spent: spent,
+      income: income,
+      limit: 0,
+      avgDaily: spent / _days(month),
+      bars: bars,
+      barLabels: labels,
+      highlight: _maxIndex(bars),
+      recent: txns.take(5).toList(),
+    );
+  }
+
+  /// From `/api/dashboard/?month=`, falling back to [local] for what the server leaves out.
+  factory _MonthView.fromServer(DateTime month, DashboardData d, _MonthView local) {
+    final spent = double.tryParse(d.monthlyExpenses.replaceAll(',', '')) ?? local.spent;
+    final bars = d.weekValues.isNotEmpty ? d.weekValues : local.bars;
+    return _MonthView(
+      spent: spent,
+      income: double.tryParse(d.monthlyIncome.replaceAll(',', '')) ?? local.income,
+      limit: d.monthlyBudgetLimit,
+      avgDaily: d.avgDaily ?? spent / _days(month),
+      bars: bars,
+      barLabels: d.weekLabels.length == bars.length ? d.weekLabels : local.barLabels,
+      highlight: _maxIndex(bars),
+      recent: d.recentTransactions.isNotEmpty ? d.recentTransactions : local.recent,
+    );
+  }
 }

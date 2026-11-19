@@ -391,9 +391,10 @@ class ApiService {
 
   /// ─── Dashboard ─────────────────────────────────────────────────────────
 
-  static Future<ApiResult<DashboardData>> getDashboard() async {
+  /// [month] like "2026-10" for an earlier month; this month when null.
+  static Future<ApiResult<DashboardData>> getDashboard({String? month}) async {
     try {
-      final url = await _url('/api/dashboard/');
+      final url = await _url(month == null ? '/api/dashboard/' : '/api/dashboard/?month=$month');
       final response = await _Http.get(
         Uri.parse(url),
         headers: await _headers(),
@@ -1037,6 +1038,49 @@ class ApiService {
         return ApiResult(data: Map<String, dynamic>.from(data));
       }
       return ApiResult(error: data['error'] ?? 'Failed to add member.');
+    } catch (e) {
+      return ApiResult(error: 'Connection error.');
+    }
+  }
+
+  /// ─── Notifications (in-app inbox) ───────────────────────────────────────
+
+  /// Returns `{notifications: [...], unread_count: n}`.
+  static Future<ApiResult<Map<String, dynamic>>> getNotifications({int limit = 50}) async {
+    try {
+      final url = await _url('/api/notifications/?limit=$limit');
+      final response = await _Http.get(Uri.parse(url), headers: await _headers());
+      if (response.statusCode == 200) {
+        return ApiResult(data: Map<String, dynamic>.from(jsonDecode(response.body) as Map));
+      }
+      return ApiResult(error: 'Failed to load notifications (${response.statusCode}).');
+    } catch (e) {
+      return ApiResult(error: 'Connection error.');
+    }
+  }
+
+  /// Marks [ids] as read, or all of them when [ids] is null.
+  static Future<ApiResult<void>> markNotificationsRead([List<int>? ids]) async {
+    try {
+      final url = await _url('/api/notifications/read/');
+      final response = await _Http.post(
+        Uri.parse(url),
+        headers: await _headers(),
+        body: jsonEncode({if (ids != null) 'ids': ids}),
+      );
+      if (response.statusCode == 200) return ApiResult(data: null);
+      return ApiResult(error: 'Failed to update notifications.');
+    } catch (e) {
+      return ApiResult(error: 'Connection error.');
+    }
+  }
+
+  static Future<ApiResult<void>> deleteNotification(int id) async {
+    try {
+      final url = await _url('/api/notifications/$id/');
+      final response = await _Http.delete(Uri.parse(url), headers: await _headers());
+      if (response.statusCode == 200 || response.statusCode == 404) return ApiResult(data: null);
+      return ApiResult(error: 'Failed to delete notification.');
     } catch (e) {
       return ApiResult(error: 'Connection error.');
     }
