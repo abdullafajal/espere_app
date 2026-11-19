@@ -2061,13 +2061,13 @@ class _S extends State<SplitGroupDetailScreen>
                                 SliverPersistentHeader(
                                   pinned: true,
                                   delegate: _SliverAppBarDelegate(
-                                    height: 64,
+                                    height: 76,
                                     child: Padding(
                                       padding: const EdgeInsets.fromLTRB(
                                         16,
                                         12,
                                         16,
-                                        0,
+                                        12,
                                       ),
                                       child: Container(
                                         child: SpringTabs(

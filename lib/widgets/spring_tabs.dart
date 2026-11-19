@@ -89,7 +89,7 @@ class _SpringTabsState extends State<SpringTabs> with SingleTickerProviderStateM
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: AppColors.card,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(26), // fully round, like every switch
         boxShadow: AppShadows.soft,
       ),
       child: LayoutBuilder(
@@ -107,7 +107,7 @@ class _SpringTabsState extends State<SpringTabs> with SingleTickerProviderStateM
                     bottom: 0,
                     width: w,
                     child: Container(
-                      decoration: BoxDecoration(color: AppColors.dark, borderRadius: BorderRadius.circular(16)),
+                      decoration: BoxDecoration(color: AppColors.dark, borderRadius: BorderRadius.circular(22)),
                     ),
                   ),
                   Row(
