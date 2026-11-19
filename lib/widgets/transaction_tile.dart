@@ -41,6 +41,14 @@ class TransactionTile extends StatelessWidget {
     return '${t.isIncome ? '+' : '−'}$symbol${f.format(v)}';
   }
 
+  static String _method(TransactionModel t) => switch (t.paymentMethod) {
+        'upi' => 'UPI',
+        'cash' => 'Cash',
+        'card' => 'Card',
+        'bank' => 'Bank',
+        _ => '',
+      };
+
   @override
   Widget build(BuildContext context) {
     final t = transaction;
@@ -49,7 +57,7 @@ class TransactionTile extends StatelessWidget {
     final sub = <String>[
       if (t.notes.trim().isNotEmpty) t.category.name,
       '${DateFormat('d MMM').format(local)}, ${DateFormat('h:mm a').format(local)}',
-      if (t.paymentMethodDisplay.isNotEmpty) t.paymentMethodDisplay,
+      if (_method(t).isNotEmpty) _method(t),
     ].join(' · ');
 
     Widget row = Material(
