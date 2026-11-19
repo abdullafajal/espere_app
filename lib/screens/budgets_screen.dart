@@ -217,17 +217,6 @@ class BudgetsScreenState extends State<BudgetsScreen> {
     }
   }
 
-  Color _parseColor(String? hex) {
-    if (hex == null || hex.isEmpty) return AppColors.error;
-    try {
-      String cleanHex = hex.replaceFirst('#', '');
-      if (cleanHex.length == 6) cleanHex = 'FF$cleanHex';
-      return Color(int.parse(cleanHex, radix: 16));
-    } catch (e) {
-      return AppColors.error;
-    }
-  }
-
   void _prevMonth() {
     setState(() {
       _currentMonth = DateTime(_currentMonth.year, _currentMonth.month - 1);
@@ -249,6 +238,7 @@ class BudgetsScreenState extends State<BudgetsScreen> {
         // Custom Fixed Header
         EspereHeader(
           title: 'Budgets',
+          showBack: widget.onBack == null,
           onBack: () {
             if (widget.onBack != null) {
               widget.onBack?.call();
@@ -257,20 +247,21 @@ class BudgetsScreenState extends State<BudgetsScreen> {
             }
           },
           trailing: EspereActionButton(
-            icon: Icons.add,
+            icon: Icons.add_rounded,
             primary: true,
+            tooltip: 'New budget',
             onPressed: () => _showBudgetForm(),
           ),
         ),
 
         // Month Navigator
         Container(
-          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+          margin: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          height: 44,
           decoration: BoxDecoration(
             color: AppColors.card,
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            border: Border.all(color: AppColors.border),
+            borderRadius: BorderRadius.circular(22),
             boxShadow: AppShadows.soft,
           ),
           child: Row(
@@ -279,9 +270,9 @@ class BudgetsScreenState extends State<BudgetsScreen> {
               GestureDetector(
                 onTap: _prevMonth,
                 child: const SizedBox(
-                  width: 32,
-                  height: 32,
-                  child: Icon(Icons.chevron_left, size: 20, color: AppColors.muted),
+                  width: 44,
+                  height: 44,
+                  child: Icon(Icons.chevron_left_rounded, size: 24, color: AppColors.dark),
                 ),
               ),
               Padding(
@@ -298,9 +289,9 @@ class BudgetsScreenState extends State<BudgetsScreen> {
               GestureDetector(
                 onTap: _nextMonth,
                 child: const SizedBox(
-                  width: 32,
-                  height: 32,
-                  child: Icon(Icons.chevron_right, size: 20, color: AppColors.muted),
+                  width: 44,
+                  height: 44,
+                  child: Icon(Icons.chevron_right_rounded, size: 24, color: AppColors.dark),
                 ),
               ),
             ],
@@ -312,7 +303,7 @@ class BudgetsScreenState extends State<BudgetsScreen> {
           child:
               _isLoading
                   ? const Center(
-                    child: CircularProgressIndicator(color: AppColors.accent),
+                    child: CircularProgressIndicator(color: AppColors.dark),
                   )
                   : _budgets.isEmpty
                   ? Center(
@@ -375,7 +366,7 @@ class BudgetsScreenState extends State<BudgetsScreen> {
                     )
                   : RefreshIndicator(
                     onRefresh: _handleRefresh,
-                    color: AppColors.accent,
+                    color: AppColors.dark,
                     child: ListView.builder(
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
                       itemCount: _budgets.length,
@@ -628,7 +619,7 @@ class _BudgetFormSheetState extends State<_BudgetFormSheet> {
               ),
               IconButton(
                 onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.close, color: AppColors.muted),
+                icon: const Icon(Icons.close_rounded, color: AppColors.muted),
               ),
             ],
           ),
@@ -654,7 +645,6 @@ class _BudgetFormSheetState extends State<_BudgetFormSheet> {
                 decoration: BoxDecoration(
                   color: AppColors.surface,
                   borderRadius: BorderRadius.circular(AppRadius.lg),
-                  border: Border.all(color: AppColors.dark, width: 1.5),
                 ),
                 child: Row(
                   children: [
@@ -663,8 +653,8 @@ class _BudgetFormSheetState extends State<_BudgetFormSheet> {
                         width: 28,
                         height: 28,
                         decoration: BoxDecoration(
-                          color: AppColors.accent,
-                          borderRadius: BorderRadius.circular(8),
+                          color: AppColors.card,
+                          shape: BoxShape.circle,
                         ),
                         child: Icon(
                           IconMapper.map(_selectedCategoryIcon!),
@@ -686,7 +676,7 @@ class _BudgetFormSheetState extends State<_BudgetFormSheet> {
                         ),
                       ),
                     ),
-                    const Icon(Icons.arrow_drop_down, color: AppColors.muted),
+                    const Icon(Icons.expand_more_rounded, color: AppColors.muted),
                   ],
                 ),
               ),
@@ -707,8 +697,8 @@ class _BudgetFormSheetState extends State<_BudgetFormSheet> {
                     width: 24,
                     height: 24,
                     decoration: BoxDecoration(
-                      color: AppColors.accent,
-                      borderRadius: BorderRadius.circular(6),
+                      color: AppColors.card,
+                      shape: BoxShape.circle,
                     ),
                     child: Icon(
                       IconMapper.map(_selectedCategoryIcon!),
@@ -855,7 +845,7 @@ class _CategoryPickerSheetState extends State<_CategoryPickerSheet> {
               decoration: InputDecoration(
                 hintText: 'Search categories...',
                 prefixIcon: const Icon(
-                  Icons.search,
+                  Icons.search_rounded,
                   size: 18,
                   color: AppColors.muted,
                 ),
@@ -902,7 +892,7 @@ class _CategoryPickerSheetState extends State<_CategoryPickerSheet> {
                               decoration: BoxDecoration(
                                 color:
                                     isSelected
-                                        ? AppColors.accent.withOpacity(0.15)
+                                        ? AppColors.accentSoft
                                         : Colors.transparent,
                                 borderRadius: BorderRadius.circular(
                                   AppRadius.md,
@@ -914,8 +904,8 @@ class _CategoryPickerSheetState extends State<_CategoryPickerSheet> {
                                     width: 36,
                                     height: 36,
                                     decoration: BoxDecoration(
-                                      color: AppColors.accent,
-                                      borderRadius: BorderRadius.circular(10),
+                                      color: AppColors.surface,
+                                      shape: BoxShape.circle,
                                     ),
                                     child: Icon(
                                       IconMapper.map(cat['icon'].toString()),
@@ -939,9 +929,9 @@ class _CategoryPickerSheetState extends State<_CategoryPickerSheet> {
                                   ),
                                   if (isSelected)
                                     const Icon(
-                                      Icons.check_circle,
+                                      Icons.check_circle_rounded,
                                       size: 20,
-                                      color: AppColors.accent,
+                                      color: AppColors.dark,
                                     ),
                                 ],
                               ),

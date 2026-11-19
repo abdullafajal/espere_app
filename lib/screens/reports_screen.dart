@@ -56,7 +56,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           children: [
             // Custom Fixed Header
             EspereHeader(
-              title: 'Financial Reports',
+              title: 'Reports',
               onBack: () => Navigator.maybePop(context),
               trailing: _buildYearPicker(),
             ),
@@ -66,13 +66,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
               child:
                   _isLoading
                       ? const Center(
-                        child: CircularProgressIndicator(
-                          color: AppColors.accent,
+                        child: CircularProgressIndicator(color: AppColors.dark,
                         ),
                       )
                       : RefreshIndicator(
                         onRefresh: _handleRefresh,
-                        color: AppColors.accent,
+                        color: AppColors.dark,
                         child: _buildContent(),
                       ),
             ),
@@ -86,12 +85,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
     final years = List.generate(5, (index) => DateTime.now().year - index);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14),
-      height: 36,
+      height: 44,
       decoration: BoxDecoration(
         color: AppColors.card,
-        borderRadius: BorderRadius.circular(AppRadius.md),
+        borderRadius: BorderRadius.circular(22),
         boxShadow: AppShadows.soft,
-        border: Border.all(color: AppColors.border),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<int>(
@@ -120,8 +118,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
             }
           },
           icon: const Icon(
-            Icons.keyboard_arrow_down,
-            size: 16,
+            Icons.expand_more_rounded,
+            size: 20,
             color: AppColors.text,
           ),
           dropdownColor: AppColors.card,
@@ -153,7 +151,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     double.tryParse(data['annual_income'].toString()) ?? 0,
                   ),
                   AppColors.income,
-                  Icons.arrow_upward,
+                  Icons.south_west_rounded,
                 ),
               ),
               const SizedBox(width: 12),
@@ -164,7 +162,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     double.tryParse(data['annual_expenses'].toString()) ?? 0,
                   ),
                   AppColors.expense,
-                  Icons.arrow_downward,
+                  Icons.north_east_rounded,
                 ),
               ),
               const SizedBox(width: 12),
@@ -234,26 +232,26 @@ class _ReportsScreenState extends State<ReportsScreen> {
       decoration: BoxDecoration(
         color: AppColors.dark,
         borderRadius: BorderRadius.circular(AppRadius.xl),
-        boxShadow: AppShadows.soft,
+        boxShadow: AppShadows.elevated,
       ),
       child: Column(
         children: [
           Container(
             width: 36,
             height: 36,
-            decoration: BoxDecoration(
-              color: AppColors.accent,
-              borderRadius: BorderRadius.circular(AppRadius.md),
+            decoration: const BoxDecoration(
+              color: AppColors.darkCard,
+              shape: BoxShape.circle,
             ),
-            child: Icon(icon, size: 18, color: AppColors.dark),
+            child: Icon(icon, size: 18, color: AppColors.accent),
           ),
           const SizedBox(height: 12),
           Text(
             title,
             style: const TextStyle(
-              fontSize: 10,
-              color: AppColors.muted,
-              fontWeight: FontWeight.w500,
+              fontSize: 11,
+              color: AppColors.darkMuted,
+              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 4),
@@ -451,13 +449,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 (i) => FlSpot(i.toDouble(), values[i]),
               ),
               isCurved: true,
-              color: AppColors.accent,
+              color: AppColors.dark,
               barWidth: 3,
               isStrokeCapRound: true,
               dotData: const FlDotData(show: false),
               belowBarData: BarAreaData(
                 show: true,
-                color: AppColors.accent.withOpacity(0.1),
+                color: AppColors.accentSoft,
               ),
             ),
           ],
@@ -480,7 +478,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
     final labels = topCategories.map((c) => c['name'].toString()).toList();
     final values = topCategories.map((c) => double.tryParse(c['total'].toString()) ?? 0.0).toList();
-    final colors = topCategories.map((c) => c['color'].toString()).toList();
     final icons = topCategories.map((c) => c['icon'].toString()).toList();
 
     return Column(
@@ -492,10 +489,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
               sectionsSpace: 2,
               centerSpaceRadius: 40,
               sections: List.generate(topCategories.length, (i) {
-                final colorHex = colors[i].replaceFirst('#', '');
-                final color = Color(int.parse('FF$colorHex', radix: 16));
                 return PieChartSectionData(
-                  color: color,
+                  color: AppColors.chartAt(i),
                   value: values[i],
                   title: '',
                   radius: 50,
@@ -506,8 +501,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         ),
         const SizedBox(height: 20),
         ...List.generate(topCategories.length, (i) {
-          final colorHex = colors[i].replaceFirst('#', '');
-          final color = Color(int.parse('FF$colorHex', radix: 16));
+          final color = AppColors.chartAt(i);
           final total = values.reduce((a, b) => a + b);
           final pct = (values[i] / total * 100).toStringAsFixed(1);
           final iconData = IconMapper.map(icons[i]);
@@ -517,13 +511,16 @@ class _ReportsScreenState extends State<ReportsScreen> {
             child: Row(
               children: [
                 Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: color, // Use category color
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(iconData, size: 16, color: AppColors.dark),
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                ),
+                const SizedBox(width: 10),
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: const BoxDecoration(color: AppColors.categoryFill, shape: BoxShape.circle),
+                  child: Icon(iconData, size: 17, color: AppColors.categoryInk),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -587,8 +584,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     height: 48,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: AppColors.accent,
-                      borderRadius: BorderRadius.circular(AppRadius.md),
+                      color: AppColors.surface,
+                      shape: BoxShape.circle,
                     ),
                     child: Text(
                       m['month'],
@@ -693,8 +690,8 @@ class _ChartCard extends StatelessWidget {
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: AppColors.accent,
-                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  color: AppColors.surface,
+                  shape: BoxShape.circle,
                 ),
                 child: Icon(icon, size: 18, color: AppColors.dark),
               ),

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../utils/icon_mapper.dart';
 
+/// Icon picker for groups. Groups have no colour any more (the app uses only ink, white
+/// and lime), so only the icon is chosen; the colour passed to [onSelected] is whatever the
+/// group already had, so the server data stays untouched.
 class IconColorPicker extends StatefulWidget {
   final Function(String color, String icon) onSelected;
   final String initialColor;
@@ -21,11 +24,9 @@ class IconColorPicker extends StatefulWidget {
 }
 
 class _IconColorPickerState extends State<IconColorPicker> {
-  late String _selectedColor;
   late String _selectedIcon;
 
-  final List<(String, String)> _iconChoices = [
-    ('category', 'Category'),
+  static const List<(String, String)> _iconChoices = [
     ('groups', 'Friends'),
     ('home', 'Home'),
     ('favorite', 'Couple'),
@@ -38,24 +39,13 @@ class _IconColorPickerState extends State<IconColorPicker> {
     ('pets', 'Pets'),
     ('directions_car', 'Trip'),
     ('movie', 'Movies'),
-  ];
-
-  final List<String> _colorChoices = [
-    '#C8E64A', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4',
-    '#FFEAA7', '#DDA0DD', '#FF8C42', '#98D8C8', '#F7DC6F',
-    '#BB8FCE', '#85C1E9', '#F0B27A', '#82E0AA', '#F1948A',
-    '#AED6F1', '#D7BDE2', '#A3E4D7',
+    ('category', 'Other'),
   ];
 
   @override
   void initState() {
     super.initState();
-    _selectedColor = widget.initialColor;
     _selectedIcon = widget.initialIcon;
-  }
-
-  Color _parseColor(String hex) {
-    return Color(int.parse('FF${hex.replaceFirst('#', '')}', radix: 16));
   }
 
   @override
@@ -63,106 +53,56 @@ class _IconColorPickerState extends State<IconColorPicker> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Icon picker
-        const Text('Icon', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.text)),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
+        const Text('Icon', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.text)),
+        const SizedBox(height: 10),
+        GridView.count(
+          crossAxisCount: 5,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 6,
+          crossAxisSpacing: 6,
+          childAspectRatio: 0.82,
           children: _iconChoices.map((choice) {
             final isSelected = _selectedIcon == choice.$1;
-            return GestureDetector(
-              onTap: () {
-                setState(() => _selectedIcon = choice.$1);
-                widget.onSelected(_selectedColor, _selectedIcon);
-              },
-              child: Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: isSelected ? AppColors.accent : AppColors.surface,
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                  border: Border.all(
-                    color: isSelected ? AppColors.dark : AppColors.border,
-                    width: isSelected ? 2 : 1,
-                  ),
-                ),
-                child: Icon(
-                  IconMapper.map(choice.$1),
-                  size: 20,
-                  color: isSelected ? AppColors.dark : AppColors.muted,
+            return Semantics(
+              button: true,
+              selected: isSelected,
+              label: choice.$2,
+              excludeSemantics: true,
+              child: GestureDetector(
+                onTap: () {
+                  setState(() => _selectedIcon = choice.$1);
+                  widget.onSelected(widget.initialColor, _selectedIcon);
+                },
+                child: Column(
+                  children: [
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: isSelected ? AppColors.accent : AppColors.surface,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: isSelected ? AppColors.dark : Colors.transparent, width: 2),
+                      ),
+                      child: Icon(IconMapper.map(choice.$1), size: 22, color: AppColors.dark),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      choice.$2,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                        color: AppColors.text,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             );
           }).toList(),
-        ),
-        const SizedBox(height: 20),
-
-        // Color picker
-        const Text('Color', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.text)),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: _colorChoices.map((hex) {
-            final isSelected = _selectedColor == hex;
-            final color = _parseColor(hex);
-            return GestureDetector(
-              onTap: () {
-                setState(() => _selectedColor = hex);
-                widget.onSelected(_selectedColor, _selectedIcon);
-              },
-              child: Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isSelected ? AppColors.dark : Colors.transparent,
-                    width: 2.5,
-                  ),
-                ),
-                child: isSelected ? const Icon(Icons.check, size: 18, color: AppColors.dark) : null,
-              ),
-            );
-          }).toList(),
-        ),
-        const SizedBox(height: 16),
-
-        // Preview
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(AppRadius.xxl),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: _parseColor(_selectedColor),
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                ),
-                child: Icon(
-                  IconMapper.map(_selectedIcon),
-                  size: 22,
-                  color: AppColors.dark,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                widget.currentName.isEmpty ? 'Preview' : widget.currentName,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.text,
-                ),
-              ),
-            ],
-          ),
         ),
       ],
     );

@@ -24,15 +24,10 @@ class BudgetTile extends StatefulWidget {
 }
 
 class _BudgetTileState extends State<BudgetTile> {
-  Color _parseColor(String? hex) {
-    if (hex == null || hex.isEmpty) return AppColors.error;
-    try {
-      String cleanHex = hex.replaceFirst('#', '');
-      if (cleanHex.length == 6) cleanHex = 'FF$cleanHex';
-      return Color(int.parse(cleanHex, radix: 16));
-    } catch (e) {
-      return AppColors.error;
-    }
+  String _m(dynamic v) {
+    final d = double.tryParse(v.toString()) ?? 0;
+    final f = NumberFormat.decimalPatternDigits(locale: 'en_IN', decimalDigits: d == d.roundToDouble() ? 0 : 2);
+    return '${widget.currencySymbol}${f.format(d)}';
   }
 
   @override
@@ -40,7 +35,6 @@ class _BudgetTileState extends State<BudgetTile> {
     final isExceeded = widget.budget['is_exceeded'] == true;
     final pct = double.tryParse(widget.budget['percentage'].toString()) ?? 0;
     final category = widget.budget['category'];
-    final categoryColor = _parseColor(category['color']);
 
     Widget content = Container(
       padding: const EdgeInsets.all(16),
@@ -54,16 +48,13 @@ class _BudgetTileState extends State<BudgetTile> {
           Row(
             children: [
               Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: categoryColor,
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                ),
+                width: 42,
+                height: 42,
+                decoration: const BoxDecoration(color: AppColors.categoryFill, shape: BoxShape.circle),
                 child: Icon(
                   IconMapper.map(category['icon']),
-                  color: AppColors.dark,
-                  size: 24,
+                  color: AppColors.categoryInk,
+                  size: 21,
                 ),
               ),
               const SizedBox(width: 12),
@@ -73,23 +64,28 @@ class _BudgetTileState extends State<BudgetTile> {
                   children: [
                     Text(
                       category['name'] ?? 'Category',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: AppColors.text,
-                      ),
+                      style: AppText.rowTitle,
                     ),
                     Text(
                       DateFormat('MMMM yyyy').format(
                         DateTime.parse(widget.budget['month']),
                       ),
-                      style: const TextStyle(
-                        color: AppColors.muted,
-                        fontSize: 11,
-                      ),
+                      style: AppText.rowSub,
                     ),
                   ],
                 ),
+              ),
+              PopupMenuButton<String>(
+                tooltip: 'More',
+                icon: const Icon(Icons.more_vert_rounded, size: 20, color: AppColors.muted),
+                onSelected: (v) {
+                  if (v == 'edit') widget.onEdit?.call();
+                  if (v == 'delete') widget.onDelete?.call();
+                },
+                itemBuilder: (_) => const [
+                  PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_rounded, size: 20), SizedBox(width: 10), Text('Edit')])),
+                  PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline_rounded, size: 20), SizedBox(width: 10), Text('Delete')])),
+                ],
               ),
             ],
           ),
@@ -100,7 +96,7 @@ class _BudgetTileState extends State<BudgetTile> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '${widget.currencySymbol}${widget.budget['spent']} spent',
+                '${_m(widget.budget['spent'])} spent',
                 style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -111,7 +107,7 @@ class _BudgetTileState extends State<BudgetTile> {
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 12,
-                  color: isExceeded ? AppColors.accent : AppColors.text,
+                  color: AppColors.text,
                 ),
               ),
             ],
@@ -120,9 +116,9 @@ class _BudgetTileState extends State<BudgetTile> {
           LinearProgressIndicator(
             value: (pct / 100).clamp(0.0, 1.0),
             backgroundColor: AppColors.surface,
-            color: AppColors.accent,
-            minHeight: 10,
-            borderRadius: BorderRadius.circular(5),
+            color: AppColors.dark,
+            minHeight: 8,
+            borderRadius: BorderRadius.circular(4),
           ),
           const SizedBox(height: 10),
           Row(
@@ -136,7 +132,7 @@ class _BudgetTileState extends State<BudgetTile> {
                 ),
               ),
               Text(
-                'Limit: ${widget.currencySymbol}${widget.budget['amount']}',
+                'Limit: ${_m(widget.budget['amount'])}',
                 style: const TextStyle(
                   fontSize: 11,
                   color: AppColors.muted,
@@ -168,7 +164,7 @@ class _BudgetTileState extends State<BudgetTile> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Budget exceeded by ${widget.currencySymbol}${double.parse(widget.budget['spent'].toString()) - double.parse(widget.budget['amount'].toString())}',
+                      'Budget exceeded by ${_m(double.parse(widget.budget['spent'].toString()) - double.parse(widget.budget['amount'].toString()))}',
                       style: const TextStyle(
                         color: AppColors.accent,
                         fontSize: 12,
@@ -197,11 +193,11 @@ class _BudgetTileState extends State<BudgetTile> {
         }
         return false;
       },
-      bgIcon: Icons.delete,
+      bgIcon: Icons.delete_outline_rounded,
       bgColor: AppColors.dark,
-      bgIconColor: categoryColor,
-      secBgIcon: Icons.edit,
-      secBgColor: categoryColor,
+      bgIconColor: AppColors.accent,
+      secBgIcon: Icons.edit_rounded,
+      secBgColor: AppColors.accent,
       secBgIconColor: AppColors.dark,
       borderRadius: BorderRadius.circular(AppRadius.xxl),
       child: content,
@@ -211,7 +207,7 @@ class _BudgetTileState extends State<BudgetTile> {
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(AppRadius.xxl),
-        boxShadow: AppShadows.card,
+        boxShadow: AppShadows.soft,
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(AppRadius.xxl),

@@ -143,52 +143,6 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     );
   }
 
-  void _showTypeFilterSheet() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.card,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: AppColors.border,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'Filter Categories',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.text,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _buildTypePickerOption('All Types', 'all'),
-                _buildTypePickerOption('Expense', 'expense'),
-                _buildTypePickerOption('Income', 'income'),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   Widget _buildTypePickerOption(String title, String value) {
     final isSelected = _typeFilter == value;
     return ListTile(
@@ -198,11 +152,11 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
         style: TextStyle(
           fontSize: 15,
           fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-          color: isSelected ? AppColors.accent : AppColors.text,
+          color: AppColors.text,
         ),
       ),
       trailing: isSelected
-          ? const Icon(Icons.check, color: AppColors.accent, size: 20)
+          ? const Icon(Icons.check_rounded, color: AppColors.dark, size: 20)
           : null,
       onTap: () {
         Navigator.pop(context);
@@ -231,8 +185,9 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
               title: 'Categories',
               onBack: () => Navigator.pop(context),
               trailing: EspereActionButton(
-                icon: Icons.add,
+                icon: Icons.add_rounded,
                 primary: true,
+                tooltip: 'New category',
                 onPressed: () => _showCategoryForm(),
               ),
             ),
@@ -241,26 +196,19 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
               // Single filter: stretch to the full width (label left, arrow right).
-              child: EspereFilterChip(
-                expand: true,
-                active: _typeFilter != 'all',
-                label: _typeFilter == 'all'
-                    ? 'All Types'
-                    : _typeFilter == 'expense'
-                        ? 'Expense'
-                        : 'Income',
-                onTap: () {
-                  setState(() {
-                    if (_typeFilter == 'all') {
-                      _typeFilter = 'expense';
-                    } else if (_typeFilter == 'expense') {
-                      _typeFilter = 'income';
-                    } else {
-                      _typeFilter = 'all';
-                    }
-                  });
-                },
-                onLongPress: _showTypeFilterSheet,
+              child: Row(
+                children: [
+                  for (final (value, label) in const [('all', 'All'), ('expense', 'Expense'), ('income', 'Income')])
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: EspereFilterChip(
+                        label: label,
+                        dropdown: false,
+                        active: _typeFilter == value,
+                        onTap: () => setState(() => _typeFilter = value),
+                      ),
+                    ),
+                ],
               ),
             ),
 
@@ -268,11 +216,10 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
             Expanded(
               child: _isLoading
                   ? const Center(
-                      child: CircularProgressIndicator(
-                          color: AppColors.accent))
+                      child: CircularProgressIndicator(color: AppColors.dark))
                   : RefreshIndicator(
                           onRefresh: _handleRefresh,
-                          color: AppColors.accent,
+                          color: AppColors.dark,
                           child: ListView(
                             padding: const EdgeInsets.fromLTRB(
                                 16, 8, 16, 100),
@@ -350,8 +297,8 @@ class _SectionHeader extends StatelessWidget {
             padding:
                 const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(
-              color: AppColors.accent,
-              borderRadius: BorderRadius.circular(8),
+              color: AppColors.surface,
+              shape: BoxShape.circle,
             ),
             child: Text(
               '$count',
@@ -386,22 +333,22 @@ class _CategoryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Widget content = Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.fromLTRB(14, 12, canEdit ? 2 : 14, 12),
       color: AppColors.card,
       child: Row(
         children: [
           // Icon badge
           Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: category.colorValue,
-              borderRadius: BorderRadius.circular(AppRadius.md),
+            width: 42,
+            height: 42,
+            decoration: const BoxDecoration(
+              color: AppColors.categoryFill,
+              shape: BoxShape.circle,
             ),
             child: Icon(
               IconMapper.map(category.icon),
-              size: 22,
-              color: AppColors.dark,
+              size: 21,
+              color: AppColors.categoryInk,
             ),
           ),
           const SizedBox(width: 12),
@@ -413,15 +360,11 @@ class _CategoryTile extends StatelessWidget {
               children: [
                 Text(
                   category.name,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.text,
-                  ),
+                  style: AppText.rowTitle,
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  category.isSystem ? 'System' : 'Custom',
+                  '${category.type == 'income' ? 'Income' : 'Expense'} · ${category.isSystem ? 'Built-in' : 'Yours'}',
                   style: const TextStyle(
                     fontSize: 12,
                     color: AppColors.muted,
@@ -430,6 +373,16 @@ class _CategoryTile extends StatelessWidget {
               ],
             ),
           ),
+          if (canEdit)
+            PopupMenuButton<String>(
+              tooltip: 'More',
+              icon: const Icon(Icons.more_vert_rounded, size: 20, color: AppColors.muted),
+              onSelected: (v) => v == 'edit' ? onEdit?.call() : onDelete?.call(),
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_rounded, size: 20), SizedBox(width: 10), Text('Edit')])),
+                PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline_rounded, size: 20), SizedBox(width: 10), Text('Delete')])),
+              ],
+            ),
         ],
       ),
     );
@@ -448,11 +401,11 @@ class _CategoryTile extends StatelessWidget {
           }
           return false;
         },
-        bgIcon: Icons.delete,
+        bgIcon: Icons.delete_rounded,
         bgColor: AppColors.dark,
-        bgIconColor: category.colorValue,
-        secBgIcon: Icons.edit,
-        secBgColor: category.colorValue,
+        bgIconColor: AppColors.accent,
+        secBgIcon: Icons.edit_rounded,
+        secBgColor: AppColors.accent,
         secBgIconColor: AppColors.dark,
         borderRadius: BorderRadius.circular(AppRadius.xxl),
         child: content,
@@ -463,7 +416,7 @@ class _CategoryTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(AppRadius.xxl),
-        boxShadow: AppShadows.card,
+        boxShadow: AppShadows.soft,
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(AppRadius.xxl),
@@ -511,13 +464,6 @@ const _iconChoices = [
   ('child_care', 'Baby'),
 ];
 
-/// Preset color palette for categories.
-const _colorChoices = [
-  '#C8E64A', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4',
-  '#FFEAA7', '#DDA0DD', '#FF8C42', '#98D8C8', '#F7DC6F',
-  '#BB8FCE', '#85C1E9', '#F0B27A', '#82E0AA', '#F1948A',
-  '#AED6F1', '#D7BDE2', '#A3E4D7',
-];
 
 class _CategoryFormSheet extends StatefulWidget {
   final CategoryModel? category;
@@ -693,11 +639,11 @@ class _CategoryFormSheetState extends State<_CategoryFormSheet> {
                       width: 32,
                       height: 32,
                       decoration: BoxDecoration(
-                        color: AppColors.accent,
-                        borderRadius: BorderRadius.circular(8),
+                        color: AppColors.card,
+                        shape: BoxShape.circle,
                       ),
                       child: Icon(
-                        _selectedType == 'income' ? Icons.arrow_upward : Icons.arrow_downward,
+                        _selectedType == 'income' ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
                         size: 18,
                         color: AppColors.dark,
                       ),
@@ -709,7 +655,7 @@ class _CategoryFormSheetState extends State<_CategoryFormSheet> {
                         style: const TextStyle(fontSize: 14, color: AppColors.text),
                       ),
                     ),
-                    const Icon(Icons.arrow_drop_down, color: AppColors.muted),
+                    const Icon(Icons.expand_more_rounded, color: AppColors.muted),
                   ],
                 ),
               ),
@@ -772,108 +718,23 @@ class _CategoryFormSheetState extends State<_CategoryFormSheet> {
                         color: isSelected
                             ? AppColors.accent
                             : AppColors.surface,
-                        borderRadius:
-                            BorderRadius.circular(AppRadius.md),
+                        shape: BoxShape.circle,
                         border: Border.all(
                           color: isSelected
                               ? AppColors.dark
-                              : AppColors.border,
-                          width: isSelected ? 2 : 1,
+                              : Colors.transparent,
+                          width: 2,
                         ),
                       ),
                       child: Icon(
                         IconMapper.map(choice.$1),
-                        size: 20,
-                        color: isSelected
-                            ? AppColors.dark
-                            : AppColors.muted,
+                        size: 21,
+                        color: AppColors.dark,
                       ),
                     ),
                   ),
                 );
               }).toList(),
-            ),
-            const SizedBox(height: 20),
-
-            // Color picker
-            const Text('Color',
-                style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.text)),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _colorChoices.map((hex) {
-                final isSelected = _selectedColor == hex;
-                final color = Color(int.parse(
-                    'FF${hex.replaceFirst('#', '')}',
-                    radix: 16));
-                return GestureDetector(
-                  onTap: () =>
-                      setState(() => _selectedColor = hex),
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: color,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: isSelected
-                            ? AppColors.dark
-                            : Colors.transparent,
-                        width: 2.5,
-                      ),
-                    ),
-                    child: isSelected
-                        ? const Icon(Icons.check,
-                            size: 18, color: AppColors.dark)
-                        : null,
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 16),
-
-            // Preview
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(AppRadius.xxl),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: Color(int.parse(
-                          'FF${_selectedColor.replaceFirst('#', '')}',
-                          radix: 16)),
-                      borderRadius:
-                          BorderRadius.circular(AppRadius.md),
-                    ),
-                    child: Icon(
-                      IconMapper.map(_selectedIcon),
-                      size: 22,
-                      color: AppColors.dark,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    _nameController.text.isEmpty
-                        ? 'Preview'
-                        : _nameController.text,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.text,
-                    ),
-                  ),
-                ],
-              ),
             ),
             const SizedBox(height: 20),
 
@@ -941,13 +802,13 @@ class _CategoryTypePickerSheet extends StatelessWidget {
             context,
             'income',
             'Income',
-            Icons.arrow_upward,
+            Icons.arrow_upward_rounded,
           ),
           _buildItem(
             context,
             'expense',
             'Expense',
-            Icons.arrow_downward,
+            Icons.arrow_downward_rounded,
           ),
         ],
       ),
@@ -968,7 +829,7 @@ class _CategoryTypePickerSheet extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppColors.accent.withValues(alpha: 0.15)
+              ? AppColors.accentSoft
               : AppColors.surface,
           borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(
@@ -982,8 +843,8 @@ class _CategoryTypePickerSheet extends StatelessWidget {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: AppColors.accent,
-                borderRadius: BorderRadius.circular(8),
+                color: AppColors.surface,
+                shape: BoxShape.circle,
               ),
               child: Icon(icon, size: 20, color: AppColors.dark),
             ),
@@ -998,7 +859,7 @@ class _CategoryTypePickerSheet extends StatelessWidget {
             ),
             if (isSelected) ...[
               const Spacer(),
-              const Icon(Icons.check_circle, color: AppColors.accent),
+              const Icon(Icons.check_circle_rounded, color: AppColors.dark),
             ],
           ],
         ),

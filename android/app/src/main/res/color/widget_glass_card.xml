@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Espere palette: ink, white, lime (no wallpaper colours) -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:color="#C2B9CEF3" />
+    <item android:color="#F2F3EE" />
 </selector>

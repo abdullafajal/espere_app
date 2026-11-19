@@ -1,7 +1,5 @@
-/// Dashboard Screen — exact match of dashboard.html.
-///
-/// Layout: greeting header → balance card → 3 summary cards → promo banner
-///         → insights → charts → recent transactions → quick links
+/// Home: greeting → spend hero card (this month, last 7 days) → Add expense / Scan →
+/// one-tap repeats → payments to review → recent → budget, insights, charts → shortcuts.
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -18,8 +16,6 @@ import '../theme/app_theme.dart';
 import '../models/dashboard.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
-import '../widgets/balance_card.dart';
-import '../widgets/summary_card.dart';
 import '../widgets/transaction_tile.dart';
 import '../widgets/thanos_snap_widget.dart';
 import '../utils/icon_mapper.dart';
@@ -29,6 +25,13 @@ import 'reports_screen.dart';
 import '../services/sync_service.dart';
 import '../services/widget_service.dart';
 import 'transaction_form_screen.dart';
+import 'quick_add_screen.dart';
+import 'auto_track_review_screen.dart';
+import '../models/category.dart';
+import '../services/auto_expense_service.dart';
+import '../services/receipt_service.dart';
+import '../services/transaction_store.dart';
+import 'package:image_picker/image_picker.dart';
 
 class DashboardScreen extends StatefulWidget {
   final Function(int)? onTabChange;
@@ -45,6 +48,15 @@ class DashboardScreenState extends State<DashboardScreen> {
   StreamSubscription<void>? _syncSub;
   final Map<int, GlobalKey<ThanosSnapWidgetState>> _snapKeys = {};
 
+  /// Spending of the last 7 days (oldest first) and their weekday letters.
+  List<double> _week = List.filled(7, 0);
+  List<String> _weekDays = List.filled(7, '');
+
+  /// Frequent expenses offered as one-tap repeats.
+  List<_Again> _again = const [];
+  int _reviewCount = 0;
+  StreamSubscription<void>? _autoSub;
+
   void initState() {
     super.initState();
     _loadDashboard();
@@ -54,11 +66,13 @@ class DashboardScreenState extends State<DashboardScreen> {
       debugPrint('[Dashboard] Background sync detected — refreshing data...');
       _loadDashboard();
     });
+    _autoSub = AutoExpenseService.changes.listen((_) => _loadExtras());
   }
 
   @override
   void dispose() {
     _syncSub?.cancel();
+    _autoSub?.cancel();
     super.dispose();
   }
 
@@ -80,6 +94,8 @@ class DashboardScreenState extends State<DashboardScreen> {
         
       });
 
+      _loadExtras();
+
       // Update home screen widget
       WidgetService.updateDashboard(
         totalBalance: double.tryParse(d.totalBalance.replaceAll(',', '')) ?? 0,
@@ -92,20 +108,529 @@ class DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  /// Week bars, one-tap repeats and the review count, all from local data.
+  Future<void> _loadExtras() async {
+    final cached = await CacheService.getCachedTransactions();
+    final txns = ((cached?['transactions'] as List?) ?? const []).whereType<Map>().toList();
+    final today = DateUtils.dateOnly(DateTime.now());
+    final week = List<double>.filled(7, 0);
+    final days = List.generate(7, (i) => DateFormat('E').format(today.subtract(Duration(days: 6 - i)))[0]);
+    final counts = <String, _Again>{};
+    for (final t in txns) {
+      if (t['type'] != 'expense') continue;
+      final date = DateTime.tryParse(t['date']?.toString() ?? '')?.toLocal();
+      final amount = double.tryParse(t['amount']?.toString() ?? '') ?? 0;
+      if (date == null || amount <= 0) continue;
+      final age = today.difference(DateUtils.dateOnly(date)).inDays;
+      if (age >= 0 && age < 7) week[6 - age] += amount;
+      if (age < 0 || age > 60) continue;
+      final cat = t['category'] is Map ? Map<String, dynamic>.from(t['category'] as Map) : null;
+      final note = (t['notes'] ?? '').toString().trim();
+      final key = '${note.toLowerCase()}|${cat?['id']}|${amount.toStringAsFixed(2)}';
+      final prev = counts[key];
+      counts[key] = _Again(
+        label: note.isNotEmpty ? note : (cat?['name']?.toString() ?? 'Other'),
+        amount: amount,
+        note: note,
+        category: cat == null ? null : CategoryModel.fromJson(cat),
+        count: (prev?.count ?? 0) + 1,
+      );
+    }
+    final again = counts.values.where((a) => a.count >= 2).toList()
+      ..sort((a, b) => b.count.compareTo(a.count));
+    var review = 0;
+    if (await AutoExpenseService.isAvailable()) review = await AutoExpenseService.reviewCount();
+    if (!mounted) return;
+    setState(() {
+      _week = week;
+      _weekDays = days;
+      _again = again.take(4).toList();
+      _reviewCount = review;
+    });
+  }
+
+  String _money(num v, String symbol) {
+    final whole = v == v.roundToDouble();
+    final f = NumberFormat.decimalPatternDigits(locale: 'en_IN', decimalDigits: whole ? 0 : 2);
+    return '$symbol${f.format(v)}';
+  }
+
+  double _num(String s) => double.tryParse(s.replaceAll(',', '')) ?? 0;
+
+  Future<void> _openQuickAdd({String type = 'expense'}) async {
+    final added = await QuickAddScreen.open(context, type: type);
+    if (added && mounted) _loadDashboard();
+  }
+
+  Future<void> _scanReceipt() async {
+    final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
+    if (picked == null || !mounted) return;
+    final scan = await ReceiptService.recognize(picked.path);
+    if (!mounted) return;
+    if (scan == null) {
+      AppToast.error(context, 'Could not read text from this image.');
+      return;
+    }
+    await ReceiptService.openForm(context, scan: scan);
+    if (mounted) _loadDashboard();
+  }
+
+  Future<void> _addAgain(_Again a, String symbol) async {
+    HapticFeedback.mediumImpact();
+    final id = await TransactionStore.create(
+      amount: a.amount,
+      type: 'expense',
+      category: a.category,
+      notes: a.note,
+    );
+    if (!mounted) return;
+    await _loadDashboard();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text('−${_money(a.amount, symbol)} added · ${a.label}'),
+        duration: const Duration(seconds: 4),
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 96),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () async {
+            await TransactionStore.remove(id);
+            if (mounted) _loadDashboard();
+          },
+        ),
+      ));
+  }
+
+  Future<void> _openReview() async {
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => const AutoTrackReviewScreen()));
+    if (mounted) _loadDashboard();
+  }
+
+  // ─── Home: top part ──────────────────────────────────────────────────────
+
+  Widget _header(DashboardData d) {
+    final initial = d.user.displayName.trim().isEmpty ? '?' : d.user.displayName.trim()[0].toUpperCase();
+    return Padding(
+      padding: const EdgeInsets.only(top: 14, bottom: 16),
+      child: SizedBox(
+        height: 48,
+        child: Row(
+          children: [
+            Semantics(
+              button: true,
+              label: 'Profile and settings',
+              excludeSemantics: true,
+              child: GestureDetector(
+                onTap: () async {
+                  await Navigator.pushNamed(context, '/profile');
+                  if (mounted) _loadDashboard();
+                },
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  alignment: Alignment.center,
+                  decoration: const BoxDecoration(color: AppColors.dark, shape: BoxShape.circle),
+                  child: Text(initial, style: const TextStyle(color: AppColors.accent, fontWeight: FontWeight.w800, fontSize: 16)),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Good ${d.greeting.toLowerCase()}', style: AppText.rowSub),
+                  Text(
+                    d.user.displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.text),
+                  ),
+                ],
+              ),
+            ),
+            Semantics(
+              button: true,
+              label: 'Settings',
+              excludeSemantics: true,
+              child: GestureDetector(
+                onTap: () async {
+                  await Navigator.pushNamed(context, '/profile');
+                  if (mounted) _loadDashboard();
+                },
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(color: AppColors.card, shape: BoxShape.circle, boxShadow: AppShadows.soft),
+                  child: const Icon(Icons.settings_rounded, size: 22, color: AppColors.dark),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _hero(DashboardData d) {
+    final spent = _num(d.monthlyExpenses);
+    final income = _num(d.monthlyIncome);
+    final limit = d.monthlyBudgetLimit;
+    final maxDay = _week.fold<double>(0, math.max);
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.dark,
+        borderRadius: BorderRadius.circular(AppRadius.xxxl),
+        boxShadow: AppShadows.elevated,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text('Spent this month', style: TextStyle(fontSize: 13, color: AppColors.darkMuted)),
+              ),
+              Container(
+                height: 28,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(color: AppColors.darkCard, borderRadius: BorderRadius.circular(14)),
+                child: Text(
+                  DateFormat('MMMM').format(DateTime.now()),
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(_money(spent, d.currencySymbol), style: AppText.hero.copyWith(color: Colors.white)),
+                if (limit > 0) ...[
+                  const SizedBox(width: 8),
+                  Text('of ${_money(limit, d.currencySymbol)}',
+                      style: const TextStyle(fontSize: 13, color: AppColors.darkMuted)),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          SizedBox(
+            height: 74,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: List.generate(7, (i) {
+                final today = i == 6;
+                final h = maxDay <= 0 ? 6.0 : math.max(6.0, 52 * (_week[i] / maxDay));
+                return Expanded(
+                  child: Tooltip(
+                    message: _money(_week[i], d.currencySymbol),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 500),
+                            curve: Curves.easeOutCubic,
+                            height: h,
+                            decoration: BoxDecoration(
+                              color: today ? AppColors.accent : AppColors.darkCardRaised,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            _weekDays[i],
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: today ? AppColors.accent : AppColors.darkFaint,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _heroStat(
+                  limit > 0 ? 'Left to spend' : 'Balance',
+                  limit > 0 ? _money(math.max(0, limit - spent), d.currencySymbol) : _money(_num(d.totalBalance), d.currencySymbol),
+                  Colors.white,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(child: _heroStat('Money in', '+${_money(income, d.currencySymbol)}', AppColors.accent)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _heroStat(String label, String value, Color color) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(color: AppColors.darkCard, borderRadius: BorderRadius.circular(16)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: const TextStyle(fontSize: 11, color: AppColors.darkMuted)),
+            const SizedBox(height: 2),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: color)),
+            ),
+          ],
+        ),
+      );
+
+  Widget _actions() {
+    return Row(
+      children: [
+        Expanded(
+          child: Semantics(
+            button: true,
+            label: 'Add expense',
+            excludeSemantics: true,
+            child: GestureDetector(
+              onTap: () {
+                HapticFeedback.mediumImpact();
+                _openQuickAdd();
+              },
+              child: Container(
+                height: 58,
+                decoration: BoxDecoration(
+                  color: AppColors.accent,
+                  borderRadius: BorderRadius.circular(AppRadius.xl),
+                  boxShadow: AppShadows.accent,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 30,
+                      height: 30,
+                      decoration: const BoxDecoration(color: AppColors.dark, shape: BoxShape.circle),
+                      child: const Icon(Icons.add_rounded, size: 20, color: AppColors.accent),
+                    ),
+                    const SizedBox(width: 10),
+                    const Text('Add expense', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.dark)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Semantics(
+          button: true,
+          label: 'Scan receipt',
+          excludeSemantics: true,
+          child: GestureDetector(
+            onTap: _scanReceipt,
+            child: Container(
+              width: 58,
+              height: 58,
+              decoration: BoxDecoration(color: AppColors.card, borderRadius: BorderRadius.circular(AppRadius.xl), boxShadow: AppShadows.soft),
+              child: const Icon(Icons.document_scanner_rounded, size: 24, color: AppColors.dark),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _againRow(DashboardData d) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Add again in one tap', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.muted)),
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            clipBehavior: Clip.none,
+            child: Row(
+              children: _again.map((a) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Semantics(
+                    button: true,
+                    label: 'Add ${a.label} ${_money(a.amount, d.currencySymbol)} again',
+                    excludeSemantics: true,
+                    child: GestureDetector(
+                      onTap: () => _addAgain(a, d.currencySymbol),
+                      child: Container(
+                        height: 42,
+                        padding: const EdgeInsets.only(left: 6, right: 14),
+                        decoration: BoxDecoration(color: AppColors.card, borderRadius: BorderRadius.circular(21), boxShadow: AppShadows.soft),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 30,
+                              height: 30,
+                              decoration: const BoxDecoration(color: AppColors.categoryFill, shape: BoxShape.circle),
+                              child: Icon(IconMapper.map(a.category?.icon ?? 'category'), size: 17, color: AppColors.categoryInk),
+                            ),
+                            const SizedBox(width: 8),
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 120),
+                              child: Text(a.label, maxLines: 1, overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.text)),
+                            ),
+                            Text(' ${_money(a.amount, d.currencySymbol)}',
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.text)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _reviewRow() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Material(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(AppRadius.xxl),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadius.xxl),
+          onTap: _openReview,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: const BoxDecoration(color: AppColors.accent, shape: BoxShape.circle),
+                  child: const Icon(Icons.bolt_rounded, size: 22, color: AppColors.dark),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _reviewCount == 1 ? '1 payment to review' : '$_reviewCount payments to review',
+                        style: AppText.rowTitle,
+                      ),
+                      const Text('Found in your payment notifications', style: AppText.rowSub),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _recent(DashboardData d) {
+    final list = d.recentTransactions.take(5).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 24, bottom: 8),
+          child: Row(
+            children: [
+              const Expanded(child: Text('Recent', style: AppText.section)),
+              TextButton(
+                onPressed: () => widget.onTabChange?.call(1),
+                style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 4)),
+                child: const Text('See all', style: TextStyle(decoration: TextDecoration.underline)),
+              ),
+            ],
+          ),
+        ),
+        if (list.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
+            decoration: BoxDecoration(color: AppColors.card, borderRadius: BorderRadius.circular(AppRadius.xxl)),
+            child: Column(
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: const BoxDecoration(color: AppColors.surface, shape: BoxShape.circle),
+                  child: const Icon(Icons.receipt_long_rounded, color: AppColors.dark),
+                ),
+                const SizedBox(height: 10),
+                const Text('No transactions yet', style: AppText.rowTitle),
+                const SizedBox(height: 4),
+                const Text('Tap “Add expense” to log your first one.', style: AppText.rowSub, textAlign: TextAlign.center),
+              ],
+            ),
+          )
+        else
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: BorderRadius.circular(AppRadius.xxl),
+              boxShadow: AppShadows.soft,
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
+                for (var i = 0; i < list.length; i++) ...[
+                  if (i > 0) const Divider(height: 1, indent: 68, endIndent: 14),
+                  Builder(builder: (_) {
+                    final txn = list[i];
+                    final snapKey = _snapKeys.putIfAbsent(txn.id, () => GlobalKey<ThanosSnapWidgetState>());
+                    return ThanosSnapWidget(
+                      key: snapKey,
+                      child: TransactionTile(
+                        transaction: txn,
+                        currencySymbol: d.currencySymbol,
+                        showActions: true,
+                        card: false,
+                        onTap: () => TransactionFormScreen.show(context, transactionId: txn.id, onSaved: _loadDashboard),
+                        onEdit: () => TransactionFormScreen.show(context, transactionId: txn.id, onSaved: _loadDashboard),
+                        onDelete: () => _deleteTransaction(txn.id, snapKey: snapKey),
+                      ),
+                    );
+                  }),
+                ],
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
   Future<void> _handleRefresh() async {
     await SyncService.syncAll();
     await _loadDashboard();
-  }
-
-  Color _parseColor(String? hex) {
-    if (hex == null || hex.isEmpty) return AppColors.error;
-    try {
-      String cleanHex = hex.replaceFirst('#', '');
-      if (cleanHex.length == 6) cleanHex = 'FF$cleanHex';
-      return Color(int.parse(cleanHex, radix: 16));
-    } catch (e) {
-      return AppColors.error;
-    }
   }
 
   /// Calculates a "nice" interval for chart axes (like Chart.js/Django)
@@ -223,181 +748,21 @@ class DashboardScreenState extends State<DashboardScreen> {
 
     return RefreshIndicator(
       onRefresh: _handleRefresh,
-      color: AppColors.accent,
+      color: AppColors.dark,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ─── Greeting Header ────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.only(top: 32, bottom: 24),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'GOOD ${d.greeting.toUpperCase()}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.muted,
-                          letterSpacing: 2.4,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      RichText(
-                        text: TextSpan(
-                          style: const TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.text,
-                            letterSpacing: -0.5,
-                          ),
-                          children: [
-                            TextSpan(text: d.user.displayName),
-                            const TextSpan(
-                              text: '.',
-                              style: TextStyle(color: AppColors.accent),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  GestureDetector(
-                    onTap: () async {
-                      await Navigator.pushNamed(context, '/profile');
-                      if (mounted) _loadDashboard();
-                    },
-                    child: Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: AppColors.dark,
-                        borderRadius: BorderRadius.circular(AppRadius.xl),
-                        boxShadow: AppShadows.soft,
-                      ),
-                      child: const Icon(
-                        Icons.settings_outlined,
-                        color: AppColors.accent,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            _header(d),
+            _hero(d),
             const SizedBox(height: 16),
-
-            // ─── Balance Card ───────────────────────────────────
-            BalanceCard(
-              totalBalance: d.totalBalance,
-              monthlyIncome: d.monthlyIncome,
-              monthlyExpenses: d.monthlyExpenses,
-              monthlySavings: d.monthlySavings,
-              currencySymbol: d.currencySymbol,
-              onAddIncome: () {
-                TransactionFormScreen.show(
-                  context,
-                  presetType: 'income',
-                  onSaved: _loadDashboard,
-                );
-              },
-              onAddExpense: () {
-                TransactionFormScreen.show(
-                  context,
-                  presetType: 'expense',
-                  onSaved: _loadDashboard,
-                );
-              },
-            ),
-
-            const SizedBox(height: 16),
-
-            // ─── Summary Cards (3 columns) ─────────────────────
-            Row(
-              children: [
-                Expanded(
-                  child: SummaryCard(
-                    icon: Icons.arrow_upward,
-                    label: 'Income',
-                    value: '${d.currencySymbol}${double.parse(d.monthlyIncome.replaceAll(',', '')).toStringAsFixed(2)}',
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: SummaryCard(
-                    icon: Icons.arrow_downward,
-                    label: 'Expenses',
-                    value: '${d.currencySymbol}${double.parse(d.monthlyExpenses.replaceAll(',', '')).toStringAsFixed(2)}',
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: SummaryCard(
-                    icon: Icons.savings_outlined,
-                    label: 'Savings',
-                    value: '${d.currencySymbol}${double.parse(d.monthlySavings.replaceAll(',', '')).toStringAsFixed(2)}',
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 16),
-
-            // ─── Promo Banner ──────────────────────────────────
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.accent,
-                borderRadius: BorderRadius.circular(AppRadius.xl),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Start tracking money tax free',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.dark,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'The best place for tracking expenses and income. Start saving now!',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.dark.withValues(alpha: 0.7),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withValues(alpha: 0.3),
-                    ),
-                    child: const Icon(
-                      Icons.savings_outlined,
-                      size: 28,
-                      color: AppColors.dark,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
+            _actions(),
+            if (_again.isNotEmpty) _againRow(d),
+            if (_reviewCount > 0) _reviewRow(),
+            _recent(d),
+            const SizedBox(height: 24),
 
             // ─── Overall Monthly Budget ─────────────────────────────
             if (d.monthlyBudgetLimit > 0)
@@ -417,14 +782,11 @@ class DashboardScreenState extends State<DashboardScreen> {
                         Container(
                           width: 32,
                           height: 32,
-                          decoration: BoxDecoration(
-                            color: AppColors.accent.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
+                          decoration: const BoxDecoration(color: AppColors.surface, shape: BoxShape.circle),
                           child: const Icon(
-                            Icons.track_changes,
+                            Icons.track_changes_rounded,
                             size: 18,
-                            color: AppColors.accent,
+                            color: AppColors.dark,
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -466,7 +828,7 @@ class DashboardScreenState extends State<DashboardScreen> {
                     LinearProgressIndicator(
                       value: (d.monthlyBudgetLimit > 0 ? (d.monthlyBudgetSpent / d.monthlyBudgetLimit) : 0.0).clamp(0.0, 1.0),
                       backgroundColor: AppColors.surface,
-                      color: d.monthlyBudgetSpent > d.monthlyBudgetLimit ? AppColors.error : AppColors.accent,
+                      color: AppColors.dark,
                       minHeight: 8,
                       borderRadius: BorderRadius.circular(4),
                     ),
@@ -511,9 +873,9 @@ class DashboardScreenState extends State<DashboardScreen> {
                       Container(
                         width: 32,
                         height: 32,
-                        decoration: BoxDecoration(
+                        decoration: const BoxDecoration(
                           color: AppColors.accent,
-                          borderRadius: BorderRadius.circular(8),
+                          shape: BoxShape.circle,
                         ),
                         child: Icon(
                           IconMapper.map(w['icon'] ?? 'category'),
@@ -552,9 +914,9 @@ class DashboardScreenState extends State<DashboardScreen> {
                       Container(
                         width: 32,
                         height: 32,
-                        decoration: BoxDecoration(
+                        decoration: const BoxDecoration(
                           color: AppColors.accent,
-                          borderRadius: BorderRadius.circular(8),
+                          shape: BoxShape.circle,
                         ),
                         child: const Icon(Icons.lightbulb_outline, size: 18, color: AppColors.dark),
                       ),
@@ -676,8 +1038,6 @@ class DashboardScreenState extends State<DashboardScreen> {
                             ),
                             borderData: FlBorderData(show: false),
                             barGroups: List.generate(d.pieLabels.length, (i) {
-                              final colorStr = i < d.pieColors.length ? d.pieColors[i] : '#CCCCCC';
-                              final colorHex = colorStr.replaceFirst('#', '');
                               final value = i < d.pieValues.length ? d.pieValues[i] : 0.0;
                               
                               return BarChartGroupData(
@@ -685,7 +1045,7 @@ class DashboardScreenState extends State<DashboardScreen> {
                                 barRods: [
                                   BarChartRodData(
                                     toY: value,
-                                    color: Color(int.parse('FF$colorHex', radix: 16)),
+                                    color: AppColors.dark,
                                     width: d.pieLabels.length <= 3 ? 28 : 14,
                                     borderRadius: BorderRadius.circular(4),
                                   ),
@@ -925,7 +1285,7 @@ class DashboardScreenState extends State<DashboardScreen> {
                               isCurved: false,
                               isStepLineChart: true,
                               lineChartStepData: const LineChartStepData(stepDirection: 0),
-                              color: AppColors.accent,
+                              color: AppColors.dark,
                               barWidth: 2.5,
                               dotData: const FlDotData(show: false),
                               belowBarData: BarAreaData(
@@ -942,115 +1302,51 @@ class DashboardScreenState extends State<DashboardScreen> {
               }),
             ],
 
-            // ─── Recent Transactions ────────────────────────────
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'History Transaction',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.text),
-                ),
-                GestureDetector(
-                  onTap: () {
-                    // Navigate to transactions tab via parent
-                  },
-                  child: const Text(
-                    'see more',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.muted),
-                  ),
-                ),
-              ],
+            // ─── Shortcuts ──────────────────────────────────────
+            const Padding(
+              padding: EdgeInsets.only(top: 8, bottom: 10),
+              child: Text('Shortcuts', style: AppText.section),
             ),
-            const SizedBox(height: 12),
-
-            if (d.recentTransactions.isEmpty)
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 40),
-                  child: Column(
-                    children: [
-                      Icon(Icons.receipt_outlined, size: 48, color: AppColors.muted.withValues(alpha: 0.4)),
-                      const SizedBox(height: 8),
-                      const Text('No transactions yet.', style: TextStyle(fontSize: 14, color: AppColors.muted)),
-                    ],
-                  ),
-                ),
-              )
-            else
-              ...d.recentTransactions.map(
-                (txn) {
-                  final snapKey = _snapKeys.putIfAbsent(txn.id, () => GlobalKey<ThanosSnapWidgetState>());
-                  return ThanosSnapWidget(
-                    key: snapKey,
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: TransactionTile(
-                        transaction: txn,
-                        currencySymbol: d.currencySymbol,
-                        showActions: true,
-                        onTap: () {
-                          TransactionFormScreen.show(
-                            context,
-                            transactionId: txn.id,
-                            onSaved: _loadDashboard,
-                          );
-                        },
-                        onEdit: () {
-                          TransactionFormScreen.show(
-                            context,
-                            transactionId: txn.id,
-                            onSaved: _loadDashboard,
-                          );
-                        },
-                        onDelete: () => _deleteTransaction(txn.id, snapKey: snapKey),
-                      ),
-                    ),
-                  );
-                },
-              ),
-
-            // ─── Quick Links ────────────────────────────────────
-            const SizedBox(height: 16),
             GridView.count(
-              crossAxisCount: 2,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 1.3,
+              crossAxisCount: 3,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 0.95,
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               children: [
                 _QuickLink(
-                  icon: Icons.savings,
+                  icon: Icons.donut_large_rounded,
                   label: 'Budgets',
                   subtitle: 'Set spending limits',
                   onTap: () => widget.onTabChange?.call(2),
                 ),
                 _QuickLink(
-                  icon: Icons.group,
+                  icon: Icons.group_rounded,
                   label: 'Friends',
                   subtitle: 'Manage friends',
                   onTap: () => widget.onTabChange?.call(3),
                 ),
                 _QuickLink(
-                  icon: Icons.category,
+                  icon: Icons.category_rounded,
                   label: 'Categories',
                   subtitle: 'Organize spending',
                   onTap: () => Navigator.pushNamed(context, '/categories'),
                 ),
                 _QuickLink(
-                  icon: Icons.pie_chart,
+                  icon: Icons.pie_chart_rounded,
                   label: 'Reports',
                   subtitle: 'Analyze spending',
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportsScreen())),
                 ),
                 _QuickLink(
-                  icon: Icons.groups,
+                  icon: Icons.groups_rounded,
                   label: 'Split Groups',
                   subtitle: 'Share expenses',
                   onTap: () => widget.onTabChange?.call(4),
                 ),
                 _QuickLink(
-                  icon: Icons.download,
+                  icon: Icons.ios_share_rounded,
                   label: 'Export',
                   subtitle: 'Download CSV',
                   onTap: () => _showExportDialog(context),
@@ -1177,11 +1473,11 @@ class _ChartCard extends StatelessWidget {
               Container(
                 width: 28,
                 height: 28,
-                decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(8)),
+                decoration: const BoxDecoration(color: AppColors.surface, shape: BoxShape.circle),
                 child: Icon(icon, size: 16, color: AppColors.dark),
               ),
-              const SizedBox(width: 8),
-              Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.text)),
+              const SizedBox(width: 10),
+              Text(title, style: AppText.section.copyWith(fontSize: 15)),
             ],
           ),
           const SizedBox(height: 16),
@@ -1202,29 +1498,36 @@ class _QuickLink extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.dark,
+    return Semantics(
+      button: true,
+      label: '$label, $subtitle',
+      excludeSemantics: true,
+      child: Material(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        child: InkWell(
           borderRadius: BorderRadius.circular(AppRadius.xl),
-          boxShadow: AppShadows.soft,
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(AppRadius.md)),
-              child: Icon(icon, size: 24, color: AppColors.dark),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: const BoxDecoration(color: AppColors.surface, shape: BoxShape.circle),
+                  child: Icon(icon, size: 21, color: AppColors.dark),
+                ),
+                const SizedBox(height: 8),
+                Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.text)),
+                const SizedBox(height: 2),
+                Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 11, color: AppColors.muted)),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.accent)),
-            const SizedBox(height: 2),
-            Text(subtitle, style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.5)), textAlign: TextAlign.center),
-          ],
+          ),
         ),
       ),
     );
@@ -1508,4 +1811,14 @@ class _ExportBottomSheetState extends State<_ExportBottomSheet> {
       ),
     );
   }
+}
+
+/// A frequent expense offered as a one-tap repeat on Home.
+class _Again {
+  final String label;
+  final double amount;
+  final String note;
+  final CategoryModel? category;
+  final int count;
+  const _Again({required this.label, required this.amount, required this.note, required this.category, required this.count});
 }

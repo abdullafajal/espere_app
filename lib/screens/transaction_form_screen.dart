@@ -496,8 +496,8 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                         children: [
                           Icon(
                             _type == 'income'
-                                ? Icons.arrow_upward
-                                : Icons.arrow_downward,
+                                ? Icons.south_west_rounded
+                                : Icons.north_east_rounded,
                             size: 14,
                             color: AppColors.dark,
                           ),
@@ -526,7 +526,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                   _isLoading
                       ? const Center(
                         child: CircularProgressIndicator(
-                          color: AppColors.accent,
+                          color: AppColors.dark,
                         ),
                       )
                       : SingleChildScrollView(
@@ -551,7 +551,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                           'Type',
                                           style: TextStyle(
                                             fontSize: 14,
-                                            fontWeight: FontWeight.w500,
+                                            fontWeight: FontWeight.w700,
                                             color: AppColors.text,
                                           ),
                                         ),
@@ -598,10 +598,6 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                                   BorderRadius.circular(
                                                     AppRadius.lg,
                                                   ),
-                                              border: Border.all(
-                                                color: AppColors.border,
-                                                width: 1.5,
-                                              ),
                                             ),
                                             child: Row(
                                               children: [
@@ -609,16 +605,13 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                                   width: 32,
                                                   height: 32,
                                                   decoration: BoxDecoration(
-                                                    color: AppColors.accent,
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          8,
-                                                        ),
+                                                    color: AppColors.card,
+                    shape: BoxShape.circle,
                                                   ),
                                                   child: Icon(
                                                     _type == 'income'
-                                                        ? Icons.arrow_upward
-                                                        : Icons.arrow_downward,
+                                                        ? Icons.south_west_rounded
+                                                        : Icons.north_east_rounded,
                                                     size: 18,
                                                     color: AppColors.dark,
                                                   ),
@@ -636,7 +629,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                                   ),
                                                 ),
                                                 const Icon(
-                                                  Icons.arrow_drop_down,
+                                                  Icons.expand_more_rounded,
                                                   color: AppColors.muted,
                                                 ),
                                               ],
@@ -685,7 +678,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                         'Category',
                                         style: TextStyle(
                                           fontSize: 14,
-                                          fontWeight: FontWeight.w500,
+                                          fontWeight: FontWeight.w700,
                                           color: AppColors.text,
                                         ),
                                       ),
@@ -703,10 +696,6 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                             borderRadius: BorderRadius.circular(
                                               AppRadius.lg,
                                             ),
-                                            border: Border.all(
-                                              color: AppColors.border,
-                                              width: 1.5,
-                                            ),
                                           ),
                                           child: Row(
                                             children: [
@@ -716,13 +705,8 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                                   width: 28,
                                                   height: 28,
                                                   decoration: BoxDecoration(
-                                                    color:
-                                                        _selectedCategory!
-                                                            .colorValue,
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          8,
-                                                        ),
+                                                    color: AppColors.card,
+                    shape: BoxShape.circle,
                                                   ),
                                                   child: Icon(
                                                     IconMapper.map(
@@ -749,7 +733,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                                 ),
                                               ),
                                               const Icon(
-                                                Icons.arrow_drop_down,
+                                                Icons.expand_more_rounded,
                                                 color: AppColors.muted,
                                               ),
                                             ],
@@ -769,7 +753,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                         'Date & Time',
                                         style: TextStyle(
                                           fontSize: 14,
-                                          fontWeight: FontWeight.w500,
+                                          fontWeight: FontWeight.w700,
                                           color: AppColors.text,
                                         ),
                                       ),
@@ -819,10 +803,6 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                             borderRadius: BorderRadius.circular(
                                               AppRadius.lg,
                                             ),
-                                            border: Border.all(
-                                              color: AppColors.border,
-                                              width: 1.5,
-                                            ),
                                           ),
                                           child: Text(
                                             DateFormat(
@@ -848,7 +828,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                         'Payment Method',
                                         style: TextStyle(
                                           fontSize: 14,
-                                          fontWeight: FontWeight.w500,
+                                          fontWeight: FontWeight.w700,
                                           color: AppColors.text,
                                         ),
                                       ),
@@ -891,10 +871,6 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                             borderRadius: BorderRadius.circular(
                                               AppRadius.lg,
                                             ),
-                                            border: Border.all(
-                                              color: AppColors.border,
-                                              width: 1.5,
-                                            ),
                                           ),
                                           child: Row(
                                             children: [
@@ -902,9 +878,8 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                                 width: 32,
                                                 height: 32,
                                                 decoration: BoxDecoration(
-                                                  color: AppColors.accent,
-                                                  borderRadius:
-                                                      BorderRadius.circular(8),
+                                                  color: AppColors.card,
+                    shape: BoxShape.circle,
                                                 ),
                                                 child: Icon(
                                                   IconMapper.map(
@@ -931,7 +906,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                                 ),
                                               ),
                                               const Icon(
-                                                Icons.arrow_drop_down,
+                                                Icons.expand_more_rounded,
                                                 color: AppColors.muted,
                                               ),
                                             ],
@@ -1135,18 +1110,13 @@ class _CategoryPickerSheetState extends State<_CategoryPickerSheet> {
                               decoration: BoxDecoration(
                                 color:
                                     isSelected
-                                        ? AppColors.accent.withValues(
-                                          alpha: 0.15,
-                                        )
+                                        ? AppColors.accentSoft
                                         : AppColors.surface,
                                 borderRadius: BorderRadius.circular(
                                   AppRadius.lg,
                                 ),
                                 border: Border.all(
-                                  color:
-                                      isSelected
-                                          ? AppColors.accent
-                                          : AppColors.border,
+                                  color: isSelected ? AppColors.dark : Colors.transparent,
                                   width: isSelected ? 2 : 1,
                                 ),
                               ),
@@ -1157,8 +1127,8 @@ class _CategoryPickerSheetState extends State<_CategoryPickerSheet> {
                                     width: 36,
                                     height: 36,
                                     decoration: BoxDecoration(
-                                      color: cat.colorValue,
-                                      borderRadius: BorderRadius.circular(10),
+                                      color: AppColors.card,
+                                      shape: BoxShape.circle,
                                     ),
                                     child: Icon(
                                       IconMapper.map(cat.icon),
@@ -1186,9 +1156,9 @@ class _CategoryPickerSheetState extends State<_CategoryPickerSheet> {
                                   // Check mark
                                   if (isSelected)
                                     const Icon(
-                                      Icons.check_circle,
+                                      Icons.check_circle_rounded,
                                       size: 20,
-                                      color: AppColors.accent,
+                                      color: AppColors.dark,
                                     ),
                                 ],
                               ),
@@ -1243,14 +1213,14 @@ class _TransactionTypePickerSheet extends StatelessWidget {
             context,
             'income',
             'Income',
-            Icons.arrow_upward,
+            Icons.south_west_rounded,
             AppColors.income,
           ),
           _buildItem(
             context,
             'expense',
             'Expense',
-            Icons.arrow_downward,
+            Icons.north_east_rounded,
             AppColors.expense,
           ),
         ],
@@ -1274,11 +1244,11 @@ class _TransactionTypePickerSheet extends StatelessWidget {
         decoration: BoxDecoration(
           color:
               isSelected
-                  ? AppColors.accent.withValues(alpha: 0.15)
+                  ? AppColors.accentSoft
                   : AppColors.surface,
           borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(
-            color: isSelected ? AppColors.accent : AppColors.border,
+            color: isSelected ? AppColors.dark : Colors.transparent,
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -1288,8 +1258,8 @@ class _TransactionTypePickerSheet extends StatelessWidget {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: AppColors.accent,
-                borderRadius: BorderRadius.circular(8),
+                color: AppColors.card,
+                    shape: BoxShape.circle,
               ),
               child: Icon(icon, size: 20, color: AppColors.dark),
             ),
@@ -1304,7 +1274,7 @@ class _TransactionTypePickerSheet extends StatelessWidget {
             ),
             const Spacer(),
             if (isSelected)
-              const Icon(Icons.check_circle, color: AppColors.accent, size: 20),
+              const Icon(Icons.check_circle_rounded, color: AppColors.dark, size: 20),
           ],
         ),
       ),
@@ -1370,11 +1340,11 @@ class _PaymentMethodPickerSheet extends StatelessWidget {
                 decoration: BoxDecoration(
                   color:
                       isSelected
-                          ? AppColors.accent.withValues(alpha: 0.15)
+                          ? AppColors.accentSoft
                           : AppColors.surface,
                   borderRadius: BorderRadius.circular(AppRadius.lg),
                   border: Border.all(
-                    color: isSelected ? AppColors.accent : Colors.transparent,
+                    color: isSelected ? AppColors.dark : Colors.transparent,
                     width: 1.5,
                   ),
                 ),
@@ -1384,8 +1354,8 @@ class _PaymentMethodPickerSheet extends StatelessWidget {
                       width: 32,
                       height: 32,
                       decoration: BoxDecoration(
-                        color: AppColors.accent,
-                        borderRadius: BorderRadius.circular(8),
+                        color: AppColors.card,
+                    shape: BoxShape.circle,
                       ),
                       child: Icon(
                         IconMapper.map(method.$1),
@@ -1407,9 +1377,9 @@ class _PaymentMethodPickerSheet extends StatelessWidget {
                     ),
                     if (isSelected)
                       const Icon(
-                        Icons.check_circle,
+                        Icons.check_circle_rounded,
                         size: 20,
-                        color: AppColors.accent,
+                        color: AppColors.dark,
                       ),
                   ],
                 ),
@@ -1441,13 +1411,12 @@ class _DropdownField extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.border, width: 1.5),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: items.any((item) => item.$1 == value) ? value : null,
           isExpanded: true,
-          icon: const Icon(Icons.arrow_drop_down, color: AppColors.muted),
+          icon: const Icon(Icons.expand_more_rounded, color: AppColors.muted),
           style: const TextStyle(fontSize: 14, color: AppColors.text),
           dropdownColor: AppColors.card,
           borderRadius: BorderRadius.circular(AppRadius.lg),

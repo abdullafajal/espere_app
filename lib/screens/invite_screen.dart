@@ -117,7 +117,7 @@ class _InviteScreenState extends State<InviteScreen> {
               color: AppColors.dark,
               borderRadius: BorderRadius.circular(24),
             ),
-            child: const Icon(Icons.group_add, size: 56, color: AppColors.accent),
+            child: const Icon(Icons.group_add_rounded, size: 56, color: AppColors.accent),
           ),
           const SizedBox(height: 24),
           Text(
@@ -167,7 +167,7 @@ class _InviteScreenState extends State<InviteScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.error_outline, size: 80, color: Colors.red),
+          const Icon(Icons.error_outline_rounded, size: 80, color: AppColors.dark),
           const SizedBox(height: 24),
           Text(
             "Oops!",

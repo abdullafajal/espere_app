@@ -91,7 +91,7 @@ class _AutoTrackReviewScreenState extends State<AutoTrackReviewScreen> {
               ListTile(
                 title: Text((c['name'] ?? '').toString()),
                 trailing: (_chosenCategory[item.id] ?? item.txn.categoryId) == c['id']
-                    ? const Icon(Icons.check, color: AppColors.text)
+                    ? const Icon(Icons.check_rounded, color: AppColors.text)
                     : null,
                 onTap: () => Navigator.pop(ctx, c['id'] as int?),
               ),
@@ -113,7 +113,7 @@ class _AutoTrackReviewScreenState extends State<AutoTrackReviewScreen> {
             EspereHeader(title: 'Review payments', onBack: () => Navigator.pop(context)),
             Expanded(
               child: items == null
-                  ? const Center(child: CircularProgressIndicator(color: AppColors.accent))
+                  ? const Center(child: CircularProgressIndicator(color: AppColors.dark))
                   : items.isEmpty
                       ? const _Empty()
                       : ListView.separated(
@@ -188,7 +188,7 @@ class _AutoTrackReviewScreenState extends State<AutoTrackReviewScreen> {
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                         ),
-                        const Icon(Icons.arrow_drop_down, color: AppColors.muted),
+                        const Icon(Icons.expand_more_rounded, color: AppColors.muted),
                       ],
                     ),
                   ),

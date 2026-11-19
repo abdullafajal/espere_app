@@ -17,6 +17,10 @@ class SyncService {
   static Future<void> Function(int id)? onTransactionDeleted;
   static Future<void> Function(int oldId, int newId)? onTransactionIdChanged;
 
+  /// Offline-created transaction ids replaced by server ids during sync (temp → real),
+  /// so an "Undo" right after saving still finds the entry.
+  static final Map<int, int> transactionIdRemap = {};
+
   static final _syncController = StreamController<void>.broadcast();
 
   /// Stream that emits when a sync cycle finishes (queue processed).
@@ -305,6 +309,7 @@ class SyncService {
                   oldId: action == 'create' ? entityId : null
                 );
                 if (action == 'create' && entityId != null && txnJson['id'] != entityId) {
+                  transactionIdRemap[entityId] = txnJson['id'] as int;
                   try {
                     await onTransactionIdChanged?.call(entityId, txnJson['id'] as int);
                   } catch (_) {}

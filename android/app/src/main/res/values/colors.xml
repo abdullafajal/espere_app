@@ -1,32 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="widget_background_color">#FDEEE3</color>
-    <color name="widget_text_primary">#212121</color>
-    <color name="widget_text_secondary">#757575</color>
-    <color name="widget_divider">#E7D1C1</color>
-    <color name="widget_button_background_color">#F7D8C5</color>
-    <color name="notification_icon_color">#7A5C44</color>
+    <color name="widget_background_color">#FFFFFF</color>
+    <color name="widget_text_primary">#141414</color>
+    <color name="widget_text_secondary">#5B6058</color>
+    <color name="widget_divider">#ECEEE8</color>
+    <color name="widget_button_background_color">#C8E64A</color>
+    <color name="notification_icon_color">#141414</color>
     <color name="ic_launcher_background">#FFFFFF</color>
-    <color name="accent_lime">#7A5C44</color>
-    <color name="pill_background">#E7D1C1</color>
-    <color name="circle_background">#F7D8C5</color>
+    <color name="accent_lime">#C8E64A</color>
+    <color name="pill_background">#F2F3EE</color>
+    <color name="circle_background">#C8E64A</color>
 
     <!-- Quick Add Widget Theme Colors (Light Fallback) -->
-    <color name="quick_widget_bg">#FFF8F5</color>
+    <color name="quick_widget_bg">#F5F6F2</color>
     <color name="quick_widget_surface">#FFFFFF</color>
-    <color name="quick_widget_surface_variant">#F4ECE4</color>
-    <color name="quick_widget_card_bg">#FDEEE3</color>
+    <color name="quick_widget_surface_variant">#F2F3EE</color>
+    <color name="quick_widget_card_bg">#FFFFFF</color>
     <color name="quick_widget_keypad_bg">#FFFFFF</color>
-    <color name="quick_widget_primary">#7A5C44</color>
-    <color name="quick_widget_on_primary">#FFFFFF</color>
-    <color name="quick_widget_primary_container">#F7D8C5</color>
-    <color name="quick_widget_on_primary_container">#2C1A0E</color>
-    <color name="quick_widget_text_primary">#212121</color>
-    <color name="quick_widget_text_secondary">#666666</color>
-    <color name="quick_widget_text_tertiary">#999999</color>
-    <color name="quick_widget_divider">#E7D1C1</color>
-    <color name="quick_widget_success">#2E7D32</color>
-    <color name="quick_widget_error">#C62828</color>
-    <color name="quick_widget_progress_track">#E0D4CA</color>
-    <color name="quick_widget_progress_fill">#7A5C44</color>
+    <color name="quick_widget_primary">#141414</color>
+    <color name="quick_widget_on_primary">#C8E64A</color>
+    <color name="quick_widget_primary_container">#C8E64A</color>
+    <color name="quick_widget_on_primary_container">#141414</color>
+    <color name="quick_widget_text_primary">#141414</color>
+    <color name="quick_widget_text_secondary">#5B6058</color>
+    <color name="quick_widget_text_tertiary">#8E938A</color>
+    <color name="quick_widget_divider">#ECEEE8</color>
+    <color name="quick_widget_success">#141414</color>
+    <color name="quick_widget_error">#141414</color>
+    <color name="quick_widget_progress_track">#ECEEE8</color>
+    <color name="quick_widget_progress_fill">#141414</color>
 </resources>

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../widgets/espere_header.dart';
+import '../widgets/split_switcher.dart';
 import '../widgets/espere_swipe_action.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
@@ -131,7 +133,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
         children: [
           Row(
             children: [
-              Container(width: 40, height: 40, decoration: BoxDecoration(color: AppColors.accent.withOpacity(0.2), shape: BoxShape.circle), child: const Icon(Icons.groups, color: AppColors.accent, size: 20)),
+              Container(width: 40, height: 40, decoration: BoxDecoration(color: AppColors.accentSoft, shape: BoxShape.circle), child: const Icon(Icons.groups_rounded, color: AppColors.accent, size: 20)),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -192,8 +194,8 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
           const SizedBox(width: 12),
           Expanded(child: Text(u['display_name'] ?? u['username'] ?? '', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.text))),
           if (isReceived) ...[
-            IconButton(onPressed: () => _handleFriendAction(req['id'], 'reject'), icon: const Icon(Icons.close, color: AppColors.error, size: 20)),
-            IconButton(onPressed: () => _handleFriendAction(req['id'], 'accept'), icon: const Icon(Icons.check, color: AppColors.success, size: 20)),
+            IconButton(onPressed: () => _handleFriendAction(req['id'], 'reject'), icon: const Icon(Icons.close_rounded, color: AppColors.error, size: 20)),
+            IconButton(onPressed: () => _handleFriendAction(req['id'], 'accept'), icon: const Icon(Icons.check_rounded, color: AppColors.success, size: 20)),
           ] else
             TextButton(onPressed: () => _handleFriendAction(req['id'], 'cancel'), child: const Text('Cancel', style: TextStyle(color: AppColors.muted, fontSize: 12))),
         ],
@@ -318,7 +320,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
                 const Text('Add Members', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.muted)),
                 const SizedBox(height: 12),
                 if (loadingFriends)
-                  const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator(color: AppColors.accent)))
+                  const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator(color: AppColors.dark)))
                 else if (friends.isEmpty)
                   Container(
                     padding: const EdgeInsets.all(16),
@@ -380,7 +382,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
                       }
                     },
                     child: isSaving 
-                        ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: AppColors.accent, strokeWidth: 2))
+                        ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: AppColors.dark, strokeWidth: 2))
                         : const Text('Create Group', style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold, fontSize: 16)),
                   ),
                 ),
@@ -421,7 +423,8 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
           child: Column(
             children: [
               EspereHeader(
-                title: 'Split Groups',
+                title: 'Split',
+                showBack: widget.onBack == null,
                 onBack: () {
                   if (widget.onBack != null) {
                     widget.onBack?.call();
@@ -434,20 +437,23 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
                   children: [
                     if (_groupInvitations.isNotEmpty || _pendingReceived.isNotEmpty) ...[
                       EspereActionButton(
-                        icon: Icons.notifications_none,
+                        icon: Icons.notifications_rounded,
                         showBadge: true,
+                        tooltip: 'Requests',
                         onPressed: _showRequestsPopup,
                       ),
                       const SizedBox(width: 8),
                     ],
                     EspereActionButton(
-                      icon: Icons.add,
+                      icon: Icons.group_add_rounded,
                       primary: true,
+                      tooltip: 'New group',
                       onPressed: _showCreateGroupSheet,
                     ),
                   ],
                 ),
               ),
+              if (widget.onBack != null) const SplitSwitcher(current: 'groups'),
 
         // Content
         Expanded(
@@ -458,7 +464,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
                   ? _buildEmptyState()
                   : RefreshIndicator(
                     onRefresh: _loadGroups,
-                    color: AppColors.accent,
+                    color: AppColors.dark,
                     child: ListView.builder(
                       padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
                       itemCount: _groups.length + 1,
@@ -534,7 +540,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.add, size: 20, color: AppColors.dark),
+                  Icon(Icons.add_rounded, size: 20, color: AppColors.dark),
                   SizedBox(width: 8),
                   Text(
                     'Create Group',
@@ -570,7 +576,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.08),
+          color: AppColors.darkCard,
           borderRadius: BorderRadius.circular(AppRadius.lg),
         ),
         child: Row(
@@ -579,7 +585,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
               width: 28,
               height: 28,
               decoration: BoxDecoration(
-                color: AppColors.accent.withValues(alpha: 0.18),
+                color: AppColors.darkCardRaised,
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, size: 14, color: AppColors.accent),
@@ -591,11 +597,11 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
                 children: [
                   Text(
                     label,
-                    style: const TextStyle(fontSize: 11, color: Color(0x99FFFFFF)),
+                    style: const TextStyle(fontSize: 11, color: AppColors.darkMuted),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '$_currencySymbol${value.toStringAsFixed(0)}',
+                    '$_currencySymbol${NumberFormat.decimalPattern('en_IN').format(value.round())}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -629,14 +635,14 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
             style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w500,
-              color: Color(0x99FFFFFF),
+              color: AppColors.darkMuted,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             net.abs() < 0.5
                 ? 'All settled up'
-                : '${net > 0 ? '+' : '-'}$_currencySymbol${net.abs().toStringAsFixed(0)}',
+                : '${net > 0 ? '+' : '−'}$_currencySymbol${NumberFormat.decimalPattern('en_IN').format(net.abs().round())}',
             style: const TextStyle(
               fontSize: 30,
               fontWeight: FontWeight.bold,
@@ -661,7 +667,6 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
     final netBalance = double.tryParse(group['net_balance'].toString()) ?? 0;
     final memberCount = group['total_members'] ?? 0;
 
-    final groupColor = _parseColor(group['color']);
 
     final canEditDelete = group['is_accepted'] == true && group['created_by_id'] == _myId;
 
@@ -695,13 +700,13 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
                   Container(
                     width: 48,
                     height: 48,
-                    decoration: BoxDecoration(
-                      color: groupColor,
-                      borderRadius: BorderRadius.circular(AppRadius.xl),
+                    decoration: const BoxDecoration(
+                      color: AppColors.categoryFill,
+                      shape: BoxShape.circle,
                     ),
                     child: Icon(
                       _getIconData(group['icon'] ?? 'groups'),
-                      color: AppColors.dark,
+                      color: AppColors.categoryInk,
                       size: 24,
                     ),
                   ),
@@ -770,12 +775,11 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
                       child: GestureDetector(
                         onTap: () => _handleCardAction(group['id'], 'reject'),
                         child: Container(
-                          height: 40,
+                          height: 44,
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
                             color: AppColors.surface,
-                            borderRadius: BorderRadius.circular(AppRadius.md),
-                            border: Border.all(color: AppColors.border),
+                            borderRadius: BorderRadius.circular(22),
                           ),
                           child: const Text(
                             'Decline',
@@ -793,11 +797,11 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
                       child: GestureDetector(
                         onTap: () => _handleCardAction(group['id'], 'accept'),
                         child: Container(
-                          height: 40,
+                          height: 44,
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
                             color: AppColors.dark,
-                            borderRadius: BorderRadius.circular(AppRadius.md),
+                            borderRadius: BorderRadius.circular(22),
                           ),
                           child: const Text(
                             'Accept',
@@ -821,7 +825,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
 
   /// Right-aligned balance chip: lime = you get back, dark = you owe.
   Widget _buildBalanceChip(double balance) {
-    final amount = '$_currencySymbol${balance.abs().toStringAsFixed(0)}';
+    final amount = '$_currencySymbol${NumberFormat.decimalPattern('en_IN').format(balance.abs().round())}';
     Color bg;
     Color fg;
     String caption;
@@ -848,15 +852,17 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: balance.abs() <= 0.005 ? Border.all(color: AppColors.border) : null,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            value,
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: fg),
-          ),
+          if (value == '✓')
+            Icon(Icons.check_rounded, size: 18, color: fg)
+          else
+            Text(
+              value,
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: fg),
+            ),
           Text(
             caption,
             style: TextStyle(
@@ -931,7 +937,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
                     }
                   },
                   child: isSaving 
-                      ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: AppColors.accent, strokeWidth: 2))
+                      ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: AppColors.dark, strokeWidth: 2))
                       : const Text('Save Changes', style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold, fontSize: 16)),
                 ),
               ),
@@ -1022,7 +1028,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
             child: Row(
               children: [
                 Icon(
-                  isError ? Icons.error_outline : Icons.check_circle_outline,
+                  isError ? Icons.error_outline_rounded : Icons.check_circle_outline,
                   color: AppColors.accent,
                   size: 20,
                 ),
@@ -1095,10 +1101,10 @@ class _GroupTileState extends State<_GroupTile> {
         child: EspereSwipeAction(
           dismissKey: ValueKey('group_${widget.group['id']}'),
           direction: DismissDirection.horizontal,
-          bgIcon: Icons.delete,
+          bgIcon: Icons.delete_rounded,
           bgColor: AppColors.dark,
           bgIconColor: AppColors.accent,
-          secBgIcon: Icons.edit,
+          secBgIcon: Icons.edit_rounded,
           secBgColor: AppColors.accent,
           secBgIconColor: AppColors.dark,
           borderRadius: BorderRadius.circular(AppRadius.xxl),
