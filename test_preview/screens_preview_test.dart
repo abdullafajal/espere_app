@@ -37,6 +37,36 @@ void main() {
         ]),
       ), size: const Size(320, 300)));
   testWidgets('notifications', (t) => shot(t, 'notifications', const NotificationsScreen(), scaffold: false));
+  testWidgets('when_sheet', (t) async {
+    AppAccent.debugIndex = 4;
+    try {
+      await shot(t, 'when_sheet', const QuickAddScreen(), scaffold: false, act: (t) async {
+        await t.tap(find.text('Now'));
+        await t.pump(const Duration(milliseconds: 600));
+      });
+    } finally {
+      AppAccent.debugIndex = 0;
+    }
+  });
+  testWidgets('time_picker', (t) async {
+    AppAccent.debugIndex = 4;
+    try {
+      await shot(t, 'time_picker', const QuickAddScreen(), scaffold: false, act: (t) async {
+        await t.tap(find.text('Now'));
+        for (var k = 0; k < 10; k++) {
+          await t.pump(const Duration(milliseconds: 100));
+        }
+        await t.tap(find.text('Exact time…'));
+        await t.pump();
+        for (var k = 0; k < 10; k++) {
+          await t.pump(const Duration(milliseconds: 100));
+        }
+        await t.pump(const Duration(milliseconds: 600));
+      });
+    } finally {
+      AppAccent.debugIndex = 0;
+    }
+  });
   testWidgets('menu_open', (t) => shot(t, 'menu_open', const TransactionListScreen(), act: (t) async {
         await t.tap(find.byIcon(Icons.more_vert_rounded).first);
         await t.pumpAndSettle();
