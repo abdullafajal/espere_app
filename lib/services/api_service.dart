@@ -1122,6 +1122,25 @@ class ApiService {
   /// ─── Friends & Invitations ─────────────────────────────────────────────
 
   /// Get friends list and pending requests
+  /// Resend or cancel a group invite: [email] for an email invite, [userId] for an app
+  /// user who has not accepted yet. [action] is "resend" or "cancel".
+  static Future<ApiResult<String>> manageSplitInvite(int groupId, String action,
+      {String? email, int? userId}) async {
+    try {
+      final url = await _url('/api/split/groups/$groupId/invites/$action/');
+      final response = await _Http.post(
+        Uri.parse(url),
+        headers: await _headers(),
+        body: jsonEncode({if (email != null) 'email': email, if (userId != null) 'user_id': userId}),
+      );
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) return ApiResult(data: data['message']?.toString() ?? 'Done');
+      return ApiResult(error: data['error']?.toString() ?? 'Could not update the invite.');
+    } catch (e) {
+      return ApiResult(error: 'Connection error.');
+    }
+  }
+
   static Future<ApiResult<Map<String, dynamic>>> getFriends() async {
     try {
       final url = await _url('/api/split/friends/');
