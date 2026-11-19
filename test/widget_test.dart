@@ -25,9 +25,10 @@ Future<void> _pump(WidgetTester tester, TransactionModel t) => tester.pumpWidget
 void main() {
   testWidgets('an auto-tracked entry looks exactly like a manual one (no badge)', (tester) async {
     // Auto entries carry only the payee as their note, like a quick manual entry.
+    // The payee is the title; the category is in the line under it.
     await _pump(tester, _txn('Swiggy'));
-    expect(find.text('Food'), findsOneWidget);
     expect(find.text('Swiggy'), findsOneWidget);
+    expect(find.textContaining('Food'), findsOneWidget);
     expect(find.text('Auto'), findsNothing);
   });
 
@@ -35,4 +36,22 @@ void main() {
     await _pump(tester, _txn('Lunch with team'));
     expect(find.text('Lunch with team'), findsOneWidget);
   });
+
+  testWidgets('amounts carry a + / − sign and Indian digit grouping', (tester) async {
+    await _pump(tester, _txn('Rent').copyWithAmount('12500.00'));
+    expect(find.text('−₹12,500'), findsOneWidget);
+  });
+}
+
+extension on TransactionModel {
+  TransactionModel copyWithAmount(String amount) => TransactionModel(
+        id: id,
+        amount: amount,
+        type: type,
+        category: category,
+        date: date,
+        paymentMethod: paymentMethod,
+        paymentMethodDisplay: paymentMethodDisplay,
+        notes: notes,
+      );
 }

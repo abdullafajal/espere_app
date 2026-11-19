@@ -2,10 +2,10 @@
 <resources>
     <!-- Espere "Lime on Smoke" tokens (dark): smoked glass, light text, lime action -->
 
-    <color name="widget_text_1">#D6DEFF</color>
-    <color name="widget_text_2">#A5B1E6</color>
+    <color name="widget_text_1">#FFFFFF</color>
+    <color name="widget_text_2">#B9BDB5</color>
 
-    <color name="widget_hero_bg">#A9C7FF</color>
-    <color name="widget_on_hero">#0C2A5A</color>
-    <color name="widget_accent_ink">#A9C7FF</color>
+    <color name="widget_hero_bg">#C8E64A</color>
+    <color name="widget_on_hero">#141414</color>
+    <color name="widget_accent_ink">#C8E64A</color>
 </resources>

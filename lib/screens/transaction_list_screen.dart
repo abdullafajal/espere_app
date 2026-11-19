@@ -672,16 +672,16 @@ class TransactionListScreenState extends State<TransactionListScreen> {
                           final cat = filtered[i];
                           return ListTile(
                             leading: Container(
-                              width: 32,
-                              height: 32,
-                              decoration: BoxDecoration(
-                                color: cat.colorValue,
-                                borderRadius: BorderRadius.circular(8),
+                              width: 38,
+                              height: 38,
+                              decoration: const BoxDecoration(
+                                color: AppColors.categoryFill,
+                                shape: BoxShape.circle,
                               ),
                               child: Icon(
                                 IconMapper.map(cat.icon),
-                                size: 16,
-                                color: AppColors.dark,
+                                size: 19,
+                                color: AppColors.categoryInk,
                               ),
                             ),
                             title: Text(cat.name),
