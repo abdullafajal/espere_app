@@ -108,6 +108,11 @@ void main() {
   testWidgets('categories', (t) => shot(t, 'categories', const CategoriesScreen(), scaffold: false));
   testWidgets('split', (t) => shot(t, 'split', SplitGroupsScreen(onBack: () {}), scaffold: false));
   testWidgets('group_detail', (t) => shot(t, 'group_detail', const SplitGroupDetailScreen(groupId: 1, groupName: 'Goa Trip'), scaffold: false));
+  testWidgets('group_detail_scrolled', (t) => shot(t, 'group_detail_scrolled',
+      const SplitGroupDetailScreen(groupId: 1, groupName: 'Goa Trip'), scaffold: false, act: (t) async {
+        await t.drag(find.text('Expenses').last, const Offset(0, -500));
+        await t.pump(const Duration(milliseconds: 800));
+      }));
   testWidgets('friends', (t) => shot(t, 'friends', FriendsScreen(onBack: () {}), scaffold: false));
   testWidgets('group_balances', (t) => shot(t, 'group_balances', const SplitGroupDetailScreen(groupId: 1, groupName: 'Goa Trip'),
       scaffold: false, act: (t) => t.tap(find.text('Balances'))));
