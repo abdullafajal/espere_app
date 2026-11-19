@@ -22,6 +22,12 @@ void main() {
   });
 
   testWidgets('settings', (t) => shot(t, 'settings', const ProfileScreen(), scaffold: false, size: const Size(390, 1900)));
+  testWidgets('settings_colour', (t) => shot(t, 'settings_colour', const ProfileScreen(), scaffold: false, act: (t) async {
+        await t.tap(find.text('App colour'));
+        await t.pumpAndSettle();
+        await t.tap(find.text('Mint'));
+        await t.pumpAndSettle();
+      }));
   testWidgets('auto_track', (t) => shot(t, 'auto_track', const AutoTrackSettingsScreen(), scaffold: false));
   testWidgets('auto_review', (t) => shot(t, 'auto_review', const AutoTrackReviewScreen(), scaffold: false));
   testWidgets('login', (t) => shot(t, 'login', const LoginScreen(), scaffold: false));
