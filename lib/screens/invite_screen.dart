@@ -167,7 +167,7 @@ class _InviteScreenState extends State<InviteScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.error_outline_rounded, size: 80, color: Colors.red),
+          const Icon(Icons.error_outline_rounded, size: 80, color: AppColors.dark),
           const SizedBox(height: 24),
           Text(
             "Oops!",

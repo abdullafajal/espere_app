@@ -531,6 +531,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  /// On/off switch drawn like the app's switches (ink track, lime knob).
+  Widget _switch(bool on) => AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        width: 46,
+        height: 28,
+        padding: const EdgeInsets.all(3),
+        alignment: on ? Alignment.centerRight : Alignment.centerLeft,
+        decoration: BoxDecoration(
+          color: on ? AppColors.dark : const Color(0xFFDADDD5),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Container(
+          width: 22,
+          height: 22,
+          decoration: BoxDecoration(color: on ? AppColors.accent : Colors.white, shape: BoxShape.circle),
+        ),
+      );
+
   Widget _buildRow({
     IconData? icon,
     Widget? customIcon,
@@ -563,10 +581,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(width: 16),
                   ] else if (icon != null) ...[
                     Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppColors.accent,
-                        borderRadius: BorderRadius.circular(AppRadius.lg),
+                      width: 40,
+                      height: 40,
+                      decoration: const BoxDecoration(
+                        color: AppColors.surface,
+                        shape: BoxShape.circle,
                       ),
                       child: Icon(icon, size: 20, color: AppColors.dark),
                     ),
@@ -628,13 +647,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final currentCurrency = _currencies.firstWhere((c) => c.$1 == _currency, orElse: () => _currencies.first);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFBFBFB), // Very light background to match screenshot
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: _isLoading
             ? const Center(child: CircularProgressIndicator(color: AppColors.dark))
             : Column(
                 children: [
                   EspereHeader(
+                    title: 'Settings',
                     onBack: () => Navigator.pop(context),
                   ),
                   Expanded(
@@ -654,7 +674,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 height: 88,
                                 decoration: const BoxDecoration(
                                   shape: BoxShape.circle,
-                                  gradient: AppColors.avatarGradient,
+                                  color: AppColors.dark,
                                 ),
                                 child: _getAvatarUrl().isNotEmpty
                                     ? ClipOval(
@@ -666,8 +686,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                               _user?.initials ?? '?',
                                               style: const TextStyle(
                                                 fontSize: 32,
-                                                fontWeight: FontWeight.w600,
-                                                color: AppColors.dark,
+                                                fontWeight: FontWeight.w800,
+                                                color: AppColors.accent,
                                               ),
                                             ),
                                           ),
@@ -678,8 +698,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           _user?.initials ?? '?',
                                           style: const TextStyle(
                                             fontSize: 32,
-                                            fontWeight: FontWeight.w600,
-                                            color: AppColors.dark,
+                                            fontWeight: FontWeight.w800,
+                                            color: AppColors.accent,
                                           ),
                                         ),
                                       ),
@@ -759,7 +779,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         _buildCard(
                           children: [
                             _buildRow(
-                              icon: Icons.payments_outlined,
+                              icon: Icons.payments_rounded,
                               title: 'Currency',
                               subtitle: currentCurrency.$3,
                               trailing: Row(
@@ -777,7 +797,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                             if (_autoTrackAvailable)
                               _buildRow(
-                                icon: Icons.bolt,
+                                icon: Icons.bolt_rounded,
                                 title: 'Auto-track payments',
                                 subtitle: _autoTrackOn
                                     ? 'On · from UPI & bank notifications'
@@ -785,26 +805,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 onTap: _openAutoTrack,
                                 trailing: GestureDetector(
                                   onTap: _toggleAutoTrack,
-                                  child: Container(
-                                    width: 28,
-                                    height: 28,
-                                    decoration: BoxDecoration(
-                                      color: _autoTrackOn ? AppColors.dark : Colors.transparent,
-                                      border: Border.all(
-                                        color: _autoTrackOn ? AppColors.dark : AppColors.muted,
-                                        width: 1.5,
-                                      ),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    alignment: Alignment.center,
-                                    child: _autoTrackOn
-                                        ? const Icon(Icons.check_rounded, size: 18, color: AppColors.accent)
-                                        : null,
-                                  ),
+                                  child: _switch(_autoTrackOn),
                                 ),
                               ),
                             _buildRow(
-                              icon: Icons.notifications_none,
+                              icon: Icons.notifications_rounded,
                               title: 'Daily Reminders',
                               subtitle: 'Alerts for tracking limits',
                               showDivider: false,
@@ -813,27 +818,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   setState(() => _emailReminders = !_emailReminders);
                                   _save();
                                 },
-                                child: Container(
-                                  width: 28,
-                                  height: 28,
-                                  decoration: BoxDecoration(
-                                    color: _emailReminders ? AppColors.dark : Colors.transparent,
-                                    border: Border.all(
-                                      color: _emailReminders ? AppColors.dark : AppColors.muted,
-                                      width: 1.5,
-                                    ),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  alignment: Alignment.center,
-                                  child: _emailReminders
-                                      ? const Icon(Icons.check_rounded, size: 18, color: AppColors.accent)
-                                      : null,
-                                ),
+                                child: _switch(_emailReminders),
                               ),
                             ),
 
                             _buildRow(
-                              icon: Icons.animation,
+                              icon: Icons.animation_rounded,
                               title: 'Delete Animation',
                               showDivider: false,
                               trailing: GestureDetector(
@@ -842,22 +832,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   final prefs = await SharedPreferences.getInstance();
                                   await prefs.setBool('enable_shredder_anim', _shredderAnimation);
                                 },
-                                child: Container(
-                                  width: 28,
-                                  height: 28,
-                                  decoration: BoxDecoration(
-                                    color: _shredderAnimation ? AppColors.dark : Colors.transparent,
-                                    border: Border.all(
-                                      color: _shredderAnimation ? AppColors.dark : AppColors.muted,
-                                      width: 1.5,
-                                    ),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  alignment: Alignment.center,
-                                  child: _shredderAnimation
-                                      ? const Icon(Icons.check_rounded, size: 18, color: AppColors.accent)
-                                      : null,
-                                ),
+                                child: _switch(_shredderAnimation),
                               ),
                             ),
                           ],

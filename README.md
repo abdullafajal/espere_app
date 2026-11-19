@@ -4,6 +4,9 @@ Modern Expense & Income Tracker — Flutter frontend for the Django backend.
 
 ---
 
+
+> Look and feel (colours, components, navigation, screen previews): [docs/DESIGN.md](docs/DESIGN.md).
+
 ## Prerequisites
 
 | Tool | Version | Install Guide |

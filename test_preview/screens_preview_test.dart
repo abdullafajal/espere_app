@@ -37,4 +37,10 @@ void main() {
       scaffold: false, act: (t) => t.tap(find.text('Balances'))));
   testWidgets('group_settle', (t) => shot(t, 'group_settle', const SplitGroupDetailScreen(groupId: 1, groupName: 'Goa Trip'),
       scaffold: false, act: (t) => t.tap(find.text('Settle Up').last)));
+  testWidgets('sheet_group_expense', (t) => shot(t, 'sheet_group_expense', const SplitGroupDetailScreen(groupId: 1, groupName: 'Goa Trip'),
+      scaffold: false, act: (t) => t.tap(find.text('Add Expense'))));
+  testWidgets('sheet_new_group', (t) => shot(t, 'sheet_new_group', SplitGroupsScreen(onBack: () {}),
+      scaffold: false, act: (t) => t.tap(find.byTooltip('New group'))));
+  testWidgets('sheet_budget', (t) => shot(t, 'sheet_budget', const BudgetsScreen(),
+      act: (t) => t.tap(find.byTooltip('New budget'))));
 }

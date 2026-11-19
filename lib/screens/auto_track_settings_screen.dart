@@ -233,7 +233,7 @@ class _AutoTrackSettingsScreenState extends State<AutoTrackSettingsScreen>
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: AppColors.accent,
-                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                  shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.bolt, size: 20, color: AppColors.dark),
               ),
@@ -303,11 +303,15 @@ class _AutoTrackSettingsScreenState extends State<AutoTrackSettingsScreen>
 
   Widget _card(List<Widget> children) => Container(
         decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppRadius.xxl),
+          boxShadow: AppShadows.soft,
+        ),
+        child: Material(
           color: AppColors.card,
           borderRadius: BorderRadius.circular(AppRadius.xxl),
-          boxShadow: AppShadows.card,
+          clipBehavior: Clip.antiAlias,
+          child: Column(children: children),
         ),
-        child: Column(children: children),
       );
 
   Widget _switchRow({
