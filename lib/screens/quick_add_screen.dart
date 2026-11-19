@@ -759,7 +759,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
                 width: 36,
                 height: 36,
                 decoration: const BoxDecoration(color: AppColors.dark, shape: BoxShape.circle),
-                child: const Icon(Icons.check_rounded, size: 20, color: AppColors.accent),
+                child: Icon(Icons.check_rounded, size: 20, color: AppColors.accent),
               ),
               const SizedBox(width: 10),
               Expanded(

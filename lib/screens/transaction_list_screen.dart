@@ -659,7 +659,7 @@ class TransactionListScreenState extends State<TransactionListScreen> {
               Container(
                 width: 42,
                 height: 42,
-                decoration: const BoxDecoration(color: AppColors.accent, shape: BoxShape.circle),
+                decoration: BoxDecoration(color: AppColors.accent, shape: BoxShape.circle),
                 child: Icon(IconMapper.map(cat?.icon ?? 'category'), size: 22, color: AppColors.dark),
               ),
               const SizedBox(width: 12),
@@ -839,7 +839,7 @@ class TransactionListScreenState extends State<TransactionListScreen> {
                   // All categories option (only if search is empty)
                   if (searchCtrl.text.isEmpty)
                     ListTile(
-                      leading: const Icon(
+                      leading: Icon(
                         Icons.all_inclusive,
                         color: AppColors.accent,
                       ),

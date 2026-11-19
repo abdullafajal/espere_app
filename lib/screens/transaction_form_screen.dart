@@ -935,7 +935,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                 onPressed: _isSaving ? null : _save,
                                 child:
                                     _isSaving
-                                        ? const SizedBox(
+                                        ? SizedBox(
                                           width: 20,
                                           height: 20,
                                           child: CircularProgressIndicator(

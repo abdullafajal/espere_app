@@ -65,6 +65,7 @@ void main() async {
     statusBarBrightness: Brightness.light,
   ));
 
+  await AppAccent.load();
   runApp(const EspereApp());
 }
 

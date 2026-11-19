@@ -162,7 +162,7 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
                 ),
               ),
               if (isSearching)
-                const Padding(padding: EdgeInsets.all(12.0), child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent))))
+                Padding(padding: EdgeInsets.all(12.0), child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent))))
               else if (searchResults.isNotEmpty)
                 Container(
                   margin: const EdgeInsets.only(top: 8),
@@ -373,7 +373,7 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
                     }
                   },
                   child: isSaving 
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent))
+                    ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent))
                     : const Text('Create Group'),
                 ),
               ),
@@ -604,7 +604,7 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
         children: [
           Row(
             children: [
-              Container(width: 40, height: 40, decoration: BoxDecoration(color: AppColors.accentSoft, shape: BoxShape.circle), child: const Icon(Icons.groups_rounded, color: AppColors.accent, size: 20)),
+              Container(width: 40, height: 40, decoration: BoxDecoration(color: AppColors.accentSoft, shape: BoxShape.circle), child: Icon(Icons.groups_rounded, color: AppColors.accent, size: 20)),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -666,7 +666,7 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
           Expanded(child: Text(u['display_name'] ?? u['username'] ?? '', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.text))),
           if (isReceived) ...[
             IconButton(onPressed: () => _handleFriendAction(req['id'], 'reject'), icon: const Icon(Icons.close_rounded, color: AppColors.error, size: 20)),
-            IconButton(onPressed: () => _handleFriendAction(req['id'], 'accept'), icon: const Icon(Icons.check_rounded, color: AppColors.success, size: 20)),
+            IconButton(onPressed: () => _handleFriendAction(req['id'], 'accept'), icon: Icon(Icons.check_rounded, color: AppColors.success, size: 20)),
           ] else
             TextButton(onPressed: () => _handleFriendAction(req['id'], 'cancel'), child: const Text('Cancel', style: TextStyle(color: AppColors.muted, fontSize: 12))),
         ],
@@ -757,7 +757,7 @@ class _FriendTileState extends State<_FriendTile> {
               ),
               alignment: Alignment.center,
               child: widget.isSelected
-                  ? const Icon(Icons.check_rounded, size: 18, color: AppColors.accent)
+                  ? Icon(Icons.check_rounded, size: 18, color: AppColors.accent)
                   : null,
             ),
           ],

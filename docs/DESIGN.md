@@ -22,7 +22,10 @@ The app uses one look everywhere, so people always know what they can tap.
 - Money in / out: `+₹` / `−₹` (true minus sign). Arrows: in ↙ (`south_west_rounded`),
   out ↗ (`north_east_rounded`).
 - Charts without category colours use `AppColors.chartAt(i)` (ink, lime, greys).
-- There is no wallpaper / dynamic colour.
+- There is no wallpaper / dynamic colour. The user can swap lime for another light accent
+  in **Settings → App colour** (`AppAccent.options`: Lime, Mint, Sky, Lavender, Pink,
+  Peach, Sun). So `AppColors.accent` / `accentSoft` are getters, not `const`: never put
+  them inside a `const` widget. The Android home-screen widget stays lime.
 
 ## Type
 

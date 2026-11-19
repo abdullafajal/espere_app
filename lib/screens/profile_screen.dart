@@ -3,6 +3,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../widgets/espere_header.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
@@ -612,7 +613,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Container(
       width: size,
       height: size,
-      decoration: const BoxDecoration(color: AppColors.accent, shape: BoxShape.circle),
+      decoration: BoxDecoration(color: AppColors.accent, shape: BoxShape.circle),
       child: _getAvatarUrl().isNotEmpty
           ? ClipOval(child: CachedAvatarImage(url: _getAvatarUrl(), size: size, fallback: fallback))
           : fallback,
@@ -680,6 +681,93 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  /// Accent colour picker: a few light colours that keep ink text readable.
+  Future<void> _pickAccent() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.card,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, ss) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('App colour', style: AppText.section),
+                const SizedBox(height: 4),
+                const Text('Used for buttons, the selected tab and highlights.', style: AppText.rowSub),
+                const SizedBox(height: 18),
+                Wrap(
+                  spacing: 14,
+                  runSpacing: 16,
+                  children: [
+                    for (var i = 0; i < AppAccent.options.length; i++)
+                      Semantics(
+                        button: true,
+                        selected: i == AppAccent.index,
+                        label: AppAccent.options[i].name,
+                        excludeSemantics: true,
+                        child: GestureDetector(
+                          onTap: () async {
+                            HapticFeedback.selectionClick();
+                            await AppAccent.set(i);
+                            ss(() {});
+                            if (mounted) setState(() {});
+                          },
+                          child: SizedBox(
+                            width: 64,
+                            child: Column(
+                              children: [
+                                AnimatedContainer(
+                                  duration: const Duration(milliseconds: 160),
+                                  width: 52,
+                                  height: 52,
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: i == AppAccent.index ? AppColors.dark : Colors.transparent,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: Container(
+                                    decoration: BoxDecoration(color: AppAccent.options[i].color, shape: BoxShape.circle),
+                                    child: i == AppAccent.index
+                                        ? const Icon(Icons.check_rounded, size: 22, color: AppColors.dark)
+                                        : null,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  AppAccent.options[i].name,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: i == AppAccent.index ? FontWeight.w700 : FontWeight.w500,
+                                    color: AppColors.text,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(onPressed: () => Navigator.pop(ctx), child: const Text('Done')),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Name and photo.
   Future<void> _editProfile() async {
     final saved = await showModalBottomSheet<bool>(
@@ -715,7 +803,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             shape: BoxShape.circle,
                             border: Border.all(color: Colors.white, width: 2),
                           ),
-                          child: const Icon(Icons.photo_camera_rounded, size: 14, color: AppColors.accent),
+                          child: Icon(Icons.photo_camera_rounded, size: 14, color: AppColors.accent),
                         ),
                       ),
                     ],
@@ -815,6 +903,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               on: _autoTrackOn,
                               onTap: _toggleAutoTrack,
                             ),
+                        ]),
+                        _group('LOOK', [
+                          _row(
+                            icon: Icons.palette_rounded,
+                            label: 'App colour',
+                            hint: 'Buttons, selected items and highlights',
+                            value: AppAccent.current.name,
+                            onTap: _pickAccent,
+                          ),
                         ]),
                         _group('REMINDERS', [
                           _row(

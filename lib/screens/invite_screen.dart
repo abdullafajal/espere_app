@@ -117,7 +117,7 @@ class _InviteScreenState extends State<InviteScreen> {
               color: AppColors.dark,
               borderRadius: BorderRadius.circular(24),
             ),
-            child: const Icon(Icons.group_add_rounded, size: 56, color: AppColors.accent),
+            child: Icon(Icons.group_add_rounded, size: 56, color: AppColors.accent),
           ),
           const SizedBox(height: 24),
           Text(

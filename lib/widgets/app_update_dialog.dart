@@ -40,7 +40,7 @@ class AppUpdateDialog extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Icon(
+            Icon(
               Icons.system_update_rounded,
               size: 48,
               color: AppColors.accent,

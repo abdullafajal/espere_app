@@ -220,7 +220,7 @@ class _S extends State<SplitGroupDetailScreen>
                     Expanded(
                       child: Text(
                         message,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppColors.accent,
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
@@ -409,7 +409,7 @@ class _S extends State<SplitGroupDetailScreen>
                                             ),
                                           ),
                                         )
-                                        : const Icon(
+                                        : Icon(
                                           Icons.send_rounded,
                                           color: AppColors.accent,
                                           size: 20,
@@ -720,7 +720,7 @@ class _S extends State<SplitGroupDetailScreen>
                                       strokeWidth: 2,
                                     ),
                                   )
-                                  : const Text(
+                                  : Text(
                                     'Save Changes',
                                     style: TextStyle(
                                       color: AppColors.accent,
@@ -1589,7 +1589,7 @@ class _S extends State<SplitGroupDetailScreen>
                                     color: AppColors.dark,
                                     borderRadius: BorderRadius.circular(12),
                                   ),
-                                  child: const Icon(
+                                  child: Icon(
                                     Icons.info_outline_rounded,
                                     size: 14,
                                     color: AppColors.accent,
@@ -1599,7 +1599,7 @@ class _S extends State<SplitGroupDetailScreen>
                                 Expanded(
                                   child: Text(
                                     splitErr!,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 13,
                                       color: AppColors.accent,
                                       fontWeight: FontWeight.w500,
@@ -1752,7 +1752,7 @@ class _S extends State<SplitGroupDetailScreen>
                                       editData != null
                                           ? 'Update Expense'
                                           : 'Add Expense',
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         color: AppColors.accent,
                                         fontWeight: FontWeight.bold,
                                         fontSize: 16,
@@ -1833,7 +1833,7 @@ class _S extends State<SplitGroupDetailScreen>
                                   color: AppColors.accentSoft,
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(
+                                child: Icon(
                                   Icons.person_rounded,
                                   color: AppColors.accent,
                                   size: 24,
@@ -1960,7 +1960,7 @@ class _S extends State<SplitGroupDetailScreen>
                                         strokeWidth: 2,
                                       ),
                                     )
-                                    : const Text(
+                                    : Text(
                                       'Confirm Settlement',
                                       style: TextStyle(
                                         color: AppColors.accent,
@@ -2194,7 +2194,7 @@ class _S extends State<SplitGroupDetailScreen>
                     color: AppColors.dark,
                     borderRadius: BorderRadius.circular(AppRadius.xxxl),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.mail_outline_rounded,
                     size: 44,
                     color: AppColors.accent,
@@ -2363,7 +2363,7 @@ class _S extends State<SplitGroupDetailScreen>
                         settled
                             ? '${_currencySymbol}0'
                             : '${bal > 0 ? "+" : "−"}${_money(bal.abs())}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 34,
                           fontWeight: FontWeight.w800,
                           color: AppColors.accent,
@@ -2891,7 +2891,7 @@ class _S extends State<SplitGroupDetailScreen>
               ),
               TextButton(
                 onPressed: () => Navigator.pop(ctx, true),
-                child: const Text(
+                child: Text(
                   'Leave',
                   style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold),
                 ),
@@ -2963,7 +2963,7 @@ class _S extends State<SplitGroupDetailScreen>
                             color: AppColors.dark,
                             borderRadius: BorderRadius.circular(AppRadius.md),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.arrow_outward_rounded,
                             size: 20,
                             color: AppColors.accent,
@@ -3136,7 +3136,7 @@ class _S extends State<SplitGroupDetailScreen>
                     Container(
                       width: 36,
                       height: 36,
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         color: AppColors.accent,
                         shape: BoxShape.circle,
                       ),
