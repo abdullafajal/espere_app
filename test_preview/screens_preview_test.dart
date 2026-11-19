@@ -138,7 +138,15 @@ void main() {
   testWidgets('group_balances', (t) => shot(t, 'group_balances', const SplitGroupDetailScreen(groupId: 1, groupName: 'Goa Trip'),
       scaffold: false, act: (t) => t.tap(find.text('Balances'))));
   testWidgets('group_settle', (t) => shot(t, 'group_settle', const SplitGroupDetailScreen(groupId: 1, groupName: 'Goa Trip'),
-      scaffold: false, act: (t) => t.tap(find.text('Settle up').first)));
+      scaffold: false, act: (t) async {
+        await t.tap(find.text('Settle up').first);
+        await t.pump(const Duration(milliseconds: 600));
+      }));
+  testWidgets('group_settings', (t) => shot(t, 'group_settings', const SplitGroupDetailScreen(groupId: 1, groupName: 'Goa Trip'),
+      scaffold: false, size: const Size(390, 1000), act: (t) async {
+        await t.tap(find.byIcon(Icons.tune_rounded));
+        await t.pump(const Duration(milliseconds: 600));
+      }));
   testWidgets('sheet_group_expense', (t) => shot(t, 'sheet_group_expense', const SplitGroupDetailScreen(groupId: 1, groupName: 'Goa Trip'),
       scaffold: false, act: (t) => t.tap(find.text('Add expense'))));
   testWidgets('sheet_new_group', (t) => shot(t, 'sheet_new_group', SplitGroupsScreen(onBack: () {}),
