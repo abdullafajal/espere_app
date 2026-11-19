@@ -19,6 +19,8 @@ import 'transaction_form_screen.dart';
 import 'quick_add_screen.dart';
 import 'auto_track_review_screen.dart';
 import 'notifications_screen.dart';
+import '../widgets/profile_avatar.dart';
+import '../widgets/home_insights.dart';
 import '../services/notification_inbox.dart';
 import '../services/api_service.dart';
 import '../models/transaction.dart';
@@ -46,6 +48,9 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
   /// Spending of the last 7 days (oldest first) and their weekday letters.
   List<double> _week = List.filled(7, 0);
   List<String> _weekDays = List.filled(7, '');
+
+  /// Everything saved on the phone (for the category and month charts).
+  List<TransactionModel> _txns = const [];
 
   /// Frequent expenses offered as one-tap repeats.
   List<_Again> _again = const [];
@@ -170,11 +175,15 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
       ),
     );
     if (picked == null || !mounted) return;
+    _selectMonth(picked);
+  }
+
+  void _selectMonth(DateTime m) {
     setState(() {
-      _month = picked;
+      _month = DateTime(m.year, m.month);
       _past = null;
     });
-    if (!_isThisMonth) _loadMonth(picked);
+    if (!_isThisMonth) _loadMonth(_month);
   }
 
   /// Numbers for an earlier month: from the transactions on this phone first, then from
@@ -261,7 +270,18 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
     var review = 0;
     if (await AutoExpenseService.isAvailable()) review = await AutoExpenseService.reviewCount();
     if (!mounted) return;
+    final all = txns
+        .map((t) {
+          try {
+            return TransactionModel.fromJson(Map<String, dynamic>.from(t));
+          } catch (_) {
+            return null;
+          }
+        })
+        .whereType<TransactionModel>()
+        .toList();
     setState(() {
+      _txns = all;
       _week = week;
       _weekDays = days;
       _again = again.take(4).toList();
@@ -272,7 +292,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
   String _money(num v, String symbol) {
     final whole = v == v.roundToDouble();
     final f = NumberFormat.decimalPatternDigits(locale: 'en_IN', decimalDigits: whole ? 0 : 2);
-    return '$symbol${f.format(v)}';
+    return '${v < 0 ? '−' : ''}$symbol${f.format(v.abs())}';
   }
 
   double _num(String s) => double.tryParse(s.replaceAll(',', '')) ?? 0;
@@ -331,9 +351,6 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
 
   Widget _header(DashboardData d) {
     final parts = d.user.displayName.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
-    final initial = parts.isEmpty
-        ? '?'
-        : parts.take(2).map((p) => p[0].toUpperCase()).join();
     final firstName = parts.isEmpty ? '' : parts.first;
     return Padding(
       padding: const EdgeInsets.only(top: 14, bottom: 16),
@@ -350,12 +367,12 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                   await Navigator.pushNamed(context, '/profile');
                   if (mounted) _loadDashboard();
                 },
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  alignment: Alignment.center,
-                  decoration: const BoxDecoration(color: AppColors.dark, shape: BoxShape.circle),
-                  child: Text(initial, style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.w800, fontSize: 16)),
+                child: ProfileAvatar(
+                  name: d.user.displayName,
+                  avatar: d.user.avatar,
+                  size: 44,
+                  background: AppColors.dark,
+                  foreground: AppColors.accent,
                 ),
               ),
             ),
@@ -690,6 +707,35 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
     );
   }
 
+  void _edit(TransactionModel txn) => TransactionFormScreen.show(context, transactionId: txn.id, onSaved: () {
+        _loadDashboard();
+        if (!_isThisMonth) _loadMonth(_month);
+      });
+
+  Future<void> _delete(TransactionModel txn, GlobalKey<ThanosSnapWidgetState> snapKey) async {
+    final sign = txn.isIncome ? '+' : '−';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete this entry?'),
+        content: Text('${txn.notes.trim().isNotEmpty ? txn.notes.trim() : txn.category.name} '
+            '($sign${_data?.currencySymbol ?? '₹'}${txn.amount}) will be removed.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    HapticFeedback.mediumImpact();
+    await snapKey.currentState?.startSnap();
+    await TransactionStore.remove(txn.id);
+    if (!mounted) return;
+    await _loadDashboard();
+    if (!_isThisMonth) _loadMonth(_month);
+    if (mounted) AppToast.success(context, 'Deleted');
+  }
+
   /// One white card: payments to review, then "Recent" with the latest entries.
   Widget _recentCard(DashboardData d) {
     final past = _isThisMonth ? null : _past;
@@ -775,7 +821,10 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                       transaction: txn,
                       currencySymbol: d.currencySymbol,
                       card: false,
-                      onTap: () => TransactionFormScreen.show(context, transactionId: txn.id, onSaved: _loadDashboard),
+                      showActions: true,
+                      onTap: () => _edit(txn),
+                      onEdit: () => _edit(txn),
+                      onDelete: () => _delete(txn, snapKey),
                     ),
                   );
                 }),
@@ -813,6 +862,18 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
             _actions(),
             if (_again.isNotEmpty) _againRow(d),
             _recentCard(d),
+            CategoryBreakdownCard(
+              key: ValueKey('cat${_month.year}-${_month.month}'),
+              month: _month,
+              transactions: _txns,
+              symbol: d.currencySymbol,
+            ),
+            MonthlyTrendCard(
+              selected: _month,
+              transactions: _txns,
+              symbol: d.currencySymbol,
+              onSelect: _selectMonth,
+            ),
 
           ],
         ),

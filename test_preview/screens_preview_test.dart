@@ -5,6 +5,7 @@ import 'package:espere_app/theme/app_theme.dart';
 
 import 'package:espere_app/screens/dashboard_screen.dart';
 import 'package:espere_app/screens/notifications_screen.dart';
+import 'package:espere_app/widgets/bottom_nav_bar.dart';
 import 'package:espere_app/screens/quick_add_screen.dart';
 import 'package:espere_app/screens/transaction_list_screen.dart';
 import 'package:espere_app/services/receipt_service.dart';
@@ -25,6 +26,16 @@ void main() {
   });
 
   testWidgets('home', (t) => shot(t, 'home', const DashboardScreen()));
+  testWidgets('nav_small', (t) => shot(t, 'nav_small', MediaQuery(
+        data: const MediaQueryData(size: Size(320, 200), textScaler: TextScaler.linear(1.3)),
+        child: Column(children: [
+          for (final i in [0, 2, 4])
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: EspereBottomNav(currentIndex: i, onTap: (_) {}, onAdd: () {}),
+            ),
+        ]),
+      ), size: const Size(320, 300)));
   testWidgets('notifications', (t) => shot(t, 'notifications', const NotificationsScreen(), scaffold: false));
   testWidgets('home_past_month', (t) => shot(t, 'home_past_month', const DashboardScreen(), act: (t) async {
         await t.tap(find.byIcon(Icons.expand_more_rounded).first);

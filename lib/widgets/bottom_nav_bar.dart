@@ -48,34 +48,40 @@ class EspereBottomNav extends StatelessWidget {
           child: Container(
             height: 68,
             margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 6),
             decoration: BoxDecoration(
               color: AppColors.dark,
               borderRadius: BorderRadius.circular(AppRadius.pill),
               boxShadow: AppShadows.nav,
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                ..._left.map(_tab),
-                Semantics(
-                  button: true,
-                  label: 'Add transaction',
-                  child: GestureDetector(
-                    onTap: () {
-                      HapticFeedback.mediumImpact();
-                      onAdd();
-                    },
-                    child: Container(
-                      width: 52,
-                      height: 52,
-                      decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                      child: const Icon(Icons.add_rounded, size: 28, color: AppColors.dark),
+            // Large system font sizes would push the tabs off a small screen.
+            child: MediaQuery.withClampedTextScaling(
+              maxScaleFactor: 1.1,
+              child: Row(
+                children: [
+                  ..._left.map(_tab),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    child: Semantics(
+                      button: true,
+                      label: 'Add transaction',
+                      child: GestureDetector(
+                        onTap: () {
+                          HapticFeedback.mediumImpact();
+                          onAdd();
+                        },
+                        child: Container(
+                          width: 52,
+                          height: 52,
+                          decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                          child: const Icon(Icons.add_rounded, size: 28, color: AppColors.dark),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-                ..._right.map(_tab),
-              ],
+                  ..._right.map(_tab),
+                ],
+              ),
             ),
           ),
         ),
@@ -83,50 +89,65 @@ class EspereBottomNav extends StatelessWidget {
     );
   }
 
-  /// Active tab: lime pill with icon and label side by side. Others: icon over a small
-  /// grey label.
+  /// Every tab gets an equal share of the width, so the bar fits any screen. The active
+  /// tab is an accent pill with icon and label (the label shrinks if it must); the others
+  /// show the icon over a small grey label.
   Widget _tab(_NavItem item) {
     final active = _isActive(item);
-    return Semantics(
-      selected: active,
-      button: true,
-      label: item.label,
-      excludeSemantics: true,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () {
-          HapticFeedback.selectionClick();
-          onTap(item.index);
-        },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOutCubic,
-          height: 52,
-          width: active ? null : 56,
-          padding: EdgeInsets.symmetric(horizontal: active ? 14 : 0),
-          decoration: BoxDecoration(
-            color: active ? AppColors.accent : Colors.transparent,
-            borderRadius: BorderRadius.circular(26),
+    return Expanded(
+      flex: active ? 18 : 10,
+      child: Semantics(
+        selected: active,
+        button: true,
+        label: item.label,
+        excludeSemantics: true,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () {
+            HapticFeedback.selectionClick();
+            onTap(item.index);
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            height: 52,
+            margin: const EdgeInsets.symmetric(horizontal: 1),
+            padding: EdgeInsets.symmetric(horizontal: active ? 8 : 0),
+            decoration: BoxDecoration(
+              color: active ? AppColors.accent : Colors.transparent,
+              borderRadius: BorderRadius.circular(26),
+            ),
+            child: active
+                ? FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(item.icon, size: 22, color: AppColors.dark),
+                        const SizedBox(width: 5),
+                        Text(item.label,
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.dark)),
+                      ],
+                    ),
+                  )
+                // Same size for every inactive label, whatever the screen or font setting.
+                : Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(item.icon, size: 22, color: AppColors.darkMuted),
+                      const SizedBox(height: 1),
+                      Text(
+                        item.label,
+                        maxLines: 1,
+                        softWrap: false,
+                        overflow: TextOverflow.fade,
+                        textScaler: TextScaler.noScaling,
+                        style: const TextStyle(
+                            fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: -0.2, color: AppColors.darkMuted),
+                      ),
+                    ],
+                  ),
           ),
-          child: active
-              ? Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(item.icon, size: 22, color: AppColors.dark),
-                    const SizedBox(width: 6),
-                    Text(item.label,
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.dark)),
-                  ],
-                )
-              : Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(item.icon, size: 22, color: AppColors.darkMuted),
-                    const SizedBox(height: 1),
-                    Text(item.label,
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.darkMuted)),
-                  ],
-                ),
         ),
       ),
     );
