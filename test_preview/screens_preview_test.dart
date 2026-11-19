@@ -37,12 +37,14 @@ void main() {
         ]),
       ), size: const Size(320, 300)));
   testWidgets('notifications', (t) => shot(t, 'notifications', const NotificationsScreen(), scaffold: false));
-  testWidgets('when_sheet', (t) async {
+  testWidgets('date_picker', (t) async {
     AppAccent.debugIndex = 4;
     try {
-      await shot(t, 'when_sheet', const QuickAddScreen(), scaffold: false, act: (t) async {
+      await shot(t, 'date_picker', const QuickAddScreen(), scaffold: false, act: (t) async {
         await t.tap(find.text('Now'));
-        await t.pump(const Duration(milliseconds: 600));
+        for (var k = 0; k < 8; k++) {
+          await t.pump(const Duration(milliseconds: 100));
+        }
       });
     } finally {
       AppAccent.debugIndex = 0;
@@ -53,15 +55,13 @@ void main() {
     try {
       await shot(t, 'time_picker', const QuickAddScreen(), scaffold: false, act: (t) async {
         await t.tap(find.text('Now'));
-        for (var k = 0; k < 10; k++) {
+        for (var k = 0; k < 8; k++) {
           await t.pump(const Duration(milliseconds: 100));
         }
-        await t.tap(find.text('Exact time…'));
-        await t.pump();
-        for (var k = 0; k < 10; k++) {
+        await t.tap(find.text('OK'));
+        for (var k = 0; k < 8; k++) {
           await t.pump(const Duration(milliseconds: 100));
         }
-        await t.pump(const Duration(milliseconds: 600));
       });
     } finally {
       AppAccent.debugIndex = 0;
