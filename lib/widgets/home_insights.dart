@@ -4,10 +4,10 @@
 library;
 
 import 'dart:math' as math;
+import '../theme/motion.dart';
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../models/transaction.dart';
@@ -107,7 +107,7 @@ class _CategoryBreakdownCardState extends State<CategoryBreakdownCard> {
                               if (!event.isInterestedForInteractions) return;
                               final i = resp?.touchedSection?.touchedSectionIndex;
                               if (i != null && i >= 0 && i != _touched) {
-                                HapticFeedback.selectionClick();
+                                AppHaptics.tap();
                                 setState(() => _touched = i);
                               }
                             },
@@ -152,7 +152,7 @@ class _CategoryBreakdownCardState extends State<CategoryBreakdownCard> {
     final pct = total <= 0 ? 0.0 : s.total / total;
     return InkWell(
       onTap: () {
-        HapticFeedback.selectionClick();
+        AppHaptics.tap();
         setState(() => _touched = _touched == i ? null : i);
       },
       child: Padding(
@@ -281,7 +281,7 @@ class MonthlyTrendCard extends StatelessWidget {
                       if (event is! FlTapUpEvent) return;
                       final i = resp?.spot?.touchedBarGroupIndex;
                       if (i == null || i < 0 || i > 5 || i == sel) return;
-                      HapticFeedback.selectionClick();
+                      AppHaptics.tap();
                       onSelect(months[i]);
                     },
                   ),

@@ -3,7 +3,7 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../theme/motion.dart';
 import '../widgets/espere_header.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
@@ -519,7 +519,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _setReminder(ReminderSlot slot, ReminderSetting v) async {
-    HapticFeedback.selectionClick();
+    AppHaptics.tap();
     setState(() => _reminders[slot] = v);
     await DailyReminders.set(slot, v);
     if (!mounted) return;
@@ -702,21 +702,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           const SizedBox(width: 8),
-          Material(
-            color: const Color(0xFF262924),
-            borderRadius: BorderRadius.circular(19),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(19),
-              onTap: _editProfile,
-              child: const SizedBox(
-                height: 38,
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 14),
-                  child: Center(
-                    child: Text('Edit', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white)),
-                  ),
-                ),
-              ),
+          SpringPress(
+            onTap: _editProfile,
+            child: Container(
+              height: 38,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: const Color(0xFF262924), borderRadius: BorderRadius.circular(19)),
+              child: const Text('Edit', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white)),
             ),
           ),
         ],
@@ -753,7 +746,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         excludeSemantics: true,
                         child: GestureDetector(
                           onTap: () async {
-                            HapticFeedback.selectionClick();
+                            AppHaptics.tap();
                             await AppAccent.set(i);
                             ss(() {});
                             if (mounted) setState(() {});

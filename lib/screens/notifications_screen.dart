@@ -3,9 +3,9 @@
 library;
 
 import 'dart:async';
+import '../theme/motion.dart';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../services/auto_expense_service.dart';
@@ -65,7 +65,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Future<void> _openItem(InboxItem item) async {
-    HapticFeedback.selectionClick();
+    AppHaptics.tap();
     if (!item.isRead) NotificationInbox.markRead([item.id]);
     final data = item.data;
     if (data['action'] == null || data['action'] == 'open_dashboard') {
@@ -250,7 +250,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         child: Icon(Icons.delete_outline_rounded, color: AppColors.accent),
       ),
       onDismissed: (_) {
-        HapticFeedback.mediumImpact();
+        AppHaptics.confirm();
         setState(() => _items = _items.where((x) => x.id != i.id).toList());
         NotificationInbox.delete(i.id);
       },

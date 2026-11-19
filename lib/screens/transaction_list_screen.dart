@@ -3,8 +3,8 @@
 /// Features: search bar, type/category filter chips, month navigator,
 /// grouped transaction list with edit/delete actions
 import 'dart:async';
+import '../theme/motion.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../widgets/espere_action_button.dart';
@@ -84,14 +84,14 @@ class TransactionListScreenState extends State<TransactionListScreen> {
   }
 
   Future<void> _confirmReview(ReviewItem item) async {
-    HapticFeedback.mediumImpact();
+    AppHaptics.confirm();
     await AutoExpenseService.confirmReview(item, categoryId: item.txn.categoryId);
     await _loadReviews();
     await _loadTransactions();
   }
 
   Future<void> _ignoreReview(ReviewItem item) async {
-    HapticFeedback.selectionClick();
+    AppHaptics.tap();
     await AutoExpenseService.discardReview(item);
     await _loadReviews();
   }
@@ -279,7 +279,7 @@ class TransactionListScreenState extends State<TransactionListScreen> {
         await snapKey.currentState?.startSnap();
       }
       
-      HapticFeedback.mediumImpact();
+      AppHaptics.confirm();
       
       // Offline mode: queue deletion
       await SyncService.queueOperation(
@@ -340,7 +340,7 @@ class TransactionListScreenState extends State<TransactionListScreen> {
 
   void _setType(String type) {
     if (_typeFilter == type) return;
-    HapticFeedback.selectionClick();
+    AppHaptics.tap();
     setState(() => _typeFilter = type);
     _loadTransactions();
   }
@@ -705,18 +705,14 @@ class TransactionListScreenState extends State<TransactionListScreen> {
     );
   }
 
-  Widget _pillButton(String label, Color bg, Color fg, VoidCallback onTap) => Material(
-        color: bg,
-        borderRadius: BorderRadius.circular(21),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(21),
-          onTap: onTap,
-          child: SizedBox(
-            height: 42,
-            child: Center(
-              child: Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: fg)),
-            ),
-          ),
+  Widget _pillButton(String label, Color bg, Color fg, VoidCallback onTap) => SpringPress(
+        haptic: HapticKind.none,
+        onTap: onTap,
+        child: Container(
+          height: 42,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(21)),
+          child: Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: fg)),
         ),
       );
 

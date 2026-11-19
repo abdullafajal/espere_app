@@ -3,6 +3,7 @@
 /// Card with type/amount/category/date/payment/notes fields.
 /// Used for both create and edit.
 import 'package:flutter/material.dart';
+import '../theme/motion.dart';
 import '../utils/app_toast.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
@@ -270,7 +271,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     setState(() {
       _isSaving = true;
     });
-    HapticFeedback.mediumImpact();
+    AppHaptics.confirm();
 
     final txnData = {
       'amount': amount,
@@ -373,7 +374,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     if (!mounted) return;
     setState(() => _isSaving = false);
 
-    HapticFeedback.mediumImpact();
+    AppHaptics.confirm();
     widget.onSaved?.call();
     Navigator.pop(context, true);
   }

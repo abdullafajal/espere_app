@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
+import '../theme/motion.dart';
 
 /// Round 44 px header action button. Pair with [EspereHeader.trailing] so every
 /// screen's header buttons share the same size and look.
@@ -29,13 +29,9 @@ class EspereActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bg = primary ? AppColors.accent : AppColors.card;
-    final button = GestureDetector(
-      onTap: onPressed == null
-          ? null
-          : () {
-              HapticFeedback.selectionClick();
-              onPressed!();
-            },
+    final button = SpringPress(
+      haptic: primary ? HapticKind.press : HapticKind.tap,
+      onTap: onPressed,
       child: SizedBox(
         width: 44,
         height: 44,

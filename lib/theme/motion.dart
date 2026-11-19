@@ -1,0 +1,118 @@
+/// One feel for the whole app: the same spring for everything that moves or is pressed,
+/// and the same few haptics, so taps feel physical and consistent everywhere.
+///
+/// - [AppMotion.move]: things that travel (the nav pill, selections). Slight overshoot.
+/// - [AppMotion.press]: a pressed button sinking and springing back.
+/// - [AppHaptics]: tap (selection), press (light), confirm (medium), warn (heavy), and
+///   land (the light tick when a moving thing arrives).
+/// - [SpringPress]: wrap any tappable to get the press spring + haptic.
+library;
+
+import 'package:flutter/physics.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
+
+class AppMotion {
+  AppMotion._();
+
+  /// Damping ratio ≈ 0.62: arrives quickly with one soft overshoot.
+  static const SpringDescription move = SpringDescription(mass: 1, stiffness: 420, damping: 25);
+
+  /// Damping ratio ≈ 0.5: snappier, a small bounce on release.
+  static const SpringDescription press = SpringDescription(mass: 1, stiffness: 900, damping: 30);
+
+  /// How far a pressed button sinks.
+  static const double pressedScale = 0.94;
+}
+
+enum HapticKind { none, tap, press, confirm, warn }
+
+class AppHaptics {
+  AppHaptics._();
+
+  static void tap() => HapticFeedback.selectionClick();
+  static void press() => HapticFeedback.lightImpact();
+  static void confirm() => HapticFeedback.mediumImpact();
+  static void warn() => HapticFeedback.heavyImpact();
+  static void land() => HapticFeedback.lightImpact();
+
+  static void of(HapticKind kind) {
+    switch (kind) {
+      case HapticKind.tap:
+        tap();
+      case HapticKind.press:
+        press();
+      case HapticKind.confirm:
+        confirm();
+      case HapticKind.warn:
+        warn();
+      case HapticKind.none:
+        break;
+    }
+  }
+}
+
+/// Sinks a little while pressed and springs back (with a small bounce) on release,
+/// with a haptic on tap. Works inside lists and scroll views (a scroll cancels it).
+class SpringPress extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+  final HapticKind haptic;
+  final double scale;
+
+  const SpringPress({
+    super.key,
+    required this.child,
+    this.onTap,
+    this.onLongPress,
+    this.haptic = HapticKind.tap,
+    this.scale = AppMotion.pressedScale,
+  });
+
+  @override
+  State<SpringPress> createState() => _SpringPressState();
+}
+
+class _SpringPressState extends State<SpringPress> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController.unbounded(vsync: this, value: 1);
+
+  void _to(double target) {
+    _c.animateWith(SpringSimulation(AppMotion.press, _c.value, target, _c.velocity));
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = widget.onTap != null || widget.onLongPress != null;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: enabled ? (_) => _to(widget.scale) : null,
+      onTapUp: enabled ? (_) => _to(1) : null,
+      onTapCancel: enabled ? () => _to(1) : null,
+      onTap: widget.onTap == null
+          ? null
+          : () {
+              AppHaptics.of(widget.haptic);
+              widget.onTap!();
+            },
+      onLongPress: widget.onLongPress == null
+          ? null
+          : () {
+              _to(1);
+              AppHaptics.confirm();
+              widget.onLongPress!();
+            },
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (_, child) => Transform.scale(scale: _c.value, child: child),
+        child: widget.child,
+      ),
+    );
+  }
+}

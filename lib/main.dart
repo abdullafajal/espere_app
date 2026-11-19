@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'theme/motion.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 
@@ -104,7 +105,7 @@ class _EspereAppState extends State<EspereApp> {
 
             if (isEdge) {
               if (_throttleStopwatch.elapsedMilliseconds > 300) {
-                HapticFeedback.mediumImpact();
+                AppHaptics.confirm();
                 _throttleStopwatch.reset();
               }
             }

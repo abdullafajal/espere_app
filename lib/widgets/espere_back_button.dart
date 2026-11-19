@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../theme/motion.dart';
 import '../theme/app_theme.dart';
 
 /// Round 44 px back button used in every screen header.
@@ -15,7 +15,7 @@ class EspereBackButton extends StatelessWidget {
       label: 'Back',
       child: GestureDetector(
         onTap: () {
-          HapticFeedback.selectionClick();
+          AppHaptics.tap();
           if (onPressed != null) {
             onPressed!();
           } else if (Navigator.canPop(context)) {

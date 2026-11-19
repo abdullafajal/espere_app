@@ -1,6 +1,6 @@
 import 'dart:async';
+import '../theme/motion.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 
 /// A universal, fully customizable swipe action widget with haptic feedback
@@ -56,8 +56,8 @@ class _EspereSwipeActionState extends State<EspereSwipeAction> {
     _zigzag = Timer.periodic(const Duration(milliseconds: 70), (_) {
       _zigTick++;
       _zigTick.isEven
-          ? HapticFeedback.heavyImpact()
-          : HapticFeedback.selectionClick();
+          ? AppHaptics.warn()
+          : AppHaptics.tap();
       if (_zigTick > 40) _stopZigzag(); // safety stop
     });
   }
@@ -120,11 +120,11 @@ class _EspereSwipeActionState extends State<EspereSwipeAction> {
         // the user pulls back), instead of buzzing continuously.
         if (details.reached != _reached) {
           if (details.reached) {
-            HapticFeedback.mediumImpact();
+            AppHaptics.confirm();
             _startZigzag();
           } else {
             _stopZigzag();
-            HapticFeedback.selectionClick();
+            AppHaptics.tap();
           }
         }
         setState(() {
