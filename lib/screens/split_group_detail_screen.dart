@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import '../widgets/espere_header.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
+import '../utils/pickers.dart';
 import '../widgets/spring_menu.dart';
+import '../widgets/spring_tabs.dart';
 import '../utils/icon_mapper.dart';
 import '../utils/avatar_cache.dart';
 import '../services/api_service.dart';
@@ -42,7 +44,9 @@ class _S extends State<SplitGroupDetailScreen>
   String _currencySymbol = '₹';
   final Map<int, GlobalKey<ThanosSnapWidgetState>> _expenseSnapKeys = {};
   final Map<int, GlobalKey<ThanosSnapWidgetState>> _memberSnapKeys = {};
-  final ScrollController _expScrollCtrl = ScrollController();
+  /// Scrolls the card and the lists together (the lists must not have their own
+  /// controllers, or the card stops scrolling with them).
+  final GlobalKey<NestedScrollViewState> _nestedKey = GlobalKey<NestedScrollViewState>();
 
   @override
   void initState() {
@@ -54,7 +58,6 @@ class _S extends State<SplitGroupDetailScreen>
   @override
   void dispose() {
     _tc.dispose();
-    _expScrollCtrl.dispose();
     super.dispose();
   }
 
@@ -1208,6 +1211,7 @@ class _S extends State<SplitGroupDetailScreen>
                             GestureDetector(
                               onTap: () async {
                                 final pickedDate = await showDatePicker(
+                                  builder: pickerBuilder,
                                   context: ctx,
                                   initialDate: _date,
                                   firstDate: DateTime(2000),
@@ -1216,6 +1220,7 @@ class _S extends State<SplitGroupDetailScreen>
                                 if (pickedDate != null) {
                                   if (!mounted) return;
                                   final pickedTime = await showTimePicker(
+                                    builder: pickerBuilder,
                                     context: ctx,
                                     initialTime: TimeOfDay.fromDateTime(_date),
                                   );
@@ -1728,8 +1733,9 @@ class _S extends State<SplitGroupDetailScreen>
                                         AppHaptics.confirm();
                                         _load();
                                         _tc.animateTo(0);
-                                        if (_expScrollCtrl.hasClients) {
-                                          _expScrollCtrl.animateTo(0,
+                                        final nested = _nestedKey.currentState;
+                                        if (nested != null && nested.innerController.hasClients) {
+                                          nested.innerController.animateTo(0,
                                               duration: const Duration(milliseconds: 300),
                                               curve: Curves.easeOut);
                                         }
@@ -2024,9 +2030,9 @@ class _S extends State<SplitGroupDetailScreen>
                           width: 44,
                           height: 44,
                           decoration: BoxDecoration(
-                            color: AppColors.card,
+                            color: AppColors.accent,
                             shape: BoxShape.circle,
-                            boxShadow: AppShadows.soft,
+                            boxShadow: AppShadows.accent,
                           ),
                           child: const Icon(Icons.more_vert_rounded, color: AppColors.dark, size: 20),
                         ),
@@ -2047,6 +2053,7 @@ class _S extends State<SplitGroupDetailScreen>
                           ),
                         )
                         : NestedScrollView(
+                          key: _nestedKey,
                           headerSliverBuilder:
                               (context, innerBoxIsScrolled) => [
                                 if (_g != null)
@@ -2054,45 +2061,18 @@ class _S extends State<SplitGroupDetailScreen>
                                 SliverPersistentHeader(
                                   pinned: true,
                                   delegate: _SliverAppBarDelegate(
-                                    height: 64,
+                                    height: 76,
                                     child: Padding(
                                       padding: const EdgeInsets.fromLTRB(
                                         16,
                                         12,
                                         16,
-                                        0,
+                                        12,
                                       ),
                                       child: Container(
-                                        decoration: BoxDecoration(
-                                          color: AppColors.card,
-                                          borderRadius: BorderRadius.circular(
-                                            16,
-                                          ),
-                                          boxShadow: AppShadows.soft,
-                                        ),
-                                        padding: const EdgeInsets.all(3),
-                                        child: TabBar(
+                                        child: SpringTabs(
                                           controller: _tc,
-                                          indicator: BoxDecoration(
-                                            color: AppColors.dark,
-                                            borderRadius: BorderRadius.circular(
-                                              14,
-                                            ),
-                                          ),
-                                          indicatorSize:
-                                              TabBarIndicatorSize.tab,
-                                          labelColor: AppColors.accent,
-                                          unselectedLabelColor: AppColors.muted,
-                                          labelStyle: const TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                          dividerHeight: 0,
-                                          tabs: const [
-                                            Tab(text: 'Expenses'),
-                                            Tab(text: 'Balances'),
-                                            Tab(text: 'Settle Up'),
-                                          ],
+                                          labels: const ['Expenses', 'Balances', 'Settle Up'],
                                         ),
                                       ),
                                     ),
@@ -2441,7 +2421,6 @@ class _S extends State<SplitGroupDetailScreen>
       onRefresh: _load,
       color: AppColors.dark,
       child: ListView.builder(
-        controller: _expScrollCtrl,
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
         itemCount: l.length,
         itemBuilder: (_, i) {
@@ -3160,7 +3139,9 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
-    return Container(color: AppColors.background, child: child);
+    // Exactly [height] tall: a pinned header whose child is shorter or taller than its
+    // extent breaks the scroll layout.
+    return Container(height: height, color: AppColors.background, child: child);
   }
 
   @override

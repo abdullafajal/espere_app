@@ -7,10 +7,11 @@ import '../theme/app_theme.dart';
 /// "Groups | Friends" switch at the top of the Split tab. Friends lives inside Split, so
 /// both screens show it; tapping the other side switches the home shell's tab.
 ///
-/// The dark pill moves on the app's spring ([AppMotion.move], like the nav bar): a tick
-/// on tap, the pill flows to the other side with a soft overshoot, a light tick when it
-/// lands, and then the screen changes.
-class SplitSwitcher extends StatefulWidget {
+/// The pill moves exactly like the nav bar's: tick on tap, it flows on [AppMotion.move]
+/// with a soft overshoot, light tick when it lands. The screen switches at once; the pill's
+/// position is shared ([SplitPill]) and driven by [SplitPillDriver] in the home shell, so
+/// the new screen's switch shows the same pill still moving and bouncing.
+class SplitSwitcher extends StatelessWidget {
   /// 'groups' or 'friends'.
   final String current;
 
@@ -19,45 +20,7 @@ class SplitSwitcher extends StatefulWidget {
   static const groupsTab = 4;
   static const friendsTab = 3;
 
-  @override
-  State<SplitSwitcher> createState() => _SplitSwitcherState();
-}
-
-class _SplitSwitcherState extends State<SplitSwitcher> with SingleTickerProviderStateMixin {
-  double get _home => widget.current == 'groups' ? 0 : 1;
-
-  /// 0 = pill on Groups, 1 = pill on Friends.
-  late final AnimationController _pos = AnimationController.unbounded(vsync: this, value: _home);
-  bool _switching = false;
-
-  void _go(double target, int tab) {
-    if (_switching) return;
-    _switching = true;
-    AppHaptics.tap();
-    void onTick() {
-      if ((_pos.value - target).abs() < 0.06) {
-        _pos.removeListener(onTick);
-        AppHaptics.land();
-        AppNavigation.openTab(tab);
-        // This screen is now hidden: put the pill back home for when it shows again.
-        Future.delayed(const Duration(milliseconds: 60), () {
-          if (!mounted) return;
-          _pos.stop();
-          _pos.value = _home;
-          _switching = false;
-        });
-      }
-    }
-
-    _pos.addListener(onTick);
-    _pos.animateWith(SpringSimulation(AppMotion.move, _pos.value, target, _pos.velocity));
-  }
-
-  @override
-  void dispose() {
-    _pos.dispose();
-    super.dispose();
-  }
+  double get _home => current == 'groups' ? 0 : 1;
 
   @override
   Widget build(BuildContext context) {
@@ -74,10 +37,11 @@ class _SplitSwitcherState extends State<SplitSwitcher> with SingleTickerProvider
         child: LayoutBuilder(
           builder: (context, box) {
             final half = box.maxWidth / 2;
-            return AnimatedBuilder(
-              animation: _pos,
-              builder: (context, _) {
-                final p = _pos.value;
+            return ValueListenableBuilder<double?>(
+              valueListenable: SplitPill.position,
+              builder: (context, moving, _) {
+                // While the pill is not moving, it sits on this screen's side.
+                final p = moving ?? _home;
                 return Stack(
                   children: [
                     Positioned(
@@ -86,16 +50,13 @@ class _SplitSwitcherState extends State<SplitSwitcher> with SingleTickerProvider
                       bottom: 0,
                       width: half,
                       child: Container(
-                        decoration: BoxDecoration(
-                          color: AppColors.dark,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
+                        decoration: BoxDecoration(color: AppColors.dark, borderRadius: BorderRadius.circular(20)),
                       ),
                     ),
                     Row(
                       children: [
-                        _item('Groups', Icons.groups_rounded, 1 - (p.clamp(0.0, 1.0)), 0, SplitSwitcher.groupsTab),
-                        _item('Friends', Icons.person_rounded, p.clamp(0.0, 1.0), 1, SplitSwitcher.friendsTab),
+                        _item('Groups', Icons.groups_rounded, 1 - p.clamp(0.0, 1.0), 0, groupsTab),
+                        _item('Friends', Icons.person_rounded, p.clamp(0.0, 1.0), 1, friendsTab),
                       ],
                     ),
                   ],
@@ -111,8 +72,6 @@ class _SplitSwitcherState extends State<SplitSwitcher> with SingleTickerProvider
   /// `on` (0-1): how much of the pill is behind this side, for the colour cross-fade.
   Widget _item(String label, IconData icon, double on, double side, int tab) {
     final selected = _home == side;
-    final fg = Color.lerp(AppColors.text, Colors.white, on)!;
-    final iconColor = Color.lerp(AppColors.muted, AppColors.accent, on)!;
     return Expanded(
       child: Semantics(
         button: true,
@@ -121,19 +80,25 @@ class _SplitSwitcherState extends State<SplitSwitcher> with SingleTickerProvider
         excludeSemantics: true,
         child: SpringPress(
           haptic: HapticKind.none,
-          onTap: selected ? null : () => _go(side, tab),
+          onTap: selected
+              ? null
+              : () {
+                  AppHaptics.tap();
+                  SplitPill.moveTo(from: _home, to: side);
+                  AppNavigation.openTab(tab);
+                },
           child: SizedBox.expand(
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(icon, size: 18, color: iconColor),
+                Icon(icon, size: 18, color: Color.lerp(AppColors.muted, AppColors.accent, on)),
                 const SizedBox(width: 6),
                 Text(
                   label,
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: on > 0.5 ? FontWeight.w800 : FontWeight.w600,
-                    color: fg,
+                    color: Color.lerp(AppColors.text, Colors.white, on),
                   ),
                 ),
               ],
@@ -143,4 +108,66 @@ class _SplitSwitcherState extends State<SplitSwitcher> with SingleTickerProvider
       ),
     );
   }
+}
+
+/// The Groups | Friends pill's shared position: null when at rest.
+class SplitPill {
+  SplitPill._();
+
+  static final ValueNotifier<double?> position = ValueNotifier<double?>(null);
+  static _SplitPillDriverState? _driver;
+
+  static void moveTo({required double from, required double to}) {
+    final d = _driver;
+    if (d == null) return;
+    d._move(from, to);
+  }
+}
+
+/// Runs the Groups | Friends pill's spring. Lives in the home shell (always on screen), so
+/// the motion keeps going while the Split screens swap.
+class SplitPillDriver extends StatefulWidget {
+  const SplitPillDriver({super.key});
+
+  @override
+  State<SplitPillDriver> createState() => _SplitPillDriverState();
+}
+
+class _SplitPillDriverState extends State<SplitPillDriver> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController.unbounded(vsync: this);
+  double _target = 0;
+  bool _landed = true;
+
+  @override
+  void initState() {
+    super.initState();
+    SplitPill._driver = this;
+    _c.addListener(() {
+      SplitPill.position.value = _c.value;
+      if (!_landed && (_c.value - _target).abs() < 0.06) {
+        _landed = true;
+        AppHaptics.land();
+      }
+    });
+  }
+
+  void _move(double from, double to) {
+    _target = to;
+    _landed = false;
+    final start = SplitPill.position.value ?? from;
+    _c.value = start;
+    _c
+        .animateWith(SpringSimulation(AppMotion.move, start, to, _c.velocity))
+        .whenComplete(() => SplitPill.position.value = null);
+  }
+
+  @override
+  void dispose() {
+    if (SplitPill._driver == this) SplitPill._driver = null;
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
 }

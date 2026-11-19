@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../widgets/nav_space.dart';
+import '../widgets/split_switcher.dart';
 import '../widgets/bottom_nav_bar.dart';
 import 'dashboard_screen.dart';
 import 'transaction_list_screen.dart';
@@ -186,6 +187,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       backgroundColor: AppColors.background,
       body: Stack(
         children: [
+          // Drives the Groups | Friends pill's spring while those screens swap.
+          const SplitPillDriver(),
           NotificationListener<ScrollNotification>(
             onNotification: (notification) {
               if (notification is ScrollUpdateNotification && notification.metrics.axis == Axis.vertical) {

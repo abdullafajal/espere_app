@@ -403,7 +403,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                 child: Container(
                   width: 44,
                   height: 44,
-                  decoration: BoxDecoration(color: AppColors.card, shape: BoxShape.circle, boxShadow: AppShadows.soft),
+                  decoration: BoxDecoration(color: AppColors.accent, shape: BoxShape.circle, boxShadow: AppShadows.accent),
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
@@ -416,9 +416,9 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                             width: 12,
                             height: 12,
                             decoration: BoxDecoration(
-                              color: AppColors.accent,
+                              color: AppColors.dark,
                               shape: BoxShape.circle,
-                              border: Border.all(color: AppColors.dark, width: 2),
+                              border: Border.all(color: AppColors.accent, width: 2),
                             ),
                           ),
                         ),

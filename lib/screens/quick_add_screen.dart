@@ -24,6 +24,7 @@ import '../services/cache_service.dart';
 import '../services/receipt_service.dart';
 import '../services/transaction_store.dart';
 import '../theme/app_theme.dart';
+import '../utils/pickers.dart';
 import '../theme/motion.dart';
 import '../utils/app_toast.dart';
 import '../utils/icon_mapper.dart';
@@ -380,6 +381,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
                   chip(DateFormat('EEE, d MMM').format(days[2]), day == days[2], () => ss(() => day = days[2])),
                   chip(customDay ? DateFormat('d MMM yyyy').format(day) : 'Other date…', customDay, () async {
                     final d = await showDatePicker(
+                      builder: pickerBuilder,
                       context: ctx,
                       initialDate: day,
                       firstDate: DateTime(now.year - 5),
@@ -398,6 +400,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
                       chip('${s.$1} · ${fmt(s.$2)}', time == s.$2, () => ss(() => time = s.$2)),
                   chip(customTime ? fmt(time!) : 'Exact time…', customTime, () async {
                     final t = await showTimePicker(
+                      builder: pickerBuilder,
                       context: ctx,
                       initialTime: time ?? TimeOfDay.fromDateTime(now),
                     );
@@ -803,6 +806,9 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
       child: GridView.count(
         crossAxisCount: 3,
         shrinkWrap: true,
+        // Without this the grid adds the status-bar and gesture-bar insets again, which
+        // left a large gap between the Save button and the keys.
+        padding: EdgeInsets.zero,
         physics: const NeverScrollableScrollPhysics(),
         mainAxisSpacing: 8,
         crossAxisSpacing: 8,

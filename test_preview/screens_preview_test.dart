@@ -97,12 +97,22 @@ void main() {
   testWidgets('quick_add', (t) => shot(t, 'quick_add', const QuickAddScreen(), scaffold: false));
   testWidgets('activity', (t) => shot(t, 'activity', const TransactionListScreen()));
   testWidgets('form_new', (t) => shot(t, 'form_new', const QuickAddScreen(prefill: TransactionPrefill(amount: 249, notes: 'Swiggy')), scaffold: false));
-  testWidgets('form_edit', (t) => shot(t, 'form_edit', const QuickAddScreen(editId: 101), scaffold: false));
+  testWidgets('form_edit', (t) => shot(t, 'form_edit',
+      MediaQuery(
+        data: const MediaQueryData(size: Size(390, 844), padding: EdgeInsets.only(top: 40, bottom: 24)),
+        child: const QuickAddScreen(editId: 101),
+      ),
+      scaffold: false));
   testWidgets('budgets', (t) => shot(t, 'budgets', const BudgetsScreen()));
   testWidgets('reports', (t) => shot(t, 'reports', const ReportsScreen(), scaffold: false, size: const Size(390, 1800)));
   testWidgets('categories', (t) => shot(t, 'categories', const CategoriesScreen(), scaffold: false));
   testWidgets('split', (t) => shot(t, 'split', SplitGroupsScreen(onBack: () {}), scaffold: false));
   testWidgets('group_detail', (t) => shot(t, 'group_detail', const SplitGroupDetailScreen(groupId: 1, groupName: 'Goa Trip'), scaffold: false));
+  testWidgets('group_detail_scrolled', (t) => shot(t, 'group_detail_scrolled',
+      const SplitGroupDetailScreen(groupId: 1, groupName: 'Goa Trip'), scaffold: false, act: (t) async {
+        await t.drag(find.text('Expenses').last, const Offset(0, -500));
+        await t.pump(const Duration(milliseconds: 800));
+      }));
   testWidgets('friends', (t) => shot(t, 'friends', FriendsScreen(onBack: () {}), scaffold: false));
   testWidgets('group_balances', (t) => shot(t, 'group_balances', const SplitGroupDetailScreen(groupId: 1, groupName: 'Goa Trip'),
       scaffold: false, act: (t) => t.tap(find.text('Balances'))));
