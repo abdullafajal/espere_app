@@ -394,15 +394,25 @@ class AppTheme {
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg)),
       ),
+      // The calendar's ink-and-white parts (header, chosen day, today when chosen, chosen
+      // year) use the app colour with ink text; everything else stays as it is.
       datePickerTheme: DatePickerThemeData(
         backgroundColor: AppColors.card,
         surfaceTintColor: Colors.transparent,
-        headerBackgroundColor: AppColors.dark,
-        headerForegroundColor: Colors.white,
+        headerBackgroundColor: AppColors.accent,
+        headerForegroundColor: AppColors.dark,
         todayBorder: const BorderSide(color: AppColors.dark),
         dayBackgroundColor: WidgetStateProperty.resolveWith(
             (s) => s.contains(WidgetState.selected) ? AppColors.accent : null),
         dayForegroundColor: WidgetStateProperty.resolveWith(
+            (s) => s.contains(WidgetState.selected) ? AppColors.dark : null),
+        todayBackgroundColor: WidgetStateProperty.resolveWith(
+            (s) => s.contains(WidgetState.selected) ? AppColors.accent : null),
+        todayForegroundColor: WidgetStateProperty.resolveWith(
+            (s) => s.contains(WidgetState.selected) ? AppColors.dark : AppColors.text),
+        yearBackgroundColor: WidgetStateProperty.resolveWith(
+            (s) => s.contains(WidgetState.selected) ? AppColors.accent : null),
+        yearForegroundColor: WidgetStateProperty.resolveWith(
             (s) => s.contains(WidgetState.selected) ? AppColors.dark : null),
       ),
       // Selected hour / minute / AM-PM: ink box with accent text (like the app's main
