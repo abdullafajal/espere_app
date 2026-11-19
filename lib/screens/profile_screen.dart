@@ -19,6 +19,7 @@ import '../services/widget_service.dart';
 import '../services/auto_expense_service.dart';
 import 'auto_track_settings_screen.dart';
 import 'reports_screen.dart';
+import '../services/daily_reminders.dart';
 import '../widgets/espere_input.dart';
 import '../utils/app_toast.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -64,6 +65,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.initState();
     _loadProfile();
     _loadCounts();
+    _loadReminders();
     _loadAutoTrack();
   }
 
@@ -505,6 +507,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return '$b$a';
   }
 
+  final Map<ReminderSlot, ReminderSetting> _reminders = {
+    for (final s in ReminderSlot.values) s: ReminderSetting(true, DailyReminders.defaults[s]!),
+  };
+
+  Future<void> _loadReminders() async {
+    for (final s in ReminderSlot.values) {
+      final v = await DailyReminders.get(s);
+      if (mounted) setState(() => _reminders[s] = v);
+    }
+  }
+
+  Future<void> _setReminder(ReminderSlot slot, ReminderSetting v) async {
+    HapticFeedback.selectionClick();
+    setState(() => _reminders[slot] = v);
+    await DailyReminders.set(slot, v);
+    if (!mounted) return;
+    final name = slot == ReminderSlot.morning ? 'Morning' : 'Night';
+    AppToast.success(context, v.on ? '$name reminder at ${DailyReminders.label(v.minutes)}' : '$name reminder off');
+  }
+
+  Future<void> _pickReminderTime(ReminderSlot slot) async {
+    final cur = _reminders[slot]!;
+    final t = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: cur.minutes ~/ 60, minute: cur.minutes % 60),
+      helpText: slot == ReminderSlot.morning ? 'Morning reminder' : 'Night reminder',
+    );
+    if (t == null || !mounted) return;
+    await _setReminder(slot, ReminderSetting(true, t.hour * 60 + t.minute));
+  }
+
   int _categoryCount = 0;
   int _pending = 0;
 
@@ -556,6 +589,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     String? hint,
     String? value,
     bool? on,
+    VoidCallback? onToggle,
     required VoidCallback onTap,
   }) {
     return Semantics(
@@ -589,9 +623,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                if (on != null)
-                  _switch(on)
-                else ...[
+                if (on != null) ...[
+                  if (value != null) ...[
+                    Text(value,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: on ? AppColors.text : AppColors.mutedLight,
+                        )),
+                    const SizedBox(width: 10),
+                  ],
+                  GestureDetector(onTap: onToggle ?? onTap, child: _switch(on)),
+                ] else ...[
                   if (value != null)
                     Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.muted)),
                   const Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.muted),
@@ -914,16 +957,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ]),
                         _group('REMINDERS', [
-                          _row(
-                            icon: Icons.notifications_rounded,
-                            label: 'Daily reminder',
-                            hint: 'A nudge to log your spending',
-                            on: _emailReminders,
-                            onTap: () {
-                              setState(() => _emailReminders = !_emailReminders);
-                              _save();
-                            },
-                          ),
+                          for (final slot in ReminderSlot.values)
+                            _row(
+                              icon: slot == ReminderSlot.morning ? Icons.wb_sunny_rounded : Icons.nightlight_round,
+                              label: slot == ReminderSlot.morning ? 'Morning reminder' : 'Night reminder',
+                              hint: slot == ReminderSlot.morning
+                                  ? "Yesterday's total, plan the day"
+                                  : "Today's total, add what's left",
+                              value: DailyReminders.label(_reminders[slot]!.minutes),
+                              on: _reminders[slot]!.on,
+                              onTap: () => _pickReminderTime(slot),
+                              onToggle: () => _setReminder(
+                                slot,
+                                ReminderSetting(!_reminders[slot]!.on, _reminders[slot]!.minutes),
+                              ),
+                            ),
                           _row(
                             icon: Icons.auto_awesome_rounded,
                             label: 'Delete animation',

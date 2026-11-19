@@ -191,6 +191,32 @@ Map<String, Object> baseCache() => {
       'cache_split_groups': jsonEncode(splitGroups),
       'cache_split_group_detail_1': jsonEncode(groupDetail),
       'cache_friends': jsonEncode(friends),
+      'cache_notifications': jsonEncode([
+        {
+          'id': 3,
+          'title': 'Today: ₹309 spent',
+          'message': '2 entries logged so far. Anything else to add? Tap to log it.',
+          'data': {'action': 'open_dashboard', 'kind': 'daily_reminder'},
+          'is_read': false,
+          'created_at': DateTime.now().subtract(const Duration(minutes: 25)).toUtc().toIso8601String(),
+        },
+        {
+          'id': 2,
+          'title': 'Goa Trip: new expense',
+          'message': 'Rahul added Dinner ₹2,400. Your share is ₹600.',
+          'data': {'action': 'open_split_group', 'group_id': '1', 'kind': 'split_expense'},
+          'is_read': false,
+          'created_at': DateTime.now().subtract(const Duration(hours: 5)).toUtc().toIso8601String(),
+        },
+        {
+          'id': 1,
+          'title': "Log today's expenses",
+          'message': "You haven't added anything today. It takes 5 seconds to keep your budget on track.",
+          'data': {'action': 'open_dashboard', 'kind': 'daily_reminder'},
+          'is_read': true,
+          'created_at': DateTime.now().subtract(const Duration(days: 1, hours: 2)).toUtc().toIso8601String(),
+        },
+      ]),
     };
 
 Future<void> loadFonts() async {

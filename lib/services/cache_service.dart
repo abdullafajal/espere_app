@@ -963,6 +963,7 @@ class CacheService {
     await prefs.remove(_savingsKey);
     await prefs.remove(_splitGroupsKey);
     await prefs.remove(_syncQueueKey);
+    await prefs.remove('cache_notifications');
   }
 
   static Future<void> savePendingFriendInvite(String username) async {

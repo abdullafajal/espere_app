@@ -1,7 +1,9 @@
-import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import '../screens/split_group_detail_screen.dart';
+import '../theme/app_theme.dart';
+import 'app_navigation.dart';
+import 'notification_inbox.dart';
 
 /// Handles background messages (must be top-level function)
 @pragma('vm:entry-point')
@@ -10,6 +12,38 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 }
 
 class NotificationService {
+  static GlobalKey<NavigatorState>? _navigatorKey;
+
+  /// Opens what a notification is about (from a push or the Notifications screen).
+  static void openAction(Map<String, dynamic> data) {
+    final nav = _navigatorKey?.currentState;
+    if (nav == null) return;
+    final id = int.tryParse(data['notification_id']?.toString() ?? '');
+    if (id != null) NotificationInbox.markRead([id]);
+    switch (data['action']) {
+      case 'open_split_group':
+        final groupId = int.tryParse(data['group_id']?.toString() ?? '');
+        if (groupId == null) return;
+        nav.push(MaterialPageRoute(
+          builder: (_) => SplitGroupDetailScreen(
+            groupId: groupId,
+            groupName: data['group_name']?.toString() ?? 'Group',
+          ),
+        ));
+      case 'open_quick_add':
+        nav.popUntil((r) => r.isFirst);
+        nav.pushNamed('/transaction/add');
+      case 'open_friends':
+        nav.popUntil((r) => r.isFirst);
+        AppNavigation.openTab(3);
+      case 'open_split_invitations':
+        nav.popUntil((r) => r.isFirst);
+        AppNavigation.openTab(4);
+      default:
+        nav.popUntil((r) => r.isFirst);
+    }
+  }
+
   /// Initialize FCM — safe to call even if Firebase config is missing/invalid.
   static Future<void> init(GlobalKey<ScaffoldMessengerState>? messengerKey, GlobalKey<NavigatorState>? navigatorKey) async {
     try {
@@ -19,27 +53,13 @@ class NotificationService {
       // Request permission
       await fcm.requestPermission(alert: true, badge: true, sound: true);
 
-      void handleMessageAction(Map<String, dynamic> data) {
-        if (data['action'] == 'open_split_group' &&
-            data['group_id'] != null &&
-            navigatorKey?.currentContext != null) {
-          navigatorKey!.currentState?.push(
-            MaterialPageRoute(
-              builder:
-                  (_) => SplitGroupDetailScreen(
-                    groupId: int.parse(data['group_id'].toString()),
-                    groupName: data['group_name']?.toString() ?? 'Group',
-                  ),
-            ),
-          );
-        } else if (data['action'] == 'open_dashboard') {
-          navigatorKey!.currentState?.popUntil((route) => route.isFirst);
-        }
-      }
+      _navigatorKey = navigatorKey;
+      void handleMessageAction(Map<String, dynamic> data) => openAction(data);
 
       // Foreground messages
       FirebaseMessaging.onMessage.listen((msg) {
         debugPrint('[FCM] Foreground: ${msg.notification?.title}');
+        NotificationInbox.pushArrived();
         if (msg.notification != null && messengerKey != null) {
           messengerKey.currentState?.showSnackBar(
             SnackBar(
@@ -53,15 +73,15 @@ class NotificationService {
               ),
               action: SnackBarAction(
                 label: 'View',
-                textColor: const Color(0xFF00C853), // AppColors.accent
+                textColor: AppColors.accent,
                 onPressed: () {
                   handleMessageAction(msg.data);
                 },
               ),
               behavior: SnackBarBehavior.floating,
               duration: const Duration(seconds: 5),
-              backgroundColor: const Color(0xFF1E1E1E), // AppColors.dark surface
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              backgroundColor: AppColors.dark,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             ),
           );
         }
@@ -70,6 +90,7 @@ class NotificationService {
       // Tap to open
       FirebaseMessaging.onMessageOpenedApp.listen((msg) {
         debugPrint('[FCM] Opened: ${msg.data}');
+        NotificationInbox.pushArrived();
         handleMessageAction(msg.data);
       });
 

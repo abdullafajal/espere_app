@@ -64,3 +64,16 @@ Friends is inside Split (`SplitSwitcher`: Groups | Friends).
 `flutter test test_preview --update-goldens` renders every screen with made-up data into
 `test_preview/goldens/*.png` (git-ignored; not part of CI). Add a screen to
 `test_preview/screens_preview_test.dart` or `more_preview_test.dart` when you build one.
+
+## Notifications and reminders
+
+- The bell on Home opens **Notifications** (`lib/screens/notifications_screen.dart`):
+  payments to review, then the list kept by `NotificationInbox` (saved on the phone,
+  refreshed from `GET /api/notifications/`). Unread rows are light accent with a dot.
+- **Daily reminders run on the phone**, not the server: Settings → Reminders sets the
+  morning and night time (`DailyReminders`, Android `reminders/DailyReminder.kt`). The
+  message uses the transactions saved on the phone, works offline, and is also added to
+  the Notifications list (negative ids = made on the phone).
+- Home's month chip picks a month (last 12). An earlier month shows weekly bars and
+  "Saved"; every month shows **Avg / day** (`/api/dashboard/?month=YYYY-MM`, with the
+  phone's numbers as fallback).

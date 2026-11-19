@@ -25,7 +25,21 @@ class DashboardData {
   final List<Map<String, String>> budgetWarnings;
   final List<String> insights;
 
+  /// "2026-11"; null from an older server.
+  final String? month;
+
+  /// Spending per day for the month's days counted so far (null from an older server).
+  final double? avgDaily;
+  final List<String> weekLabels;
+  final List<double> weekValues;
+  final int unreadNotifications;
+
   DashboardData({
+    this.month,
+    this.avgDaily,
+    this.weekLabels = const [],
+    this.weekValues = const [],
+    this.unreadNotifications = 0,
     required this.greeting,
     required this.user,
     required this.totalBalance,
@@ -51,6 +65,11 @@ class DashboardData {
 
   factory DashboardData.fromJson(Map<String, dynamic> json) {
     return DashboardData(
+      month: json['month']?.toString(),
+      avgDaily: double.tryParse(json['avg_daily']?.toString() ?? ''),
+      weekLabels: List<String>.from(json['week_labels'] ?? const []),
+      weekValues: (json['week_values'] as List? ?? const []).map((v) => (v as num).toDouble()).toList(),
+      unreadNotifications: (json['unread_notifications'] as num?)?.toInt() ?? 0,
       greeting: json['greeting'] ?? 'Morning',
       user: UserModel.fromJson(json['user'] ?? {}),
       totalBalance: json['total_balance'] ?? '0.00',
@@ -111,6 +130,11 @@ class DashboardData {
   }
 
   Map<String, dynamic> toJson() => {
+        if (month != null) 'month': month,
+        if (avgDaily != null) 'avg_daily': avgDaily.toString(),
+        'week_labels': weekLabels,
+        'week_values': weekValues,
+        'unread_notifications': unreadNotifications,
         'greeting': greeting,
         'user': user.toJson(),
         'total_balance': totalBalance,
