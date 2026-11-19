@@ -228,7 +228,7 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
                 width: double.infinity,
                 height: 52,
                 child: OutlinedButton.icon(
-                  icon: const Icon(Icons.share, size: 20),
+                  icon: const Icon(Icons.share_rounded, size: 20),
                   onPressed: () async {
                     final cachedUser = await CacheService.getCachedUser();
                     String inviteText = 'Hey! Let\'s split expenses on Espere, a modern expense and split tracker!\n\nBy joining Espere, you can easily split bills with friends, track your monthly budgets, and keep your finances in check.\n\nDownload the app to get started: https://espere.in';
@@ -444,7 +444,7 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
             const SizedBox(width: 8),
           ],
           EspereActionButton(
-            icon: Icons.add,
+            icon: Icons.add_rounded,
             primary: true,
             onPressed: _inviteFriend,
           ),
@@ -481,7 +481,7 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: _selectedFriendIds.isEmpty ? null : _createGroupWithSelected,
-                    icon: const Icon(Icons.group_add, size: 18),
+                    icon: const Icon(Icons.group_add_rounded, size: 18),
                     label: Text(_selectedFriendIds.isEmpty ? 'Select friends to create group' : 'Create Group with ${_selectedFriendIds.length}'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.dark, // This is the 'selected' state bg
@@ -598,7 +598,7 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
         children: [
           Row(
             children: [
-              Container(width: 40, height: 40, decoration: BoxDecoration(color: AppColors.accent.withOpacity(0.2), shape: BoxShape.circle), child: const Icon(Icons.groups, color: AppColors.accent, size: 20)),
+              Container(width: 40, height: 40, decoration: BoxDecoration(color: AppColors.accentSoft, shape: BoxShape.circle), child: const Icon(Icons.groups_rounded, color: AppColors.accent, size: 20)),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -659,8 +659,8 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
           const SizedBox(width: 12),
           Expanded(child: Text(u['display_name'] ?? u['username'] ?? '', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.text))),
           if (isReceived) ...[
-            IconButton(onPressed: () => _handleFriendAction(req['id'], 'reject'), icon: const Icon(Icons.close, color: AppColors.error, size: 20)),
-            IconButton(onPressed: () => _handleFriendAction(req['id'], 'accept'), icon: const Icon(Icons.check, color: AppColors.success, size: 20)),
+            IconButton(onPressed: () => _handleFriendAction(req['id'], 'reject'), icon: const Icon(Icons.close_rounded, color: AppColors.error, size: 20)),
+            IconButton(onPressed: () => _handleFriendAction(req['id'], 'accept'), icon: const Icon(Icons.check_rounded, color: AppColors.success, size: 20)),
           ] else
             TextButton(onPressed: () => _handleFriendAction(req['id'], 'cancel'), child: const Text('Cancel', style: TextStyle(color: AppColors.muted, fontSize: 12))),
         ],
@@ -751,7 +751,7 @@ class _FriendTileState extends State<_FriendTile> {
               ),
               alignment: Alignment.center,
               child: widget.isSelected
-                  ? const Icon(Icons.check, size: 18, color: AppColors.accent)
+                  ? const Icon(Icons.check_rounded, size: 18, color: AppColors.accent)
                   : null,
             ),
           ],
@@ -762,7 +762,7 @@ class _FriendTileState extends State<_FriendTile> {
     Widget swipeAction = EspereSwipeAction(
       dismissKey: ValueKey('friend_$fid'),
       direction: DismissDirection.startToEnd,
-      bgIcon: Icons.delete,
+      bgIcon: Icons.delete_rounded,
       bgColor: AppColors.dark,
       bgIconColor: AppColors.accent,
       borderRadius: BorderRadius.circular(AppRadius.xxl),

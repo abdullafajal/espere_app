@@ -4,7 +4,7 @@ import '../theme/app_theme.dart';
 
 class AppToast {
   static void success(BuildContext context, String message) {
-    _show(context, message, Icons.check_circle, AppColors.accent);
+    _show(context, message, Icons.check_circle_rounded, AppColors.accent);
   }
 
   static void error(BuildContext context, String message) {

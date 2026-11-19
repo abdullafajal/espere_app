@@ -131,7 +131,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
         children: [
           Row(
             children: [
-              Container(width: 40, height: 40, decoration: BoxDecoration(color: AppColors.accent.withOpacity(0.2), shape: BoxShape.circle), child: const Icon(Icons.groups, color: AppColors.accent, size: 20)),
+              Container(width: 40, height: 40, decoration: BoxDecoration(color: AppColors.accentSoft, shape: BoxShape.circle), child: const Icon(Icons.groups_rounded, color: AppColors.accent, size: 20)),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -192,8 +192,8 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
           const SizedBox(width: 12),
           Expanded(child: Text(u['display_name'] ?? u['username'] ?? '', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.text))),
           if (isReceived) ...[
-            IconButton(onPressed: () => _handleFriendAction(req['id'], 'reject'), icon: const Icon(Icons.close, color: AppColors.error, size: 20)),
-            IconButton(onPressed: () => _handleFriendAction(req['id'], 'accept'), icon: const Icon(Icons.check, color: AppColors.success, size: 20)),
+            IconButton(onPressed: () => _handleFriendAction(req['id'], 'reject'), icon: const Icon(Icons.close_rounded, color: AppColors.error, size: 20)),
+            IconButton(onPressed: () => _handleFriendAction(req['id'], 'accept'), icon: const Icon(Icons.check_rounded, color: AppColors.success, size: 20)),
           ] else
             TextButton(onPressed: () => _handleFriendAction(req['id'], 'cancel'), child: const Text('Cancel', style: TextStyle(color: AppColors.muted, fontSize: 12))),
         ],
@@ -318,7 +318,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
                 const Text('Add Members', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.muted)),
                 const SizedBox(height: 12),
                 if (loadingFriends)
-                  const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator(color: AppColors.accent)))
+                  const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator(color: AppColors.dark)))
                 else if (friends.isEmpty)
                   Container(
                     padding: const EdgeInsets.all(16),
@@ -380,7 +380,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
                       }
                     },
                     child: isSaving 
-                        ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: AppColors.accent, strokeWidth: 2))
+                        ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: AppColors.dark, strokeWidth: 2))
                         : const Text('Create Group', style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold, fontSize: 16)),
                   ),
                 ),
@@ -441,7 +441,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
                       const SizedBox(width: 8),
                     ],
                     EspereActionButton(
-                      icon: Icons.add,
+                      icon: Icons.add_rounded,
                       primary: true,
                       onPressed: _showCreateGroupSheet,
                     ),
@@ -458,7 +458,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
                   ? _buildEmptyState()
                   : RefreshIndicator(
                     onRefresh: _loadGroups,
-                    color: AppColors.accent,
+                    color: AppColors.dark,
                     child: ListView.builder(
                       padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
                       itemCount: _groups.length + 1,
@@ -534,7 +534,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.add, size: 20, color: AppColors.dark),
+                  Icon(Icons.add_rounded, size: 20, color: AppColors.dark),
                   SizedBox(width: 8),
                   Text(
                     'Create Group',
@@ -931,7 +931,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
                     }
                   },
                   child: isSaving 
-                      ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: AppColors.accent, strokeWidth: 2))
+                      ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: AppColors.dark, strokeWidth: 2))
                       : const Text('Save Changes', style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold, fontSize: 16)),
                 ),
               ),
@@ -1022,7 +1022,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
             child: Row(
               children: [
                 Icon(
-                  isError ? Icons.error_outline : Icons.check_circle_outline,
+                  isError ? Icons.error_outline_rounded : Icons.check_circle_outline,
                   color: AppColors.accent,
                   size: 20,
                 ),
@@ -1095,10 +1095,10 @@ class _GroupTileState extends State<_GroupTile> {
         child: EspereSwipeAction(
           dismissKey: ValueKey('group_${widget.group['id']}'),
           direction: DismissDirection.horizontal,
-          bgIcon: Icons.delete,
+          bgIcon: Icons.delete_rounded,
           bgColor: AppColors.dark,
           bgIconColor: AppColors.accent,
-          secBgIcon: Icons.edit,
+          secBgIcon: Icons.edit_rounded,
           secBgColor: AppColors.accent,
           secBgIconColor: AppColors.dark,
           borderRadius: BorderRadius.circular(AppRadius.xxl),

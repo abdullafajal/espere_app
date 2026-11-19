@@ -115,7 +115,7 @@ class _AutoTrackSettingsScreenState extends State<AutoTrackSettingsScreen>
             EspereHeader(title: 'Auto-track payments', onBack: () => Navigator.pop(context)),
             Expanded(
               child: s == null
-                  ? const Center(child: CircularProgressIndicator(color: AppColors.accent))
+                  ? const Center(child: CircularProgressIndicator(color: AppColors.dark))
                   : ListView(
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
                       children: [
@@ -353,13 +353,13 @@ class _AutoTrackSettingsScreenState extends State<AutoTrackSettingsScreen>
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: AppColors.accent,
-                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                      color: AppColors.surface,
+                      shape: BoxShape.circle,
                     ),
                     child: Text('$badge',
                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.dark)),
                   ),
-                const Icon(Icons.chevron_right, color: AppColors.text, size: 20),
+                const Icon(Icons.chevron_right_rounded, color: AppColors.text, size: 20),
               ],
             ),
           ),

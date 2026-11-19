@@ -99,12 +99,57 @@ final dashboard = {
   'insights': ['You spent 18% less on food than last month.'],
 };
 
+final _month = '${_now.year}-${_now.month.toString().padLeft(2, '0')}-01';
+
+Map<String, dynamic> budget(int id, Map<String, dynamic> category, String amount, String spent) {
+  final pct = double.parse(spent) / double.parse(amount) * 100;
+  return {
+    'id': id,
+    'name': category['name'],
+    'category': category,
+    'amount': amount,
+    'spent': spent,
+    'percentage': pct.toStringAsFixed(1),
+    'is_exceeded': pct > 100,
+    'month': _month,
+  };
+}
+
+final budgets = [
+  budget(1, categories[0], '2000', '2400'),
+  budget(2, categories[3], '3000', '1232'),
+  budget(3, categories[4], '1500', '899'),
+];
+
+final reports = {
+  'currency_symbol': '₹',
+  'annual_income': '504000',
+  'annual_expenses': '128400',
+  'annual_net': '375600',
+  'bar_labels': ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov'],
+  'bar_income': [42000, 42000, 42000, 42000, 42000, 42000, 42000, 42000, 42000, 42000, 42000],
+  'bar_expense': [9000, 12000, 8000, 15000, 11000, 9500, 12500, 8000, 15000, 11000, 8420],
+  'savings_trend': [33000, 63000, 97000, 124000, 155000, 187500, 217000, 251000, 278000, 309000, 342580],
+  'top_categories': [
+    {'name': 'Food', 'total': '24000', 'color': '#FF6B6B', 'icon': 'restaurant'},
+    {'name': 'Shopping', 'total': '18000', 'color': '#4ECDC4', 'icon': 'shopping_bag'},
+    {'name': 'Bills', 'total': '12000', 'color': '#45B7D1', 'icon': 'receipt_long'},
+    {'name': 'Travel', 'total': '8000', 'color': '#96CEB4', 'icon': 'directions_bus'},
+  ],
+  'monthly_summary': [
+    {'month': 'Nov', 'income': '42000', 'expense': '8420', 'net': '33580'},
+    {'month': 'Oct', 'income': '42000', 'expense': '11000', 'net': '31000'},
+  ],
+};
+
 /// Shared preferences the app reads its offline cache from.
 Map<String, Object> baseCache() => {
       'cache_dashboard': jsonEncode(dashboard),
       'cache_user': jsonEncode(user),
       'cache_transactions': jsonEncode({'transactions': transactions, 'currency_symbol': '₹'}),
       'cache_categories': jsonEncode({'categories': categories, 'currency_symbol': '₹'}),
+      'cache_budgets': jsonEncode({'budgets': budgets, 'currency_symbol': '₹'}),
+      'cache_reports': jsonEncode(reports),
     };
 
 Future<void> loadFonts() async {

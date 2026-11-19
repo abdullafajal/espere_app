@@ -24,6 +24,12 @@ class BudgetTile extends StatefulWidget {
 }
 
 class _BudgetTileState extends State<BudgetTile> {
+  String _m(dynamic v) {
+    final d = double.tryParse(v.toString()) ?? 0;
+    final f = NumberFormat.decimalPatternDigits(locale: 'en_IN', decimalDigits: d == d.roundToDouble() ? 0 : 2);
+    return '${widget.currencySymbol}${f.format(d)}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final isExceeded = widget.budget['is_exceeded'] == true;
@@ -90,7 +96,7 @@ class _BudgetTileState extends State<BudgetTile> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '${widget.currencySymbol}${widget.budget['spent']} spent',
+                '${_m(widget.budget['spent'])} spent',
                 style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -126,7 +132,7 @@ class _BudgetTileState extends State<BudgetTile> {
                 ),
               ),
               Text(
-                'Limit: ${widget.currencySymbol}${widget.budget['amount']}',
+                'Limit: ${_m(widget.budget['amount'])}',
                 style: const TextStyle(
                   fontSize: 11,
                   color: AppColors.muted,
@@ -158,7 +164,7 @@ class _BudgetTileState extends State<BudgetTile> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Budget exceeded by ${widget.currencySymbol}${double.parse(widget.budget['spent'].toString()) - double.parse(widget.budget['amount'].toString())}',
+                      'Budget exceeded by ${_m(double.parse(widget.budget['spent'].toString()) - double.parse(widget.budget['amount'].toString()))}',
                       style: const TextStyle(
                         color: AppColors.accent,
                         fontSize: 12,

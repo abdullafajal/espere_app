@@ -331,7 +331,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                           decoration: BoxDecoration(
                             color: isSelected
-                                ? AppColors.accent.withOpacity(0.15)
+                                ? AppColors.accentSoft
                                 : AppColors.surface,
                             borderRadius: BorderRadius.circular(AppRadius.lg),
                             border: Border.all(
@@ -345,8 +345,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 width: 36,
                                 height: 36,
                                 decoration: BoxDecoration(
-                                  color: AppColors.accent,
-                                  borderRadius: BorderRadius.circular(10),
+                                  color: AppColors.surface,
+                                  shape: BoxShape.circle,
                                 ),
                                 alignment: Alignment.center,
                                 child: Text(
@@ -370,7 +370,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ),
                               ),
                               if (isSelected)
-                                const Icon(Icons.check, color: AppColors.accent, size: 20),
+                                const Icon(Icons.check_rounded, color: AppColors.dark, size: 20),
                             ],
                           ),
                         ),
@@ -472,7 +472,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
                   child: isChanging
-                      ? const CircularProgressIndicator(color: AppColors.accent)
+                      ? const CircularProgressIndicator(color: AppColors.dark)
                       : const Text('Update Password', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
               ),
@@ -631,7 +631,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       backgroundColor: const Color(0xFFFBFBFB), // Very light background to match screenshot
       body: SafeArea(
         child: _isLoading
-            ? const Center(child: CircularProgressIndicator(color: AppColors.accent))
+            ? const Center(child: CircularProgressIndicator(color: AppColors.dark))
             : Column(
                 children: [
                   EspereHeader(
@@ -695,7 +695,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     border: Border.all(color: Colors.white, width: 2),
                                   ),
                                   child: const Icon(
-                                    Icons.edit,
+                                    Icons.edit_rounded,
                                     size: 14,
                                     color: AppColors.dark,
                                   ),
@@ -770,7 +770,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     style: const TextStyle(fontSize: 14, color: AppColors.text, fontWeight: FontWeight.w500),
                                   ),
                                   const SizedBox(width: 8),
-                                  const Icon(Icons.chevron_right, color: AppColors.text, size: 20),
+                                  const Icon(Icons.chevron_right_rounded, color: AppColors.text, size: 20),
                                 ],
                               ),
                               onTap: _showCurrencyPicker,
@@ -798,7 +798,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     ),
                                     alignment: Alignment.center,
                                     child: _autoTrackOn
-                                        ? const Icon(Icons.check, size: 18, color: AppColors.accent)
+                                        ? const Icon(Icons.check_rounded, size: 18, color: AppColors.accent)
                                         : null,
                                   ),
                                 ),
@@ -826,7 +826,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   ),
                                   alignment: Alignment.center,
                                   child: _emailReminders
-                                      ? const Icon(Icons.check, size: 18, color: AppColors.accent)
+                                      ? const Icon(Icons.check_rounded, size: 18, color: AppColors.accent)
                                       : null,
                                 ),
                               ),
@@ -855,7 +855,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   ),
                                   alignment: Alignment.center,
                                   child: _shredderAnimation
-                                      ? const Icon(Icons.check, size: 18, color: AppColors.accent)
+                                      ? const Icon(Icons.check_rounded, size: 18, color: AppColors.accent)
                                       : null,
                                 ),
                               ),
@@ -870,13 +870,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         _buildCard(
                           children: [
                             _buildRow(
-                              icon: Icons.lock_outline,
+                              icon: Icons.lock_outline_rounded,
                               title: 'Change Password',
-                              trailing: const Icon(Icons.chevron_right, color: AppColors.text, size: 20),
+                              trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.text, size: 20),
                               onTap: _showChangePasswordDialog,
                             ),
                             _buildRow(
-                              icon: Icons.logout,
+                              icon: Icons.logout_rounded,
                               iconColor: AppColors.error,
                               textColor: AppColors.error,
                               title: 'Log Out',

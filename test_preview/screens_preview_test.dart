@@ -5,6 +5,9 @@ import 'package:espere_app/screens/dashboard_screen.dart';
 import 'package:espere_app/screens/quick_add_screen.dart';
 import 'package:espere_app/screens/transaction_list_screen.dart';
 import 'package:espere_app/screens/transaction_form_screen.dart';
+import 'package:espere_app/screens/budgets_screen.dart';
+import 'package:espere_app/screens/reports_screen.dart';
+import 'package:espere_app/screens/categories_screen.dart';
 
 import 'preview_harness.dart';
 
@@ -21,4 +24,7 @@ void main() {
   testWidgets('activity', (t) => shot(t, 'activity', const TransactionListScreen()));
   testWidgets('form_new', (t) => shot(t, 'form_new', const TransactionFormScreen(presetType: 'expense')));
   testWidgets('form_edit', (t) => shot(t, 'form_edit', const TransactionFormScreen(transactionId: 101)));
+  testWidgets('budgets', (t) => shot(t, 'budgets', const BudgetsScreen()));
+  testWidgets('reports', (t) => shot(t, 'reports', const ReportsScreen(), scaffold: false, size: const Size(390, 1800)));
+  testWidgets('categories', (t) => shot(t, 'categories', const CategoriesScreen(), scaffold: false));
 }
