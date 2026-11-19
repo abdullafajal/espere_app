@@ -24,19 +24,16 @@ class SummaryCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(AppRadius.xxl),
-        boxShadow: AppShadows.card,
+        boxShadow: AppShadows.soft,
       ),
       child: Column(
         children: [
           // Icon badge — w-9 h-9 bg-mn-accent rounded-xl
           Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: AppColors.accent,
-              borderRadius: BorderRadius.circular(AppRadius.md),
-            ),
-            child: Icon(icon, size: 18, color: AppColors.dark),
+            width: 38,
+            height: 38,
+            decoration: const BoxDecoration(color: AppColors.surface, shape: BoxShape.circle),
+            child: Icon(icon, size: 19, color: AppColors.dark),
           ),
           const SizedBox(height: 8),
           // Label — text-xs text-mn-muted
@@ -52,8 +49,8 @@ class SummaryCard extends StatelessWidget {
           Text(
             value,
             style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
               color: AppColors.text,
             ),
             maxLines: 1,

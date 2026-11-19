@@ -1,9 +1,8 @@
-/// Floating bottom navigation bar — the dark pill from base.html.
+/// Floating bottom navigation: a dark pill with labelled tabs and the Add button in the
+/// middle.
 ///
-/// Matches the Django template:
-///   bg-mn-dark rounded-[28px] px-3 py-3 with 5 icon tabs
-///   Active: bg-mn-accent text-mn-dark
-///   Inactive: text-gray-400
+/// Tabs map to the home shell's screen indexes: Home 0, Activity 1, Budgets 2, Split 4.
+/// Friends (index 3) lives inside the Split tab, so Split stays highlighted there too.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
@@ -11,97 +10,129 @@ import '../theme/app_theme.dart';
 class EspereBottomNav extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
+  final VoidCallback onAdd;
   final bool isVisible;
 
   const EspereBottomNav({
     super.key,
     required this.currentIndex,
     required this.onTap,
+    required this.onAdd,
     this.isVisible = true,
   });
 
-  static const _items = [
-    _NavItem(Icons.home_outlined, Icons.home_outlined, 'Home'),
-    _NavItem(Icons.swap_horiz, Icons.swap_horiz, 'Activity'),
-    _NavItem(Icons.wallet_outlined, Icons.wallet, 'Budgets'),
-    _NavItem(Icons.group_outlined, Icons.group, 'Friends'),
-    _NavItem(Icons.call_split, Icons.call_split, 'Split'),
+  static const _left = [
+    _NavItem(0, Icons.home_rounded, 'Home'),
+    _NavItem(1, Icons.receipt_long_rounded, 'Activity'),
   ];
+  static const _right = [
+    _NavItem(2, Icons.donut_large_rounded, 'Budgets'),
+    _NavItem(4, Icons.group_rounded, 'Split'),
+  ];
+
+  bool _isActive(_NavItem item) =>
+      item.index == currentIndex || (item.index == 4 && currentIndex == 3);
 
   @override
   Widget build(BuildContext context) {
     return AnimatedOpacity(
       opacity: isVisible ? 1.0 : 0.0,
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 250),
       curve: Curves.easeOut,
       child: AnimatedSlide(
-        offset: isVisible ? Offset.zero : const Offset(0, 1.0),
-        duration: const Duration(milliseconds: 500),
-        curve: Curves.easeInOutQuart,
+        offset: isVisible ? Offset.zero : const Offset(0, 1.2),
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOutCubic,
         child: SafeArea(
-        child: Container(
-          decoration: BoxDecoration(
-            color: AppColors.dark,
-            borderRadius: BorderRadius.circular(28),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.18),
-                blurRadius: 32,
-                offset: const Offset(0, 8),
-              ),
-              BoxShadow(
-                color: Colors.black.withOpacity(0.12),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: List.generate(_items.length, (index) {
-              final item = _items[index];
-              final isActive = index == currentIndex;
-              
-              return GestureDetector(
-                onTap: () {
-                  HapticFeedback.mediumImpact();
-                  onTap(index);
-                },
-                child: SizedBox(
-                  width: 60,
-                  height: 60,
-                  child: Center(
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: isActive ? AppColors.accent : Colors.transparent,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        isActive ? item.activeIcon : item.icon,
-                        size: 24,
-                        color: isActive ? AppColors.dark : Colors.grey[600],
-                      ),
+          top: false,
+          child: Container(
+            height: 68,
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              color: AppColors.dark,
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+              boxShadow: AppShadows.nav,
+            ),
+            child: Row(
+              children: [
+                ..._left.map((i) => Expanded(child: _tab(i))),
+                Semantics(
+                  button: true,
+                  label: 'Add transaction',
+                  child: GestureDetector(
+                    onTap: () {
+                      HapticFeedback.mediumImpact();
+                      onAdd();
+                    },
+                    child: Container(
+                      width: 52,
+                      height: 52,
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                      child: const Icon(Icons.add_rounded, size: 28, color: AppColors.dark),
                     ),
                   ),
                 ),
-              );
-            }),
+                ..._right.map((i) => Expanded(child: _tab(i))),
+              ],
+            ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
+
+  Widget _tab(_NavItem item) {
+    final active = _isActive(item);
+    return Semantics(
+      selected: active,
+      button: true,
+      label: item.label,
+      excludeSemantics: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap(item.index);
+        },
+        child: Center(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+            height: 52,
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            decoration: BoxDecoration(
+              color: active ? AppColors.accent : Colors.transparent,
+              borderRadius: BorderRadius.circular(26),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(item.icon, size: 22, color: active ? AppColors.dark : AppColors.darkMuted),
+                const SizedBox(height: 2),
+                Text(
+                  item.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.visible,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: active ? FontWeight.w800 : FontWeight.w600,
+                    color: active ? AppColors.dark : AppColors.darkMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
 class _NavItem {
+  final int index;
   final IconData icon;
-  final IconData activeIcon;
   final String label;
-  const _NavItem(this.icon, this.activeIcon, this.label);
+  const _NavItem(this.index, this.icon, this.label);
 }

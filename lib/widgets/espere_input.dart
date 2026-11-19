@@ -1,10 +1,4 @@
-/// Reusable styled text input matching Django's form inputs.
-///
-/// Matches the Tailwind CSS:
-///   border: 1.5px solid #EEEEEE
-///   background: #FAFAFA
-///   border-radius: 14px
-///   focus: border-color #C8E64A with glow
+/// Text input: label above, grey filled field, ink outline when focused.
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
@@ -60,12 +54,12 @@ class _EspereInputState extends State<EspereInput> {
         Text(
           widget.label,
           style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
             color: AppColors.text,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         // Input field
         TextFormField(
           controller: widget.controller,
@@ -76,14 +70,16 @@ class _EspereInputState extends State<EspereInput> {
           validator: widget.validator,
           onChanged: widget.onChanged,
           style: const TextStyle(
-            fontSize: 14,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
             color: AppColors.text,
           ),
           decoration: InputDecoration(
             hintText: widget.hint,
             hintStyle: const TextStyle(
-              fontSize: 14,
-              color: AppColors.muted,
+              fontSize: 15,
+              fontWeight: FontWeight.w400,
+              color: AppColors.mutedLight,
             ),
             errorText: widget.errorText,
             prefixText: widget.prefixText,
@@ -95,7 +91,7 @@ class _EspereInputState extends State<EspereInput> {
             suffixIcon: widget.obscureText
                 ? IconButton(
                     icon: Icon(
-                      _obscureText ? Icons.visibility_off : Icons.visibility,
+                      _obscureText ? Icons.visibility_off_rounded : Icons.visibility_rounded,
                       color: AppColors.muted,
                       size: 20,
                     ),
@@ -108,37 +104,22 @@ class _EspereInputState extends State<EspereInput> {
                 : widget.suffixIcon,
             filled: true,
             fillColor: AppColors.surface,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 14,
-            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppRadius.lg),
-              borderSide: const BorderSide(
-                color: AppColors.border,
-                width: 1.5,
-              ),
+              borderSide: BorderSide.none,
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppRadius.lg),
-              borderSide: const BorderSide(
-                color: AppColors.border,
-                width: 1.5,
-              ),
+              borderSide: BorderSide.none,
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppRadius.lg),
-              borderSide: const BorderSide(
-                color: AppColors.accent,
-                width: 1.5,
-              ),
+              borderSide: const BorderSide(color: AppColors.dark, width: 1.5),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppRadius.lg),
-              borderSide: const BorderSide(
-                color: AppColors.error,
-                width: 1.5,
-              ),
+              borderSide: const BorderSide(color: AppColors.dark, width: 1.5),
             ),
           ),
         ),

@@ -13,7 +13,7 @@ class UserAvatar extends StatelessWidget {
     this.avatarUrl,
     required this.initial,
     this.size = 40,
-    this.borderRadius = 8, // Square-ish as requested
+    this.borderRadius = 999, // round
   });
 
   @override
@@ -35,21 +35,21 @@ class UserAvatar extends StatelessWidget {
     return fallback;
   }
 
-  // Fallback: 1 letter in avatar with app color, square-ish
+  // Fallback: first letter in lime on an ink circle
   Widget _initialBox() {
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: AppColors.accent, // App color background
+        color: AppColors.dark,
         borderRadius: BorderRadius.circular(borderRadius),
       ),
       child: Center(
         child: Text(
           initial.isEmpty ? '?' : initial[0].toUpperCase(),
           style: TextStyle(
-            color: AppColors.text, // Show in text colour as requested
-            fontWeight: FontWeight.bold,
+            color: AppColors.accent,
+            fontWeight: FontWeight.w800,
             fontSize: size * 0.4,
           ),
         ),

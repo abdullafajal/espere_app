@@ -10,6 +10,7 @@ import 'transaction_list_screen.dart';
 import 'budgets_screen.dart';
 import 'friends_screen.dart';
 import 'split_groups_screen.dart';
+import 'quick_add_screen.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
 import '../services/cache_service.dart';
@@ -29,7 +30,6 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _currentIndex = 0;
   bool _isBottomNavVisible = true;
-  double _lastScrollOffset = 0;
 
   final _dashboardKey = GlobalKey<DashboardScreenState>();
   final _transactionListKey = GlobalKey<TransactionListScreenState>();
@@ -122,6 +122,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _openQuickAdd() async {
+    final added = await QuickAddScreen.open(context);
+    if (!mounted || !added) return;
+    _dashboardKey.currentState?.reload();
+    if (_currentIndex != 0) _refreshTab(_currentIndex);
+  }
+
   /// Trigger a data refresh on the given tab index.
   void _refreshTab(int index) {
     switch (index) {
@@ -190,7 +197,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   // Scrolling up
                   setState(() => _isBottomNavVisible = true);
                 }
-                _lastScrollOffset = currentOffset;
               }
               return false;
             },
@@ -213,49 +219,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 });
                 _refreshTab(index);
               },
+              onAdd: _openQuickAdd,
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Placeholder screen for Budgets/Savings/Split tabs
-class _PlaceholderScreen extends StatelessWidget {
-  final IconData icon;
-  final String title;
-
-  const _PlaceholderScreen({required this.icon, required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: AppColors.accent.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(AppRadius.xxl),
-            ),
-            child: Icon(icon, size: 40, color: AppColors.accent),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: AppColors.text,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Coming soon',
-            style: TextStyle(fontSize: 14, color: AppColors.muted),
           ),
         ],
       ),
