@@ -8,6 +8,7 @@ import '../widgets/espere_header.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import '../theme/app_theme.dart';
+import '../utils/pickers.dart';
 import '../utils/avatar_cache.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
@@ -530,6 +531,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _pickReminderTime(ReminderSlot slot) async {
     final cur = _reminders[slot]!;
     final t = await showTimePicker(
+      builder: pickerBuilder,
       context: context,
       initialTime: TimeOfDay(hour: cur.minutes ~/ 60, minute: cur.minutes % 60),
       helpText: slot == ReminderSlot.morning ? 'Morning reminder' : 'Night reminder',

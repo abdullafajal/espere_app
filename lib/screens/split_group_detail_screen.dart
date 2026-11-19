@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../widgets/espere_header.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
+import '../utils/pickers.dart';
 import '../widgets/spring_menu.dart';
 import '../utils/icon_mapper.dart';
 import '../utils/avatar_cache.dart';
@@ -1208,6 +1209,7 @@ class _S extends State<SplitGroupDetailScreen>
                             GestureDetector(
                               onTap: () async {
                                 final pickedDate = await showDatePicker(
+                                  builder: pickerBuilder,
                                   context: ctx,
                                   initialDate: _date,
                                   firstDate: DateTime(2000),
@@ -1216,6 +1218,7 @@ class _S extends State<SplitGroupDetailScreen>
                                 if (pickedDate != null) {
                                   if (!mounted) return;
                                   final pickedTime = await showTimePicker(
+                                    builder: pickerBuilder,
                                     context: ctx,
                                     initialTime: TimeOfDay.fromDateTime(_date),
                                   );

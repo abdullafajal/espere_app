@@ -152,9 +152,11 @@ class EspereScrollPhysics extends BouncingScrollPhysics {
 class EspereScrollBehavior extends MaterialScrollBehavior {
   const EspereScrollBehavior();
 
+  /// Not "always scrollable": something that fits (a dialog, a short sheet) must not
+  /// scroll, or it steals drags from its content (the time picker's clock hand). Lists
+  /// with pull-to-refresh are made always-scrollable by ListView itself.
   @override
-  ScrollPhysics getScrollPhysics(BuildContext context) =>
-      const EspereScrollPhysics(parent: AlwaysScrollableScrollPhysics());
+  ScrollPhysics getScrollPhysics(BuildContext context) => const EspereScrollPhysics();
 
   @override
   Widget buildOverscrollIndicator(BuildContext context, Widget child, ScrollableDetails details) => child;

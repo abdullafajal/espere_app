@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
+import '../utils/pickers.dart';
 import 'quick_add_screen.dart';
 import '../models/category.dart';
 import '../models/transaction.dart';
@@ -760,6 +761,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                         onTap: () async {
                                           final pickedDate =
                                               await showDatePicker(
+                                                builder: pickerBuilder,
                                                 context: context,
                                                 initialDate: _date,
                                                 firstDate: DateTime(2020),
@@ -771,6 +773,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                             if (!mounted) return;
                                             final pickedTime =
                                                 await showTimePicker(
+                                                  builder: pickerBuilder,
                                                   context: context,
                                                   initialTime:
                                                       TimeOfDay.fromDateTime(
