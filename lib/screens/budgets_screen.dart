@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import '../theme/motion.dart';
 import '../widgets/espere_header.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../widgets/espere_action_button.dart';
@@ -208,7 +208,7 @@ class BudgetsScreenState extends State<BudgetsScreen> {
         _budgets.removeWhere((b) => b['id'] == id);
       });
 
-      HapticFeedback.mediumImpact();
+      AppHaptics.confirm();
       AppToast.success(context, 'Budget deleted.');
 
       if (ConnectivityService.isOnline) {
@@ -579,7 +579,7 @@ class _BudgetFormSheetState extends State<_BudgetFormSheet> {
 
     if (mounted) {
       setState(() => _isSaving = false);
-      HapticFeedback.mediumImpact();
+      AppHaptics.confirm();
       AppToast.success(
         context,
         widget.budget == null ? 'Budget created.' : 'Budget updated.',

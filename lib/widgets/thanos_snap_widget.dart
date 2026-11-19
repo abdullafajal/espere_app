@@ -1,10 +1,10 @@
 import 'dart:math' as math;
+import '../theme/motion.dart';
 import 'dart:typed_data';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 
 class ThanosSnapWidget extends StatefulWidget {
   final Widget child;
@@ -38,7 +38,7 @@ class ThanosSnapWidgetState extends State<ThanosSnapWidget>
       if (_controller.isAnimating) {
         final now = DateTime.now();
         if (_lastVibration == null || now.difference(_lastVibration!).inMilliseconds > 50) {
-          HapticFeedback.selectionClick();
+          AppHaptics.tap();
           _lastVibration = now;
         }
       } else {

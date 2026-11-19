@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
+import '../theme/motion.dart';
 
 /// Dropdown-style filter chip used on list screens (same height, shape and active state
 /// everywhere). Active = ink with white text.
@@ -41,11 +41,8 @@ class EspereFilterChip extends StatelessWidget {
     return Semantics(
       button: true,
       selected: active,
-      child: GestureDetector(
-        onTap: () {
-          HapticFeedback.selectionClick();
-          onTap();
-        },
+      child: SpringPress(
+        onTap: onTap,
         onLongPress: onLongPress,
         child: Container(
           height: height,

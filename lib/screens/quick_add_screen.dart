@@ -24,6 +24,7 @@ import '../services/cache_service.dart';
 import '../services/receipt_service.dart';
 import '../services/transaction_store.dart';
 import '../theme/app_theme.dart';
+import '../theme/motion.dart';
 import '../utils/app_toast.dart';
 import '../utils/icon_mapper.dart';
 
@@ -153,7 +154,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
 
   Future<void> _setType(String type) async {
     if (type == _type) return;
-    HapticFeedback.selectionClick();
+    AppHaptics.tap();
     setState(() {
       _type = type;
       _categoryId = null;
@@ -169,7 +170,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
   bool get _hasAmount => _value > 0;
 
   void _press(String key) {
-    HapticFeedback.lightImpact();
+    AppHaptics.press();
     var a = _amount;
     if (key == 'back') {
       if (a.isEmpty) return;
@@ -197,18 +198,18 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
 
   Future<void> _save(CategoryModel? category) async {
     if (_formMode) {
-      HapticFeedback.selectionClick();
+      AppHaptics.tap();
       setState(() => _categoryId = category?.id);
       return;
     }
     if (_busy) return;
     if (!_hasAmount) {
-      HapticFeedback.heavyImpact();
+      AppHaptics.warn();
       AppToast.info(context, 'Type the amount first');
       return;
     }
     _busy = true;
-    HapticFeedback.mediumImpact();
+    AppHaptics.confirm();
     final amount = _value;
     try {
       final id = await TransactionStore.create(
@@ -244,12 +245,12 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
   Future<void> _commit() async {
     if (_busy) return;
     if (!_hasAmount) {
-      HapticFeedback.heavyImpact();
+      AppHaptics.warn();
       AppToast.info(context, 'Type the amount first');
       return;
     }
     _busy = true;
-    HapticFeedback.mediumImpact();
+    AppHaptics.confirm();
     final category = _categories.where((c) => c.id == _categoryId).firstOrNull;
     try {
       if (_old != null) {
@@ -295,7 +296,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
       ),
     );
     if (ok != true || !mounted) return;
-    HapticFeedback.mediumImpact();
+    AppHaptics.confirm();
     await TransactionStore.remove(old.id);
     if (!mounted) return;
     AppToast.success(context, 'Deleted');
@@ -310,7 +311,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
   Future<void> _undo() async {
     final s = _saved;
     if (s == null) return;
-    HapticFeedback.mediumImpact();
+    AppHaptics.confirm();
     _savedTimer?.cancel();
     setState(() {
       _saved = null;
@@ -442,7 +443,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
   Widget _circle(IconData icon, String label, VoidCallback onTap) => Semantics(
         button: true,
         label: label,
-        child: GestureDetector(
+        child: SpringPress(
           onTap: onTap,
           child: Container(
             width: 44,
@@ -458,7 +459,8 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
     return Semantics(
       selected: on,
       button: true,
-      child: GestureDetector(
+      child: SpringPress(
+        haptic: HapticKind.none,
         onTap: () => _setType(type),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
@@ -478,7 +480,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
     );
   }
 
-  Widget _chip(IconData icon, String label, VoidCallback onTap) => GestureDetector(
+  Widget _chip(IconData icon, String label, VoidCallback onTap) => SpringPress(
         onTap: onTap,
         child: Container(
           height: 36,
@@ -648,8 +650,9 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
       selected: selected,
       label: dashed ? 'New category' : (_formMode ? label : 'Save to $label'),
       excludeSemantics: true,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+      child: SpringPress(
+        haptic: dashed ? HapticKind.tap : HapticKind.none,
+        scale: 0.9,
         onTap: onTap,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -717,20 +720,17 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
               button: true,
               label: k == 'back' ? 'Delete digit' : k,
               excludeSemantics: true,
-              child: Material(
-                color: AppColors.card,
-                borderRadius: BorderRadius.circular(16),
-                elevation: 0,
-                shadowColor: Colors.transparent,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(16),
-                  onTap: () => _press(k),
-                  onLongPress: k == 'back' ? () => setState(() => _amount = '') : null,
-                  child: Center(
-                    child: k == 'back'
-                        ? const Icon(Icons.backspace_outlined, size: 24, color: AppColors.dark)
-                        : Text(k, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.dark)),
-                  ),
+              child: SpringPress(
+                haptic: HapticKind.none, // _press gives the key tick
+                scale: 0.92,
+                onTap: () => _press(k),
+                onLongPress: k == 'back' ? () => setState(() => _amount = '') : null,
+                child: Container(
+                  decoration: BoxDecoration(color: AppColors.card, borderRadius: BorderRadius.circular(16)),
+                  alignment: Alignment.center,
+                  child: k == 'back'
+                      ? const Icon(Icons.backspace_outlined, size: 24, color: AppColors.dark)
+                      : Text(k, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.dark)),
                 ),
               ),
             ),
@@ -771,7 +771,8 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
                 ),
               ),
               const SizedBox(width: 8),
-              GestureDetector(
+              SpringPress(
+                haptic: HapticKind.none,
                 onTap: _undo,
                 child: Container(
                   height: 36,

@@ -1,7 +1,7 @@
 import 'dart:async';
+import '../theme/motion.dart';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../services/auto_expense_service.dart';
@@ -57,14 +57,14 @@ class _AutoTrackReviewScreenState extends State<AutoTrackReviewScreen> {
   }
 
   Future<void> _add(ReviewItem item) async {
-    HapticFeedback.mediumImpact();
+    AppHaptics.confirm();
     await AutoExpenseService.confirmReview(item, categoryId: _chosenCategory[item.id] ?? item.txn.categoryId);
     if (mounted) AppToast.success(context, 'Added');
     await _load();
   }
 
   Future<void> _discard(ReviewItem item) async {
-    HapticFeedback.lightImpact();
+    AppHaptics.press();
     await AutoExpenseService.discardReview(item);
     await _load();
   }

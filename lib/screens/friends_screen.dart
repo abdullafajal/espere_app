@@ -1,8 +1,8 @@
 import 'dart:async';
+import '../theme/motion.dart';
 import 'package:flutter/material.dart';
 import '../widgets/espere_header.dart';
 import '../widgets/split_switcher.dart';
-import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../widgets/espere_action_button.dart';
 import '../widgets/espere_swipe_action.dart';
@@ -201,7 +201,7 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
                     Navigator.pop(ctx);
                     
                     if (r.isSuccess) {
-                      HapticFeedback.mediumImpact();
+                      AppHaptics.confirm();
                       _loadData();
                       AppToast.success(context, 'Friend request sent!');
                     } else {
@@ -344,7 +344,7 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
                       if (!ctx.mounted) return;
                       
                       if (res.isSuccess) {
-                        HapticFeedback.mediumImpact();
+                        AppHaptics.confirm();
                         final groupData = res.data!;
                         setState(() => _selectedFriendIds = []);
                         Navigator.pop(ctx); // Close sheet
@@ -368,7 +368,7 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
                       // Groups are live-only: members get notified instantly,
                       // so never queue or fake a group while offline.
                       ss(() => isSaving = false);
-                      HapticFeedback.mediumImpact();
+                      AppHaptics.confirm();
                       AppToast.error(context, 'Internet connection is required to create a group.');
                     }
                   },
@@ -387,7 +387,7 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
   Future<void> _handleFriendAction(dynamic id, String action) async {
     final r = await ApiService.handleFriendRequest(id, action);
     if (r.isSuccess) {
-      HapticFeedback.mediumImpact();
+      AppHaptics.confirm();
       _loadData();
     } else {
       if (mounted) AppToast.error(context, r.error ?? 'Error');
@@ -397,7 +397,7 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
   Future<void> _handleGroupAction(int id, String action) async {
     final r = await ApiService.handleGroupInvitation(id, action);
     if (r.isSuccess) {
-      HapticFeedback.mediumImpact();
+      AppHaptics.confirm();
       _loadData();
     } else {
       if (mounted) AppToast.error(context, r.error ?? 'Error');

@@ -77,3 +77,14 @@ Friends is inside Split (`SplitSwitcher`: Groups | Friends).
 - Home's month chip picks a month (last 12). An earlier month shows weekly bars and
   "Saved"; every month shows **Avg / day** (`/api/dashboard/?month=YYYY-MM`, with the
   phone's numbers as fallback).
+
+## Motion and haptics (one feel everywhere)
+
+`lib/theme/motion.dart`:
+- `AppMotion.move`: spring for things that travel (the nav pill flows between tabs with
+  one soft overshoot). `AppMotion.press`: spring for a pressed button.
+- `SpringPress`: wrap any tappable; it sinks to 94% while pressed and springs back with a
+  small bounce, plus a haptic. Used by the nav, header buttons, chips, Home actions,
+  Quick add keys and categories, review buttons.
+- `AppHaptics`: `tap` (selection), `press` (light), `confirm` (medium), `warn` (heavy),
+  `land` (light tick when the nav pill arrives). Never call `HapticFeedback` directly.

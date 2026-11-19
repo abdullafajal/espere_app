@@ -1,7 +1,7 @@
 import 'dart:async';
+import '../theme/motion.dart';
 import 'package:flutter/material.dart';
 import '../widgets/espere_header.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../utils/icon_mapper.dart';
@@ -380,7 +380,7 @@ class _S extends State<SplitGroupDetailScreen>
 
                                         if (r.isSuccess) {
                                           emailCtrl.clear();
-                                          HapticFeedback.mediumImpact();
+                                          AppHaptics.confirm();
                                           _showTopMessage(
                                             'Invitation sent to $email',
                                           );
@@ -563,7 +563,7 @@ class _S extends State<SplitGroupDetailScreen>
                                       if (!ctx.mounted) return;
                                       Navigator.pop(ctx);
                                       if (allSuccess) {
-                                        HapticFeedback.mediumImpact();
+                                        AppHaptics.confirm();
                                         _load();
                                         _showTopMessage('Members added!');
                                       } else {
@@ -707,7 +707,7 @@ class _S extends State<SplitGroupDetailScreen>
                                     if (!ctx.mounted) return;
                                     Navigator.pop(ctx);
                                     if (r.isSuccess) {
-                                      HapticFeedback.mediumImpact();
+                                      AppHaptics.confirm();
                                       _load();
                                     }
                                   },
@@ -1046,7 +1046,7 @@ class _S extends State<SplitGroupDetailScreen>
                     Navigator.pop(context); // Close loading
                   }
                   if (r.isSuccess) {
-                    HapticFeedback.mediumImpact();
+                    AppHaptics.confirm();
                     _showTopMessage('Expense deleted');
                     _load();
                   } else {
@@ -1724,7 +1724,7 @@ class _S extends State<SplitGroupDetailScreen>
                                       if (!ctx.mounted) return;
                                       Navigator.pop(ctx);
                                       if (r.isSuccess) {
-                                        HapticFeedback.mediumImpact();
+                                        AppHaptics.confirm();
                                         _load();
                                         _tc.animateTo(0);
                                         if (_expScrollCtrl.hasClients) {
@@ -1942,7 +1942,7 @@ class _S extends State<SplitGroupDetailScreen>
                                       if (!ctx.mounted) return;
                                       Navigator.pop(ctx);
                                       if (r.isSuccess) {
-                                        HapticFeedback.mediumImpact();
+                                        AppHaptics.confirm();
                                         _load();
                                       } else {
                                         _showTopMessage(
@@ -1999,7 +1999,7 @@ class _S extends State<SplitGroupDetailScreen>
                         ),
                         child: PopupMenuButton<String>(
                           offset: const Offset(0, 48),
-                          onOpened: HapticFeedback.mediumImpact,
+                          onOpened: AppHaptics.confirm,
                           color: AppColors.card,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                           icon: Container(
@@ -2013,7 +2013,7 @@ class _S extends State<SplitGroupDetailScreen>
                             child: const Icon(Icons.more_vert_rounded, color: AppColors.dark, size: 20),
                           ),
                           onSelected: (val) {
-                            HapticFeedback.mediumImpact();
+                            AppHaptics.confirm();
                             if (val == 'edit') {
                               _editGroup();
                             } else if (val == 'share') {
@@ -2867,7 +2867,7 @@ class _S extends State<SplitGroupDetailScreen>
       if (!mounted) return;
       Navigator.pop(context);
       if (r.isSuccess) {
-        HapticFeedback.mediumImpact();
+        AppHaptics.confirm();
         Navigator.pop(context, true);
       } else {
         _showTopMessage(r.error ?? 'Error', isError: true);
@@ -2906,7 +2906,7 @@ class _S extends State<SplitGroupDetailScreen>
       if (!mounted) return;
       Navigator.pop(context);
       if (r.isSuccess) {
-        HapticFeedback.mediumImpact();
+        AppHaptics.confirm();
         Navigator.pop(context, true); // Pop back to groups list and refresh
       } else {
         _showTopMessage(r.error ?? 'Error', isError: true);

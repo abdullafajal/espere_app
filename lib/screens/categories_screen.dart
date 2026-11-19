@@ -3,8 +3,8 @@
 /// Displays system categories (read-only) and user categories (deletable).
 /// Includes a form to add new categories with icon and color pickers.
 import 'package:flutter/material.dart';
+import '../theme/motion.dart';
 import '../utils/app_toast.dart';
-import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../widgets/espere_action_button.dart';
 import '../widgets/espere_header.dart';
@@ -501,7 +501,7 @@ class _CategoryFormSheetState extends State<_CategoryFormSheet> {
     setState(() {
       _isSaving = true;
     });
-    HapticFeedback.mediumImpact();
+    AppHaptics.confirm();
 
     final catData = {
       'name': name,

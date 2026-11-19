@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../theme/motion.dart';
 import '../services/app_navigation.dart';
 import '../theme/app_theme.dart';
 
@@ -26,7 +26,7 @@ class SplitSwitcher extends StatelessWidget {
             onTap: on
                 ? null
                 : () {
-                    HapticFeedback.selectionClick();
+                    AppHaptics.tap();
                     AppNavigation.openTab(tab);
                   },
             child: AnimatedContainer(

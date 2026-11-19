@@ -3,10 +3,10 @@
 /// one-tap repeats → payments to review + recent.
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'dart:math' as math;
 import '../theme/app_theme.dart';
+import '../theme/motion.dart';
 import '../models/dashboard.dart';
 import '../services/cache_service.dart';
 import '../widgets/transaction_tile.dart';
@@ -19,6 +19,8 @@ import 'transaction_form_screen.dart';
 import 'quick_add_screen.dart';
 import 'auto_track_review_screen.dart';
 import 'notifications_screen.dart';
+import '../widgets/profile_avatar.dart';
+import '../widgets/home_insights.dart';
 import '../services/notification_inbox.dart';
 import '../services/api_service.dart';
 import '../models/transaction.dart';
@@ -46,6 +48,9 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
   /// Spending of the last 7 days (oldest first) and their weekday letters.
   List<double> _week = List.filled(7, 0);
   List<String> _weekDays = List.filled(7, '');
+
+  /// Everything saved on the phone (for the category and month charts).
+  List<TransactionModel> _txns = const [];
 
   /// Frequent expenses offered as one-tap repeats.
   List<_Again> _again = const [];
@@ -109,7 +114,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
   }
 
   Future<void> _openNotifications() async {
-    HapticFeedback.selectionClick();
+    AppHaptics.tap();
     await NotificationsScreen.open(context);
     _loadUnread();
     _loadExtras();
@@ -117,7 +122,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
 
   /// Month picker: this month and the 11 before it.
   Future<void> _pickMonth() async {
-    HapticFeedback.selectionClick();
+    AppHaptics.tap();
     final now = DateTime.now();
     final months = List.generate(12, (i) => DateTime(now.year, now.month - i));
     final picked = await showModalBottomSheet<DateTime>(
@@ -170,11 +175,15 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
       ),
     );
     if (picked == null || !mounted) return;
+    _selectMonth(picked);
+  }
+
+  void _selectMonth(DateTime m) {
     setState(() {
-      _month = picked;
+      _month = DateTime(m.year, m.month);
       _past = null;
     });
-    if (!_isThisMonth) _loadMonth(picked);
+    if (!_isThisMonth) _loadMonth(_month);
   }
 
   /// Numbers for an earlier month: from the transactions on this phone first, then from
@@ -261,7 +270,18 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
     var review = 0;
     if (await AutoExpenseService.isAvailable()) review = await AutoExpenseService.reviewCount();
     if (!mounted) return;
+    final all = txns
+        .map((t) {
+          try {
+            return TransactionModel.fromJson(Map<String, dynamic>.from(t));
+          } catch (_) {
+            return null;
+          }
+        })
+        .whereType<TransactionModel>()
+        .toList();
     setState(() {
+      _txns = all;
       _week = week;
       _weekDays = days;
       _again = again.take(4).toList();
@@ -272,7 +292,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
   String _money(num v, String symbol) {
     final whole = v == v.roundToDouble();
     final f = NumberFormat.decimalPatternDigits(locale: 'en_IN', decimalDigits: whole ? 0 : 2);
-    return '$symbol${f.format(v)}';
+    return '${v < 0 ? '−' : ''}$symbol${f.format(v.abs())}';
   }
 
   double _num(String s) => double.tryParse(s.replaceAll(',', '')) ?? 0;
@@ -296,7 +316,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
   }
 
   Future<void> _addAgain(_Again a, String symbol) async {
-    HapticFeedback.mediumImpact();
+    AppHaptics.confirm();
     final id = await TransactionStore.create(
       amount: a.amount,
       type: 'expense',
@@ -331,9 +351,6 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
 
   Widget _header(DashboardData d) {
     final parts = d.user.displayName.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
-    final initial = parts.isEmpty
-        ? '?'
-        : parts.take(2).map((p) => p[0].toUpperCase()).join();
     final firstName = parts.isEmpty ? '' : parts.first;
     return Padding(
       padding: const EdgeInsets.only(top: 14, bottom: 16),
@@ -345,17 +362,17 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
               button: true,
               label: 'Profile and settings',
               excludeSemantics: true,
-              child: GestureDetector(
+              child: SpringPress(
                 onTap: () async {
                   await Navigator.pushNamed(context, '/profile');
                   if (mounted) _loadDashboard();
                 },
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  alignment: Alignment.center,
-                  decoration: const BoxDecoration(color: AppColors.dark, shape: BoxShape.circle),
-                  child: Text(initial, style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.w800, fontSize: 16)),
+                child: ProfileAvatar(
+                  name: d.user.displayName,
+                  avatar: d.user.avatar,
+                  size: 44,
+                  background: AppColors.dark,
+                  foreground: AppColors.accent,
                 ),
               ),
             ),
@@ -379,7 +396,8 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
               button: true,
               label: _unread + _reviewCount > 0 ? 'Notifications, ${_unread + _reviewCount} new' : 'Notifications',
               excludeSemantics: true,
-              child: GestureDetector(
+              child: SpringPress(
+                haptic: HapticKind.none,
                 onTap: _openNotifications,
                 child: Container(
                   width: 44,
@@ -432,10 +450,10 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
         : DateFormat('MMM yyyy').format(_month);
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: BoxDecoration(
         color: AppColors.dark,
-        borderRadius: BorderRadius.circular(AppRadius.xxxl),
+        borderRadius: BorderRadius.circular(AppRadius.xxl),
         boxShadow: AppShadows.elevated,
       ),
       child: Column(
@@ -450,7 +468,8 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                 button: true,
                 label: 'Month: $chip. Change month',
                 excludeSemantics: true,
-                child: GestureDetector(
+                child: SpringPress(
+                  haptic: HapticKind.none,
                   onTap: _pickMonth,
                   child: Container(
                     height: 32,
@@ -468,7 +487,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 6),
           AnimatedOpacity(
             duration: const Duration(milliseconds: 200),
             opacity: loading ? 0.4 : 1,
@@ -479,7 +498,8 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                 crossAxisAlignment: CrossAxisAlignment.baseline,
                 textBaseline: TextBaseline.alphabetic,
                 children: [
-                  Text(_money(spent, d.currencySymbol), style: AppText.hero.copyWith(color: Colors.white)),
+                  Text(_money(spent, d.currencySymbol),
+                      style: AppText.hero.copyWith(color: Colors.white, fontSize: 34, letterSpacing: -1)),
                   if (limit > 0) ...[
                     const SizedBox(width: 8),
                     Text('of ${_money(limit, d.currencySymbol)}',
@@ -489,14 +509,14 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
               ),
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 10),
           SizedBox(
-            height: 74,
+            height: 50,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: List.generate(bars.length, (i) {
                 final on = i == highlight;
-                final h = maxBar <= 0 ? 6.0 : math.max(6.0, 52 * (bars[i] / maxBar));
+                final h = maxBar <= 0 ? 5.0 : math.max(5.0, 32 * (bars[i] / maxBar));
                 return Expanded(
                   child: Tooltip(
                     message: _money(bars[i], d.currencySymbol),
@@ -511,10 +531,10 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                             height: h,
                             decoration: BoxDecoration(
                               color: on ? AppColors.accent : AppColors.darkCardRaised,
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(6),
                             ),
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 4),
                           Text(
                             i < labels.length ? labels[i] : '',
                             maxLines: 1,
@@ -532,7 +552,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
               }),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
           Row(
             children: [
               Expanded(child: _heroStat('Avg / day', _money(avgDaily.roundToDouble(), d.currencySymbol), Colors.white)),
@@ -562,8 +582,8 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
   }
 
   Widget _heroStat(String label, String value, Color color) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-        decoration: BoxDecoration(color: AppColors.darkCard, borderRadius: BorderRadius.circular(16)),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(color: AppColors.darkCard, borderRadius: BorderRadius.circular(14)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -572,7 +592,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
             FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
-              child: Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: color)),
+              child: Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: color)),
             ),
           ],
         ),
@@ -586,11 +606,9 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
             button: true,
             label: 'Add expense',
             excludeSemantics: true,
-            child: GestureDetector(
-              onTap: () {
-                HapticFeedback.mediumImpact();
-                _openQuickAdd();
-              },
+            child: SpringPress(
+              haptic: HapticKind.confirm,
+              onTap: _openQuickAdd,
               child: Container(
                 height: 58,
                 decoration: BoxDecoration(
@@ -620,7 +638,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
           button: true,
           label: 'Scan receipt',
           excludeSemantics: true,
-          child: GestureDetector(
+          child: SpringPress(
             onTap: _scanReceipt,
             child: Container(
               width: 58,
@@ -653,7 +671,8 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                     button: true,
                     label: 'Add ${a.label} ${_money(a.amount, d.currencySymbol)} again',
                     excludeSemantics: true,
-                    child: GestureDetector(
+                    child: SpringPress(
+                      haptic: HapticKind.none,
                       onTap: () => _addAgain(a, d.currencySymbol),
                       child: Container(
                         height: 42,
@@ -688,6 +707,35 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
         ],
       ),
     );
+  }
+
+  void _edit(TransactionModel txn) => TransactionFormScreen.show(context, transactionId: txn.id, onSaved: () {
+        _loadDashboard();
+        if (!_isThisMonth) _loadMonth(_month);
+      });
+
+  Future<void> _delete(TransactionModel txn, GlobalKey<ThanosSnapWidgetState> snapKey) async {
+    final sign = txn.isIncome ? '+' : '−';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete this entry?'),
+        content: Text('${txn.notes.trim().isNotEmpty ? txn.notes.trim() : txn.category.name} '
+            '($sign${_data?.currencySymbol ?? '₹'}${txn.amount}) will be removed.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    AppHaptics.confirm();
+    await snapKey.currentState?.startSnap();
+    await TransactionStore.remove(txn.id);
+    if (!mounted) return;
+    await _loadDashboard();
+    if (!_isThisMonth) _loadMonth(_month);
+    if (mounted) AppToast.success(context, 'Deleted');
   }
 
   /// One white card: payments to review, then "Recent" with the latest entries.
@@ -775,7 +823,10 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                       transaction: txn,
                       currencySymbol: d.currencySymbol,
                       card: false,
-                      onTap: () => TransactionFormScreen.show(context, transactionId: txn.id, onSaved: _loadDashboard),
+                      showActions: true,
+                      onTap: () => _edit(txn),
+                      onEdit: () => _edit(txn),
+                      onDelete: () => _delete(txn, snapKey),
                     ),
                   );
                 }),
@@ -813,6 +864,18 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
             _actions(),
             if (_again.isNotEmpty) _againRow(d),
             _recentCard(d),
+            CategoryBreakdownCard(
+              key: ValueKey('cat${_month.year}-${_month.month}'),
+              month: _month,
+              transactions: _txns,
+              symbol: d.currencySymbol,
+            ),
+            MonthlyTrendCard(
+              selected: _month,
+              transactions: _txns,
+              symbol: d.currencySymbol,
+              onSelect: _selectMonth,
+            ),
 
           ],
         ),

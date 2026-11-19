@@ -4,7 +4,7 @@
 /// With [showActions] the row also has a visible "⋮" button (Edit / Delete) and keeps the
 /// swipe gestures as a shortcut.
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../theme/motion.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../models/transaction.dart';
@@ -92,7 +92,7 @@ class TransactionTile extends StatelessWidget {
                   tooltip: 'More',
                   icon: const Icon(Icons.more_vert_rounded, size: 20, color: AppColors.muted),
                   onSelected: (v) {
-                    HapticFeedback.selectionClick();
+                    AppHaptics.tap();
                     if (v == 'edit') onEdit?.call();
                     if (v == 'delete') onDelete?.call();
                   },

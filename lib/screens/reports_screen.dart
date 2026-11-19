@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../theme/motion.dart';
 import '../widgets/espere_header.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
@@ -94,7 +94,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       child: DropdownButtonHideUnderline(
         child: DropdownButton<int>(
           value: _selectedYear,
-          onTap: HapticFeedback.mediumImpact,
+          onTap: AppHaptics.confirm,
           items:
               years
                   .map(
