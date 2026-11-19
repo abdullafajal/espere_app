@@ -142,6 +142,44 @@ final reports = {
   ],
 };
 
+Map<String, dynamic> member(int id, String name, double net) => {
+      'id': id,
+      'display_name': name,
+      'username': name.toLowerCase(),
+      'initial': name[0],
+      'avatar_url': '',
+      'email': '${name.toLowerCase()}@example.com',
+      'net_balance': net.toStringAsFixed(2),
+    };
+
+final splitGroups = [
+  {'id': 1, 'name': 'Goa Trip', 'icon': 'flight', 'color': '#FF6B6B', 'total_members': 4, 'net_balance': '1250.00', 'is_accepted': true, 'created_by_id': 1},
+  {'id': 2, 'name': 'Flatmates', 'icon': 'home', 'color': '#4ECDC4', 'total_members': 3, 'net_balance': '-480.00', 'is_accepted': true, 'created_by_id': 2},
+  {'id': 3, 'name': 'Office Lunch', 'icon': 'restaurant', 'color': '#45B7D1', 'total_members': 6, 'net_balance': '0', 'is_accepted': true, 'created_by_id': 1},
+  {'id': 4, 'name': 'Cricket Team', 'icon': 'sports_soccer', 'color': '#96CEB4', 'total_members': 11, 'net_balance': '0', 'is_accepted': false, 'created_by_id': 3},
+];
+
+final groupDetail = {
+  ...splitGroups[0],
+  'members': [member(1, 'Abdulla', 1250), member(2, 'Talib', -500), member(3, 'Rahul', -450), member(4, 'Neha', -300)],
+  'recent_expenses': [
+    {'id': 11, 'description': 'Hotel booking', 'amount': '6000.00', 'date': _ago(days: 1), 'paid_by': member(1, 'Abdulla', 0), 'splits': [], 'split_type': 'equal', 'created_by_id': 1},
+    {'id': 12, 'description': 'Dinner at beach shack', 'amount': '2400.00', 'date': _ago(days: 2), 'paid_by': member(2, 'Talib', 0), 'splits': [], 'split_type': 'equal', 'created_by_id': 2},
+    {'id': 13, 'description': 'Scooter rent', 'amount': '1200.00', 'date': _ago(days: 3), 'paid_by': member(3, 'Rahul', 0), 'splits': [], 'split_type': 'equal', 'created_by_id': 3},
+  ],
+  'balances': [],
+  'simplified_debts': [],
+  'settlement_history': [],
+  'members_can_invite': true,
+  'invite_token': 'abc',
+};
+
+final friends = {
+  'friends': [member(2, 'Talib', 0), member(3, 'Rahul', 0), member(4, 'Neha', 0), member(5, 'Imran', 0)],
+  'pending_received': [member(6, 'Asha', 0)],
+  'pending_sent': [member(7, 'Karan', 0)],
+};
+
 /// Shared preferences the app reads its offline cache from.
 Map<String, Object> baseCache() => {
       'cache_dashboard': jsonEncode(dashboard),
@@ -150,6 +188,9 @@ Map<String, Object> baseCache() => {
       'cache_categories': jsonEncode({'categories': categories, 'currency_symbol': '₹'}),
       'cache_budgets': jsonEncode({'budgets': budgets, 'currency_symbol': '₹'}),
       'cache_reports': jsonEncode(reports),
+      'cache_split_groups': jsonEncode(splitGroups),
+      'cache_split_group_detail_1': jsonEncode(groupDetail),
+      'cache_friends': jsonEncode(friends),
     };
 
 Future<void> loadFonts() async {
@@ -182,7 +223,8 @@ void silencePlugins() {
 
 /// Renders [screen] at phone size and writes goldens/[name].png.
 Future<void> shot(WidgetTester tester, String name, Widget screen,
-    {Map<String, Object>? prefs, Size size = const Size(390, 844), bool scaffold = true}) async {
+    {Map<String, Object>? prefs, Size size = const Size(390, 844), bool scaffold = true,
+    Future<void> Function(WidgetTester t)? act}) async {
   debugDisableShadows = false;
   SharedPreferences.setMockInitialValues(prefs ?? baseCache());
   tester.view.devicePixelRatio = 2;
@@ -200,6 +242,12 @@ Future<void> shot(WidgetTester tester, String name, Widget screen,
   await tester.runAsync(() => Future.delayed(const Duration(milliseconds: 300)));
   for (var i = 0; i < 8; i++) {
     await tester.pump(const Duration(milliseconds: 120));
+  }
+  if (act != null) {
+    await act(tester);
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 120));
+    }
   }
   try {
     await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/$name.png'));

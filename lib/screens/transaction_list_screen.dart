@@ -356,7 +356,7 @@ class TransactionListScreenState extends State<TransactionListScreen> {
       children: [
         EspereHeader(
           title: 'Activity',
-          showBack: Navigator.canPop(context),
+          showBack: widget.onBack == null,
           onBack: () {
             if (Navigator.canPop(context)) {
               Navigator.pop(context);

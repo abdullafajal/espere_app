@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../widgets/espere_header.dart';
+import '../widgets/split_switcher.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../widgets/espere_action_button.dart';
@@ -411,6 +412,7 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
         child: Column(
           children: [
             _buildHeader(),
+            if (widget.onBack != null) const SplitSwitcher(current: 'friends'),
             Expanded(
               child: _buildFriendsTab(),
             ),
@@ -423,8 +425,10 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
   Widget _buildHeader() {
     final int pendingCount = _pendingReceived.length + _groupInvitations.length;
     
+    final isTab = widget.onBack != null;
     return EspereHeader(
-      title: 'Friends',
+      title: isTab ? 'Split' : 'Friends',
+      showBack: !isTab,
       onBack: () {
         if (widget.onBack != null) {
           widget.onBack!();
@@ -437,15 +441,17 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
         children: [
           if (pendingCount > 0) ...[
             EspereActionButton(
-              icon: Icons.notifications_none,
+              icon: Icons.notifications_rounded,
               showBadge: true,
+              tooltip: 'Requests',
               onPressed: _showRequestsPopup,
             ),
             const SizedBox(width: 8),
           ],
           EspereActionButton(
-            icon: Icons.add_rounded,
+            icon: Icons.person_add_rounded,
             primary: true,
+            tooltip: 'Invite a friend',
             onPressed: _inviteFriend,
           ),
         ],

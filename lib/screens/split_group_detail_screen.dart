@@ -2270,7 +2270,7 @@ class _S extends State<SplitGroupDetailScreen>
   Widget _heroChip(IconData i, String t) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
     decoration: BoxDecoration(
-      color: Colors.white.withValues(alpha: 0.08),
+      color: AppColors.darkCard,
       borderRadius: BorderRadius.circular(AppRadius.xl),
     ),
     child: Row(
@@ -2278,7 +2278,7 @@ class _S extends State<SplitGroupDetailScreen>
       children: [
         Icon(i, size: 14, color: AppColors.accent),
         const SizedBox(width: 6),
-        Text(t, style: const TextStyle(fontSize: 12, color: Color(0xCCFFFFFF))),
+        Text(t, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
       ],
     ),
   );
@@ -2292,9 +2292,9 @@ class _S extends State<SplitGroupDetailScreen>
     child: GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 46,
+        height: 48,
         decoration: BoxDecoration(
-          color: primary ? AppColors.accent : Colors.white.withValues(alpha: 0.1),
+          color: primary ? AppColors.accent : AppColors.darkCard,
           borderRadius: BorderRadius.circular(AppRadius.xl),
         ),
         child: Row(
@@ -2316,13 +2316,10 @@ class _S extends State<SplitGroupDetailScreen>
     ),
   );
 
-  /// Group colour chosen by the user (falls back to the app accent).
-  Color _groupColor() {
-    try {
-      return Color(int.parse('FF${(_g!['color'] ?? '#C8E64A').toString().replaceFirst('#', '')}', radix: 16));
-    } catch (_) {
-      return AppColors.accent;
-    }
+  String _money(dynamic v) {
+    final d = double.tryParse(v.toString()) ?? 0;
+    final f = NumberFormat.decimalPatternDigits(locale: 'en_IN', decimalDigits: d == d.roundToDouble() ? 0 : 2);
+    return '$_currencySymbol${f.format(d)}';
   }
 
   Widget _buildHero(double bal) {
@@ -2358,17 +2355,17 @@ class _S extends State<SplitGroupDetailScreen>
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
-                          color: Color(0x99FFFFFF),
+                          color: AppColors.darkMuted,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         settled
-                            ? '${_currencySymbol}0.00'
-                            : '${bal > 0 ? "+" : "-"}${_currencySymbol}${bal.abs().toStringAsFixed(2)}',
+                            ? '${_currencySymbol}0'
+                            : '${bal > 0 ? "+" : "−"}${_money(bal.abs())}',
                         style: const TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
+                          fontSize: 34,
+                          fontWeight: FontWeight.w800,
                           color: AppColors.accent,
                         ),
                       ),
@@ -2379,13 +2376,13 @@ class _S extends State<SplitGroupDetailScreen>
                 Container(
                   width: 48,
                   height: 48,
-                  decoration: BoxDecoration(
-                    color: _groupColor(),
-                    borderRadius: BorderRadius.circular(AppRadius.xl),
+                  decoration: const BoxDecoration(
+                    color: AppColors.darkCard,
+                    shape: BoxShape.circle,
                   ),
                   child: Icon(
                     IconMapper.map((_g!['icon'] ?? 'groups').toString()),
-                    color: AppColors.dark,
+                    color: AppColors.accent,
                     size: 24,
                   ),
                 ),
@@ -2515,14 +2512,14 @@ class _S extends State<SplitGroupDetailScreen>
                 Container(
                   width: 44,
                   height: 44,
-                  decoration: BoxDecoration(
-                    color: AppColors.dark,
-                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                  decoration: const BoxDecoration(
+                    color: AppColors.surface,
+                    shape: BoxShape.circle,
                   ),
                   child: const Icon(
                     Icons.receipt_long_rounded,
-                    size: 22,
-                    color: AppColors.accent,
+                    size: 21,
+                    color: AppColors.dark,
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -2555,10 +2552,10 @@ class _S extends State<SplitGroupDetailScreen>
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  '${_currencySymbol}${e['amount']}',
+                  _money(e['amount']),
                   style: const TextStyle(
                     fontSize: 15,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w800,
                     color: AppColors.text,
                   ),
                 ),

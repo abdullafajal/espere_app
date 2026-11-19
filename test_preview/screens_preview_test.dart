@@ -8,6 +8,9 @@ import 'package:espere_app/screens/transaction_form_screen.dart';
 import 'package:espere_app/screens/budgets_screen.dart';
 import 'package:espere_app/screens/reports_screen.dart';
 import 'package:espere_app/screens/categories_screen.dart';
+import 'package:espere_app/screens/split_groups_screen.dart';
+import 'package:espere_app/screens/split_group_detail_screen.dart';
+import 'package:espere_app/screens/friends_screen.dart';
 
 import 'preview_harness.dart';
 
@@ -27,4 +30,11 @@ void main() {
   testWidgets('budgets', (t) => shot(t, 'budgets', const BudgetsScreen()));
   testWidgets('reports', (t) => shot(t, 'reports', const ReportsScreen(), scaffold: false, size: const Size(390, 1800)));
   testWidgets('categories', (t) => shot(t, 'categories', const CategoriesScreen(), scaffold: false));
+  testWidgets('split', (t) => shot(t, 'split', SplitGroupsScreen(onBack: () {}), scaffold: false));
+  testWidgets('group_detail', (t) => shot(t, 'group_detail', const SplitGroupDetailScreen(groupId: 1, groupName: 'Goa Trip'), scaffold: false));
+  testWidgets('friends', (t) => shot(t, 'friends', FriendsScreen(onBack: () {}), scaffold: false));
+  testWidgets('group_balances', (t) => shot(t, 'group_balances', const SplitGroupDetailScreen(groupId: 1, groupName: 'Goa Trip'),
+      scaffold: false, act: (t) => t.tap(find.text('Balances'))));
+  testWidgets('group_settle', (t) => shot(t, 'group_settle', const SplitGroupDetailScreen(groupId: 1, groupName: 'Goa Trip'),
+      scaffold: false, act: (t) => t.tap(find.text('Settle Up').last)));
 }

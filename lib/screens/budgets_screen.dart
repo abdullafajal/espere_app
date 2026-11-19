@@ -238,7 +238,7 @@ class BudgetsScreenState extends State<BudgetsScreen> {
         // Custom Fixed Header
         EspereHeader(
           title: 'Budgets',
-          showBack: Navigator.canPop(context),
+          showBack: widget.onBack == null,
           onBack: () {
             if (widget.onBack != null) {
               widget.onBack?.call();
