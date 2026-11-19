@@ -258,7 +258,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           FittedBox(
             child: Text(
               amount,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.bold,
                 color: AppColors.accent,

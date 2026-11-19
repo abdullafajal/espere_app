@@ -44,7 +44,7 @@ class _ExportSheetState extends State<ExportSheet> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.dark(
+            colorScheme: ColorScheme.dark(
               primary: AppColors.accent,
               onPrimary: AppColors.dark,
               surface: AppColors.card,
@@ -215,7 +215,7 @@ class _ExportSheetState extends State<ExportSheet> {
                     ),
                   ),
                   if (_selectedPeriod == 'custom')
-                    const Icon(Icons.check_circle, color: AppColors.accent, size: 20),
+                    Icon(Icons.check_circle, color: AppColors.accent, size: 20),
                 ],
               ),
             ),
@@ -276,7 +276,7 @@ class _ExportSheetState extends State<ExportSheet> {
             ),
             const Spacer(),
             if (isSelected)
-              const Icon(Icons.check_circle, color: AppColors.accent, size: 20),
+              Icon(Icons.check_circle, color: AppColors.accent, size: 20),
           ],
         ),
       ),

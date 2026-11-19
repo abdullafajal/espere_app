@@ -254,7 +254,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               shape: const StadiumBorder(),
                             ),
                             child: _isLoading
-                                ? const SizedBox(
+                                ? SizedBox(
                                     width: 20,
                                     height: 20,
                                     child: CircularProgressIndicator(

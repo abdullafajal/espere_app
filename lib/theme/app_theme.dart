@@ -1,10 +1,12 @@
 /// Espere — Modern Expense & Income Tracker
 ///
-/// The whole app uses three colours: ink (near-black), white and Espere lime, plus neutral
+/// The whole app uses three colours: ink (near-black), white and an accent (Espere lime
+/// by default; the user can pick another in Settings → App colour), plus neutral
 /// greys for surfaces and secondary text. Nothing else: categories and groups have no
 /// colour of their own (icons only), and money in / out is told apart by the "+" / "−"
 /// sign, not by colour. Font: Plus Jakarta Sans (bundled, works offline).
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// ─── Design tokens ───────────────────────────────────────────────────────
 
@@ -12,9 +14,11 @@ class AppColors {
   AppColors._();
 
   // Brand
-  static const Color accent = Color(0xFFC8E64A); // lime: main action, selection, active tab
-  static const Color accentHover = Color(0xFFD9F260);
-  static const Color accentSoft = Color(0xFFEFF7CF); // light lime: highlights, "to review"
+  /// Accent (lime by default): main action, selection, active tab. The user can pick
+  /// another one in Settings (see [AppAccent]).
+  static Color get accent => AppAccent.current.color;
+  static Color get accentHover => Color.lerp(accent, Colors.white, 0.25)!;
+  static Color get accentSoft => AppAccent.current.soft; // highlights, "to review"
   static const Color dark = Color(0xFF141414); // ink
 
   // Light theme
@@ -49,23 +53,23 @@ class AppColors {
   static const Color errorLight = Color(0xFFF2F3EE);
   static const Color warning = Color(0xFF141414);
   static const Color warningLight = Color(0xFFF2F3EE);
-  static const Color success = Color(0xFFC8E64A);
-  static const Color successLight = Color(0xFFEFF7CF);
+  static Color get success => accent;
+  static Color get successLight => accentSoft;
 
   /// Every category / group icon sits on this circle, in [categoryInk].
   static const Color categoryFill = surface;
   static const Color categoryInk = dark;
 
   /// Chart series without category colours: ink, lime, then greys.
-  static const List<Color> chart = [
-    Color(0xFF141414),
-    Color(0xFFC8E64A),
-    Color(0xFF5B6058),
-    Color(0xFF9DB83A),
-    Color(0xFF8E938A),
-    Color(0xFFB9BDB5),
-    Color(0xFF3A3D38),
-    Color(0xFFDADDD5),
+  static List<Color> get chart => [
+    const Color(0xFF141414),
+    accent,
+    const Color(0xFF5B6058),
+    Color.lerp(accent, const Color(0xFF141414), 0.3)!,
+    const Color(0xFF8E938A),
+    const Color(0xFFB9BDB5),
+    const Color(0xFF3A3D38),
+    const Color(0xFFDADDD5),
   ];
   static Color chartAt(int i) => chart[i % chart.length];
 
@@ -75,6 +79,65 @@ class AppColors {
     end: Alignment.bottomRight,
     colors: [Color(0xFF141414), Color(0xFF141414)],
   );
+}
+
+/// ─── Accent choices ──────────────────────────────────────────────────────
+
+class AccentOption {
+  final String name;
+  final Color color;
+  final Color soft;
+  const AccentOption(this.name, this.color, this.soft);
+}
+
+/// The accent colour the user picked in Settings. Only light colours, so ink text and
+/// icons on it stay readable.
+class AppAccent {
+  AppAccent._();
+
+  static const _key = 'accent_colour';
+
+  static const options = [
+    AccentOption('Lime', Color(0xFFC8E64A), Color(0xFFEFF7CF)),
+    AccentOption('Mint', Color(0xFF8FE3B8), Color(0xFFDDF6E9)),
+    AccentOption('Sky', Color(0xFF9CCBFF), Color(0xFFE3F0FF)),
+    AccentOption('Lavender', Color(0xFFC3B3FF), Color(0xFFEDE8FF)),
+    AccentOption('Pink', Color(0xFFFFA8C8), Color(0xFFFFE5EF)),
+    AccentOption('Peach', Color(0xFFFFB68C), Color(0xFFFFE9DC)),
+    AccentOption('Sun', Color(0xFFF7D64A), Color(0xFFFCF3CC)),
+  ];
+
+  static int _index = 0;
+  static AccentOption get current => options[_index];
+  static int get index => _index;
+
+  /// Previews and tests: switch without saving.
+  @visibleForTesting
+  static set debugIndex(int i) => _index = i;
+
+  /// Reads the saved choice (call before runApp).
+  static Future<void> load() async {
+    try {
+      final i = (await SharedPreferences.getInstance()).getInt(_key) ?? 0;
+      _index = (i >= 0 && i < options.length) ? i : 0;
+    } catch (_) {
+      _index = 0;
+    }
+  }
+
+  /// Saves [i] and redraws every screen in the new colour.
+  static Future<void> set(int i) async {
+    if (i < 0 || i >= options.length || i == _index) return;
+    _index = i;
+    (await SharedPreferences.getInstance()).setInt(_key, i);
+    final root = WidgetsBinding.instance.rootElement;
+    if (root == null) return;
+    void rebuild(Element e) {
+      e.markNeedsBuild();
+      e.visitChildren(rebuild);
+    }
+    root.visitChildren(rebuild);
+  }
 }
 
 /// ─── Radii ───────────────────────────────────────────────────────────────
@@ -119,7 +182,7 @@ class AppShadows {
   /// The lime "Add expense" button.
   static List<BoxShadow> get accent => [
         BoxShadow(
-          color: const Color(0xFF96B02C).withValues(alpha: 0.30),
+          color: Color.lerp(AppColors.accent, const Color(0xFF141414), 0.25)!.withValues(alpha: 0.30),
           blurRadius: 20,
           offset: const Offset(0, 8),
         ),
@@ -143,7 +206,7 @@ class AppTheme {
   static const String fontFamily = 'PlusJakartaSans';
 
   static ThemeData get lightTheme {
-    const scheme = ColorScheme.light(
+    final scheme = ColorScheme.light(
       primary: AppColors.dark,
       onPrimary: Colors.white,
       secondary: AppColors.accent,
@@ -251,7 +314,7 @@ class AppTheme {
       iconButtonTheme: IconButtonThemeData(
         style: IconButton.styleFrom(foregroundColor: AppColors.dark, minimumSize: const Size(44, 44)),
       ),
-      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: AppColors.dark,
         foregroundColor: AppColors.accent,
         elevation: 4,
@@ -349,7 +412,7 @@ class AppTheme {
         hourMinuteColor: AppColors.surface,
         dayPeriodColor: AppColors.accent,
       ),
-      textSelectionTheme: const TextSelectionThemeData(
+      textSelectionTheme: TextSelectionThemeData(
         cursorColor: AppColors.dark,
         selectionColor: AppColors.accentSoft,
         selectionHandleColor: AppColors.dark,

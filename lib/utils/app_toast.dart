@@ -74,7 +74,7 @@ class AppToast {
                     Expanded(
                       child: Text(
                         message,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
                           color: AppColors.accent,

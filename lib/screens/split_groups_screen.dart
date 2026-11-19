@@ -133,7 +133,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
         children: [
           Row(
             children: [
-              Container(width: 40, height: 40, decoration: BoxDecoration(color: AppColors.accentSoft, shape: BoxShape.circle), child: const Icon(Icons.groups_rounded, color: AppColors.accent, size: 20)),
+              Container(width: 40, height: 40, decoration: BoxDecoration(color: AppColors.accentSoft, shape: BoxShape.circle), child: Icon(Icons.groups_rounded, color: AppColors.accent, size: 20)),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -195,7 +195,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
           Expanded(child: Text(u['display_name'] ?? u['username'] ?? '', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.text))),
           if (isReceived) ...[
             IconButton(onPressed: () => _handleFriendAction(req['id'], 'reject'), icon: const Icon(Icons.close_rounded, color: AppColors.error, size: 20)),
-            IconButton(onPressed: () => _handleFriendAction(req['id'], 'accept'), icon: const Icon(Icons.check_rounded, color: AppColors.success, size: 20)),
+            IconButton(onPressed: () => _handleFriendAction(req['id'], 'accept'), icon: Icon(Icons.check_rounded, color: AppColors.success, size: 20)),
           ] else
             TextButton(onPressed: () => _handleFriendAction(req['id'], 'cancel'), child: const Text('Cancel', style: TextStyle(color: AppColors.muted, fontSize: 12))),
         ],
@@ -383,7 +383,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
                     },
                     child: isSaving 
                         ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: AppColors.dark, strokeWidth: 2))
-                        : const Text('Create Group', style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold, fontSize: 16)),
+                        : Text('Create Group', style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold, fontSize: 16)),
                   ),
                 ),
               ],
@@ -509,7 +509,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
               borderRadius: BorderRadius.circular(AppRadius.xxxl),
               boxShadow: AppShadows.elevated,
             ),
-            child: const Icon(Icons.groups_rounded, size: 44, color: AppColors.accent),
+            child: Icon(Icons.groups_rounded, size: 44, color: AppColors.accent),
           ),
           const SizedBox(height: 20),
           const Text(
@@ -643,7 +643,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
             net.abs() < 0.5
                 ? 'All settled up'
                 : '${net > 0 ? '+' : '−'}$_currencySymbol${NumberFormat.decimalPattern('en_IN').format(net.abs().round())}',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 30,
               fontWeight: FontWeight.bold,
               color: AppColors.accent,
@@ -803,7 +803,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
                             color: AppColors.dark,
                             borderRadius: BorderRadius.circular(22),
                           ),
-                          child: const Text(
+                          child: Text(
                             'Accept',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
@@ -938,7 +938,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
                   },
                   child: isSaving 
                       ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: AppColors.dark, strokeWidth: 2))
-                      : const Text('Save Changes', style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold, fontSize: 16)),
+                      : Text('Save Changes', style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold, fontSize: 16)),
                 ),
               ),
             ],
@@ -1036,7 +1036,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
                 Expanded(
                   child: Text(
                     message,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.accent,
                       fontSize: 14,
                       fontWeight: FontWeight.bold,

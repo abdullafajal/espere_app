@@ -156,7 +156,7 @@ class _BudgetTileState extends State<BudgetTile> {
               ),
               child: Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.warning_amber_rounded,
                     size: 16,
                     color: AppColors.accent,
@@ -165,7 +165,7 @@ class _BudgetTileState extends State<BudgetTile> {
                   Expanded(
                     child: Text(
                       'Budget exceeded by ${_m(double.parse(widget.budget['spent'].toString()) - double.parse(widget.budget['amount'].toString()))}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.accent,
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
