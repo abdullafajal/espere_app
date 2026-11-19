@@ -39,7 +39,7 @@ Plus Jakarta Sans, bundled in `assets/fonts/` (works offline). Styles in `AppTex
 | Main action | Lime pill / circle with ink text (`FilledButton`, `EspereActionButton(primary: true)`) |
 | Primary button | Ink, lime text (`ElevatedButton`) |
 | Secondary | Ink outline (`OutlinedButton`) or grey pill |
-| Header | `EspereHeader`: round 44 px back button, bold title; top-level tabs have no back button |
+| Header | `EspereHeader`: round 44 px back button, bold title; top-level tabs have no back button. Header buttons (`EspereActionButton`) are all white with an ink icon, never the accent |
 | Filter chips | `EspereFilterChip`: white pill, ink when active; `dropdown: false` for toggles |
 | List rows | Grey icon circle, bold title, grey second line, amount on the right, visible `⋮` for Edit/Delete (swipe still works) |
 | Switches | Ink track, lime knob |
