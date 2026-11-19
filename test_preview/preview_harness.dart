@@ -161,14 +161,31 @@ final splitGroups = [
 
 final groupDetail = {
   ...splitGroups[0],
-  'members': [member(1, 'Abdulla', 1250), member(2, 'Talib', -500), member(3, 'Rahul', -450), member(4, 'Neha', -300)],
+  'members': [
+    {...member(1, 'Abdulla', 1250), 'is_accepted': true, 'is_creator': true},
+    {...member(2, 'Talib', -500), 'is_accepted': true},
+    {...member(3, 'Rahul', -450), 'is_accepted': true},
+    {...member(4, 'Neha', -300), 'is_accepted': true},
+    {...member(5, 'Imran', 0), 'is_accepted': false},
+  ],
+  'pending_invites': [
+    {'email': 'sam@gmail.com', 'invited_by': 'Abdulla', 'created_at': _ago(days: 2)},
+  ],
   'recent_expenses': [
-    {'id': 11, 'description': 'Hotel booking', 'amount': '6000.00', 'date': _ago(days: 1), 'paid_by': member(1, 'Abdulla', 0), 'splits': [], 'split_type': 'equal', 'created_by_id': 1},
-    {'id': 12, 'description': 'Dinner at beach shack', 'amount': '2400.00', 'date': _ago(days: 2), 'paid_by': member(2, 'Talib', 0), 'splits': [], 'split_type': 'equal', 'created_by_id': 2},
+    {'id': 11, 'description': 'Hotel booking', 'amount': '6000.00', 'date': _ago(days: 1), 'paid_by': member(1, 'Abdulla', 0), 'splits': [
+      {'user_id': 1, 'amount': '1500.00'}, {'user_id': 2, 'amount': '1500.00'}, {'user_id': 3, 'amount': '1500.00'}, {'user_id': 4, 'amount': '1500.00'},
+    ], 'split_type': 'equal', 'created_by_id': 1},
+    {'id': 12, 'description': 'Dinner at beach shack', 'amount': '2400.00', 'date': _ago(days: 2), 'paid_by': member(2, 'Talib', 0), 'splits': [
+      {'user_id': 1, 'amount': '600.00'}, {'user_id': 2, 'amount': '600.00'}, {'user_id': 3, 'amount': '600.00'}, {'user_id': 4, 'amount': '600.00'},
+    ], 'split_type': 'equal', 'created_by_id': 2},
     {'id': 13, 'description': 'Scooter rent', 'amount': '1200.00', 'date': _ago(days: 3), 'paid_by': member(3, 'Rahul', 0), 'splits': [], 'split_type': 'equal', 'created_by_id': 3},
   ],
   'balances': [],
-  'simplified_debts': [],
+  'simplified_debts': [
+    {'from_user': 'Talib', 'from_user_id': 2, 'to_user': 'Abdulla', 'to_user_id': 1, 'amount': '500.00'},
+    {'from_user': 'Rahul', 'from_user_id': 3, 'to_user': 'Abdulla', 'to_user_id': 1, 'amount': '450.00'},
+    {'from_user': 'Neha', 'from_user_id': 4, 'to_user': 'Abdulla', 'to_user_id': 1, 'amount': '300.00'},
+  ],
   'settlement_history': [],
   'members_can_invite': true,
   'invite_token': 'abc',

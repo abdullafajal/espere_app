@@ -7,6 +7,7 @@ import '../theme/app_theme.dart';
 import '../utils/pickers.dart';
 import '../widgets/spring_menu.dart';
 import '../widgets/spring_tabs.dart';
+import 'group_invite_screen.dart';
 import '../utils/icon_mapper.dart';
 import '../utils/avatar_cache.dart';
 import '../services/api_service.dart';
@@ -260,339 +261,6 @@ class _S extends State<SplitGroupDetailScreen>
       borderSide: const BorderSide(color: AppColors.dark, width: 1.5),
     ),
   );
-
-  void _addMember() async {
-    List<Map<String, dynamic>> friends = [];
-    List<int> selectedIds = [];
-    bool loadingFriends = true;
-    final emailCtrl = TextEditingController();
-    bool isInviting = false;
-    String? emailError;
-
-    final res = await ApiService.getFriends();
-    if (res.isSuccess) {
-      final allFriends = List<Map<String, dynamic>>.from(res.data!['friends']);
-      final existingIds =
-          (_g!['members'] as List).map((m) => m['id'] as int).toSet();
-      friends =
-          allFriends.where((f) => !existingIds.contains(f['id'])).toList();
-    }
-    loadingFriends = false;
-
-    if (!mounted) return;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.background,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-      ),
-      builder:
-          (ctx) => StatefulBuilder(
-            builder:
-                (ctx, ss) => Container(
-                  padding: EdgeInsets.fromLTRB(
-                    24,
-                    12,
-                    24,
-                    MediaQuery.of(ctx).viewInsets.bottom + 24,
-                  ),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Center(
-                          child: Container(
-                            width: 36,
-                            height: 4,
-                            decoration: BoxDecoration(
-                              color: AppColors.muted.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        const Center(
-                          child: Text(
-                            'Add Members',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.text,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 32),
-                        const Text(
-                          'Invite by Email',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.muted,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: emailCtrl,
-                                onChanged: (v) {
-                                  if (emailError != null)
-                                    ss(() => emailError = null);
-                                },
-                                decoration: _inputDeco(
-                                  'Friend\'s email address...',
-                                ).copyWith(errorText: emailError),
-                                style: const TextStyle(fontSize: 14),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            GestureDetector(
-                              onTap:
-                                  isInviting
-                                      ? null
-                                      : () async {
-                                        final email = emailCtrl.text.trim();
-                                        if (email.isEmpty) {
-                                          ss(
-                                            () =>
-                                                emailError =
-                                                    'Please enter an email',
-                                          );
-                                          return;
-                                        }
-                                        if (!email.contains('@')) {
-                                          ss(
-                                            () =>
-                                                emailError =
-                                                    'Invalid email format',
-                                          );
-                                          return;
-                                        }
-
-                                        ss(() => isInviting = true);
-                                        final r =
-                                            await ApiService.addSplitMember(
-                                              widget.groupId,
-                                              identifier: email,
-                                            );
-                                        ss(() => isInviting = false);
-
-                                        if (r.isSuccess) {
-                                          emailCtrl.clear();
-                                          AppHaptics.confirm();
-                                          _showTopMessage(
-                                            'Invitation sent to $email',
-                                          );
-                                        } else {
-                                          _showTopMessage(
-                                            r.error ?? 'Error',
-                                            isError: true,
-                                          );
-                                        }
-                                      },
-                              child: Container(
-                                width: 48,
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  color: AppColors.dark,
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                                child:
-                                    isInviting
-                                        ? const Center(
-                                          child: SizedBox(
-                                            width: 20,
-                                            height: 20,
-                                            child: CircularProgressIndicator(color: AppColors.dark,
-                                              strokeWidth: 2,
-                                            ),
-                                          ),
-                                        )
-                                        : Icon(
-                                          Icons.send_rounded,
-                                          color: AppColors.accent,
-                                          size: 20,
-                                        ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 32),
-                        const Text(
-                          'Select Friends',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.muted,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        if (loadingFriends)
-                          const Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(20),
-                              child: CircularProgressIndicator(color: AppColors.dark,
-                              ),
-                            ),
-                          )
-                        else if (friends.isEmpty)
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              color: AppColors.card,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: AppColors.border),
-                            ),
-                            child: const Text(
-                              'No other friends to add.',
-                              style: TextStyle(
-                                color: AppColors.muted,
-                                fontSize: 13,
-                              ),
-                            ),
-                          )
-                        else ...[
-                          ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxHeight: MediaQuery.of(ctx).size.height * 0.3,
-                            ),
-                            child: ListView.builder(
-                              shrinkWrap: true,
-                              itemCount: friends.length,
-                              itemBuilder: (ctx, i) {
-                                final f = friends[i];
-                                final fid = f['id'] as int;
-                                final isSelected = selectedIds.contains(fid);
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 8),
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color:
-                                          isSelected
-                                              ? AppColors.accent.withOpacity(
-                                                0.05,
-                                              )
-                                              : AppColors.card,
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(
-                                        color:
-                                            isSelected
-                                                ? AppColors.accent
-                                                : AppColors.border,
-                                      ),
-                                    ),
-                                    child: CheckboxListTile(
-                                      value: isSelected,
-                                      onChanged:
-                                          (v) => ss(() {
-                                            if (v!)
-                                              selectedIds.add(fid);
-                                            else
-                                              selectedIds.remove(fid);
-                                          }),
-                                      title: Text(
-                                        f['display_name'] ??
-                                            f['username'] ??
-                                            '',
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600,
-                                          color: AppColors.text,
-                                        ),
-                                      ),
-                                      subtitle: Text(
-                                        f['email'] ?? '',
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          color: AppColors.muted,
-                                        ),
-                                      ),
-                                      secondary: UserAvatar(
-                                        initial: f['initial'] ?? '?',
-                                        avatarUrl: f['avatar_url'],
-                                        size: 36,
-                                      ),
-                                      activeColor: AppColors.accent,
-                                      checkColor: AppColors.dark,
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
-                                            horizontal: 12,
-                                          ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 32),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 52,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.accent,
-                              foregroundColor: AppColors.dark,
-                              disabledBackgroundColor: AppColors.accent
-                                  .withOpacity(0.3),
-                              disabledForegroundColor: AppColors.dark
-                                  .withOpacity(0.3),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              elevation: 0,
-                            ),
-                            onPressed:
-                                selectedIds.isEmpty
-                                    ? null
-                                    : () async {
-                                      bool allSuccess = true;
-                                      for (final id in selectedIds) {
-                                        final r =
-                                            await ApiService.addSplitMember(
-                                              widget.groupId,
-                                              identifier: id.toString(),
-                                            );
-                                        if (!r.isSuccess) allSuccess = false;
-                                      }
-                                      if (!ctx.mounted) return;
-                                      Navigator.pop(ctx);
-                                      if (allSuccess) {
-                                        AppHaptics.confirm();
-                                        _load();
-                                        _showTopMessage('Members added!');
-                                      } else {
-                                        _showTopMessage(
-                                          'Some members could not be added.',
-                                          isError: true,
-                                        );
-                                      }
-                                    },
-                            child: Text(
-                              'Add ${selectedIds.length} Selected',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-          ),
-    );
-  }
 
   void _editGroup() {
     final nc = TextEditingController(text: widget.groupName);
@@ -2002,29 +1670,18 @@ class _S extends State<SplitGroupDetailScreen>
                     ? SpringMenuButton<String>(
                         tooltip: 'Group options',
                         items: [
-                          if (_g!['created_by_id'] == _myId)
-                            const SpringMenuItem('edit', Icons.edit_rounded, 'Edit group'),
-                          if (_g!['members_can_invite'] == true || _g!['created_by_id'] == _myId)
-                            const SpringMenuItem('share', Icons.share_rounded, 'Share invite'),
-                          const SpringMenuItem('add', Icons.person_add_rounded, 'Add member'),
-                          const SpringMenuItem('leave', Icons.exit_to_app_rounded, 'Leave group', destructive: true),
+                          if (_canInvite)
+                            const SpringMenuItem('invite', Icons.person_add_rounded, 'Invite people'),
+                          if (_isOwner) const SpringMenuItem('edit', Icons.edit_rounded, 'Edit group'),
+                          const SpringMenuItem('leave', Icons.logout_rounded, 'Leave group', destructive: true),
+                          if (_isOwner)
+                            const SpringMenuItem('delete', Icons.delete_outline_rounded, 'Delete group', destructive: true),
                         ],
                         onSelected: (val) {
-                          if (val == 'edit') {
-                            _editGroup();
-                          } else if (val == 'share') {
-                            final token = _g!['invite_token'];
-                            final me = _g!['members'].firstWhere((m) => m['id'] == _myId,
-                                orElse: () => {'username': '', 'display_name': 'Someone'});
-                            final myUsername = me['username'];
-                            final myName = me['display_name'];
-                            final url = 'https://espere.in/invite/$token?ref=$myUsername';
-                            Share.share('Join $myName\'s split group on Espere! $url');
-                          } else if (val == 'add') {
-                            _addMember();
-                          } else if (val == 'leave') {
-                            _leaveGroup();
-                          }
+                          if (val == 'invite') _openInvite();
+                          if (val == 'edit') _editGroup();
+                          if (val == 'leave') _leaveGroup();
+                          if (val == 'delete') _deleteGroup();
                         },
                         child: Container(
                           width: 44,
@@ -2072,7 +1729,7 @@ class _S extends State<SplitGroupDetailScreen>
                                       child: Container(
                                         child: SpringTabs(
                                           controller: _tc,
-                                          labels: const ['Expenses', 'Balances', 'Settle Up'],
+                                          labels: const ['Activity', 'Balances', 'Members'],
                                         ),
                                       ),
                                     ),
@@ -2081,7 +1738,7 @@ class _S extends State<SplitGroupDetailScreen>
                               ],
                           body: TabBarView(
                             controller: _tc,
-                            children: [_expTab(), _balTab(), _setTab()],
+                            children: [_expTab(), _setTab(), _membersTab()],
                           ),
                         ),
               ),
@@ -2203,6 +1860,211 @@ class _S extends State<SplitGroupDetailScreen>
     );
   }
 
+  bool get _isOwner => _myId != null && _g?['created_by_id'] == _myId;
+  bool get _canInvite => _isOwner || _g?['members_can_invite'] == true;
+
+  Future<void> _openInvite() async {
+    if (_g == null) return;
+    if (!_canInvite) {
+      _showTopMessage('Only the group admin can invite people to this group.', isError: true);
+      return;
+    }
+    final members = List<Map<String, dynamic>>.from(_g!['members'] ?? const []);
+    final me = members.firstWhere((m) => m['id'] == _myId, orElse: () => const {'username': ''});
+    final changed = await GroupInviteScreen.open(
+      context,
+      GroupInviteScreen(
+        groupId: widget.groupId,
+        groupName: (_g!['name'] ?? widget.groupName).toString(),
+        inviteToken: (_g!['invite_token'] ?? '').toString(),
+        myUsername: (me['username'] ?? '').toString(),
+        members: members,
+        pendingInvites: List<Map<String, dynamic>>.from(_g!['pending_invites'] ?? const []),
+      ),
+    );
+    if (changed && mounted) _load();
+  }
+
+  /// Members: invite, everyone with their balance and a ⋮ menu, people still to join,
+  /// and the group's own settings.
+  Widget _membersTab() {
+    final all = List<Map<String, dynamic>>.from(_g!['members'] ?? const []);
+    final joined = all.where((m) => m['is_accepted'] != false).toList()
+      ..sort((a, b) => (a['id'] == _myId ? 0 : 1).compareTo(b['id'] == _myId ? 0 : 1));
+    final waiting = all.where((m) => m['is_accepted'] == false).toList();
+    final emails = List<Map<String, dynamic>>.from(_g!['pending_invites'] ?? const []);
+
+    Widget card(List<Widget> rows) => Container(
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: BorderRadius.circular(22),
+            boxShadow: AppShadows.soft,
+          ),
+          child: Column(children: [
+            for (var i = 0; i < rows.length; i++) ...[
+              if (i > 0) const Divider(height: 1, indent: 66, endIndent: 14),
+              rows[i],
+            ],
+          ]),
+        );
+    Widget row(Widget lead, String title, String sub, Widget? trailing, {VoidCallback? onTap}) => InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Row(children: [
+              lead,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(title, style: AppText.rowTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 1),
+                  Text(sub, style: AppText.rowSub, maxLines: 1, overflow: TextOverflow.ellipsis),
+                ]),
+              ),
+              if (trailing != null) ...[const SizedBox(width: 8), trailing],
+            ]),
+          ),
+        );
+    Widget label(String t) => Padding(padding: const EdgeInsets.fromLTRB(6, 16, 6, 6), child: Text(t, style: AppText.label));
+    Widget iconBox(IconData i, {bool accent = false}) => Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: accent ? AppColors.accent : AppColors.surface,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Icon(i, size: 21, color: AppColors.dark),
+        );
+
+    List<Widget> memberRows() => [
+          for (final m in joined)
+            Builder(builder: (_) {
+              final b = double.tryParse(m['net_balance'].toString()) ?? 0;
+              final me = m['id'] == _myId;
+              final name = me ? 'You' : (m['display_name'] ?? m['username'] ?? '').toString();
+              final role = m['is_creator'] == true || m['id'] == _g!['created_by_id'] ? 'Admin · ' : '';
+              final sub = b.abs() < 0.01
+                  ? '${role}All settled'
+                  : b > 0
+                      ? '${role}Gets back ${_money(b)}'
+                      : '${role}Owes ${_money(b.abs())}';
+              final items = <SpringMenuItem<String>>[
+                if (!me && b < -0.009) const SpringMenuItem('remind', Icons.notifications_active_rounded, 'Send a reminder'),
+                if (me) const SpringMenuItem('leave', Icons.logout_rounded, 'Leave group', destructive: true),
+                if (!me && _isOwner)
+                  const SpringMenuItem('remove', Icons.person_remove_rounded, 'Remove from group', destructive: true),
+              ];
+              return row(
+                UserAvatar(initial: (m['initial'] ?? name).toString(), avatarUrl: m['avatar_url'], size: 40),
+                name,
+                sub,
+                items.isEmpty
+                    ? null
+                    : SpringMenuButton<String>(
+                        items: items,
+                        onSelected: (v) async {
+                          if (v == 'leave') _leaveGroup();
+                          if (v == 'remove') {
+                            if (b.abs() >= 0.01) {
+                              _showTopMessage('${m['display_name'] ?? 'They'} must settle up before being removed.',
+                                  isError: true);
+                              return;
+                            }
+                            _removeMember(m);
+                          }
+                          if (v == 'remind') {
+                            final r = await ApiService.sendSplitReminder(
+                              widget.groupId,
+                              {'user_id': m['id'], 'amount': b.abs().toStringAsFixed(2)},
+                            );
+                            if (!mounted) return;
+                            _showTopMessage(r.isSuccess ? 'Reminder sent' : (r.error ?? 'Error'), isError: !r.isSuccess);
+                          }
+                        },
+                      ),
+              );
+            }),
+        ];
+
+    List<Widget> waitingRows() => [
+          for (final m in waiting)
+            row(
+              UserAvatar(initial: (m['initial'] ?? '?').toString(), avatarUrl: m['avatar_url'], size: 40),
+              (m['display_name'] ?? m['username'] ?? '').toString(),
+              'Invited · waiting for them to accept',
+              _canInvite
+                  ? SpringMenuButton<String>(
+                      items: const [
+                        SpringMenuItem('resend', Icons.notifications_active_rounded, 'Send again'),
+                        SpringMenuItem('cancel', Icons.close_rounded, 'Cancel invite', destructive: true),
+                      ],
+                      onSelected: (v) => _manageInvite(v, userId: m['id'] as int?),
+                    )
+                  : null,
+            ),
+          for (final e in emails)
+            row(
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: AppColors.mutedLight, width: 2)),
+                child: const Icon(Icons.mail_rounded, size: 18, color: AppColors.muted),
+              ),
+              (e['email'] ?? '').toString(),
+              'Invited by email · not on Espere yet',
+              _canInvite
+                  ? SpringMenuButton<String>(
+                      items: const [
+                        SpringMenuItem('resend', Icons.send_rounded, 'Email again'),
+                        SpringMenuItem('cancel', Icons.close_rounded, 'Cancel invite', destructive: true),
+                      ],
+                      onSelected: (v) => _manageInvite(v, email: (e['email'] ?? '').toString()),
+                    )
+                  : null,
+            ),
+        ];
+
+    return RefreshIndicator(
+      onRefresh: _load,
+      color: AppColors.dark,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
+        children: [
+          if (_canInvite)
+            card([
+              row(iconBox(Icons.person_add_rounded, accent: true), 'Invite people', 'Link, username, email or friends',
+                  const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+                  onTap: _openInvite),
+            ]),
+          label('MEMBERS · ${joined.length}'),
+          card(memberRows()),
+          if (waiting.isNotEmpty || emails.isNotEmpty) ...[
+            label('WAITING TO JOIN'),
+            card(waitingRows()),
+          ],
+          label('GROUP'),
+          card([
+            if (_isOwner)
+              row(iconBox(Icons.edit_rounded), 'Edit group', 'Name, icon and who can invite',
+                  const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+                  onTap: _editGroup),
+            row(iconBox(Icons.logout_rounded), 'Leave group', 'Only when you are settled up', null, onTap: _leaveGroup),
+            if (_isOwner)
+              row(iconBox(Icons.delete_outline_rounded), 'Delete group', 'Removes it for everyone', null,
+                  onTap: _deleteGroup),
+          ]),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _manageInvite(String action, {String? email, int? userId}) async {
+    final r = await ApiService.manageSplitInvite(widget.groupId, action, email: email, userId: userId);
+    if (!mounted) return;
+    _showTopMessage(r.isSuccess ? (r.data ?? 'Done') : (r.error ?? 'Error'), isError: !r.isSuccess);
+    if (r.isSuccess) _load();
+  }
+
   Widget _heroChip(IconData i, String t) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
     decoration: BoxDecoration(
@@ -2256,6 +2118,68 @@ class _S extends State<SplitGroupDetailScreen>
     final d = double.tryParse(v.toString()) ?? 0;
     final f = NumberFormat.decimalPatternDigits(locale: 'en_IN', decimalDigits: d == d.roundToDouble() ? 0 : 2);
     return '$_currencySymbol${f.format(d)}';
+  }
+
+  /// "Rahul owes you ₹6,000 · you owe Talib ₹1,500" from the simplified debts.
+  String _heroSummary() {
+    final debts = List<Map<String, dynamic>>.from(_g?['simplified_debts'] ?? const []);
+    final parts = <String>[];
+    for (final d in debts) {
+      if (d['to_user_id'] == _myId) parts.add('${d['from_user']} owes you ${_money(d['amount'])}');
+      if (d['from_user_id'] == _myId) parts.add('you owe ${d['to_user']} ${_money(d['amount'])}');
+    }
+    if (parts.length > 2) return '${parts.take(2).join(' · ')} · +${parts.length - 2} more';
+    return parts.join(' · ');
+  }
+
+  /// Up to four member faces, then "+N".
+  Widget _faces() {
+    final m = List<Map<String, dynamic>>.from(_g?['members'] ?? const [])
+        .where((x) => x['is_accepted'] != false)
+        .toList();
+    final shown = m.take(4).toList();
+    final extra = m.length - shown.length;
+    return SizedBox(
+      height: 34,
+      child: Stack(children: [
+        for (var i = 0; i < shown.length; i++)
+          Positioned(
+            left: i * 24.0,
+            child: Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: shown[i]['id'] == _myId ? AppColors.accent : AppColors.surface,
+                border: Border.all(color: AppColors.dark, width: 2),
+              ),
+              clipBehavior: Clip.antiAlias,
+              alignment: Alignment.center,
+              child: (shown[i]['avatar_url'] ?? '').toString().isNotEmpty
+                  ? Image.network(shown[i]['avatar_url'].toString(), width: 30, height: 30, fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Text((shown[i]['initial'] ?? '?').toString(),
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.dark)))
+                  : Text((shown[i]['initial'] ?? '?').toString(),
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.dark)),
+            ),
+          ),
+        if (extra > 0)
+          Positioned(
+            left: shown.length * 24.0,
+            child: Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: AppColors.darkCardRaised,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.dark, width: 2),
+              ),
+              alignment: Alignment.center,
+              child: Text('+$extra', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white)),
+            ),
+          ),
+      ]),
+    );
   }
 
   Widget _buildHero(double bal) {
@@ -2324,28 +2248,48 @@ class _S extends State<SplitGroupDetailScreen>
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
+            if (_heroSummary().isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(_heroSummary(),
+                  maxLines: 2, overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, color: AppColors.darkMuted)),
+            ],
+            const SizedBox(height: 14),
+            Row(
               children: [
-                _heroChip(Icons.people_alt_outlined, '$members ${members == 1 ? 'member' : 'members'}'),
+                Expanded(child: _faces()),
+                if (_canInvite)
+                  SpringPress(
+                    onTap: _openInvite,
+                    child: Container(
+                      height: 36,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(color: AppColors.darkCardRaised, borderRadius: BorderRadius.circular(18)),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(Icons.person_add_rounded, size: 18, color: AppColors.accent),
+                        const SizedBox(width: 6),
+                        const Text('Invite', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white)),
+                      ]),
+                    ),
+                  )
+                else
+                  _heroChip(Icons.people_alt_outlined, '$members ${members == 1 ? 'member' : 'members'}'),
               ],
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 16),
             Row(
               children: [
                 _heroButton(
                   icon: Icons.add_rounded,
-                  label: 'Add Expense',
+                  label: 'Add expense',
                   primary: true,
                   onTap: _addExpense,
                 ),
                 const SizedBox(width: 12),
                 _heroButton(
                   icon: Icons.handshake_outlined,
-                  label: 'Settle Up',
-                  onTap: () => _tc.animateTo(2),
+                  label: 'Settle up',
+                  onTap: () => _tc.animateTo(1),
                 ),
               ],
             ),
@@ -2434,9 +2378,26 @@ class _S extends State<SplitGroupDetailScreen>
           final payer = e['paid_by'] is Map
               ? (e['paid_by']['display_name'] ?? e['paid_by']['username'])
               : null;
+          final paidByMe = paidById != null && paidById == _myId;
+          final total = double.tryParse(e['amount'].toString()) ?? 0;
+          final splits = List<Map<String, dynamic>>.from(e['splits'] ?? const []);
+          final mine = splits.where((x) => x['user_id'] == _myId).fold<double>(
+              0, (sum, x) => sum + (double.tryParse(x['amount'].toString()) ?? 0));
+          final String tag;
+          final double shown;
+          if (paidByMe) {
+            tag = total - mine > 0.009 ? 'you lent' : 'your own';
+            shown = total - mine > 0.009 ? total - mine : total;
+          } else if (mine > 0.009) {
+            tag = 'you owe';
+            shown = mine;
+          } else {
+            tag = 'not involved';
+            shown = total;
+          }
           final subtitle = [
+            if (payer != null) '${paidByMe ? 'You' : payer} paid ${_money(total)}',
             if (f.isNotEmpty) f,
-            if (payer != null) 'Paid by ${e['paid_by']['id'] == _myId ? 'you' : payer}',
           ].join(' · ');
 
           Widget cardContent = Container(
@@ -2486,13 +2447,19 @@ class _S extends State<SplitGroupDetailScreen>
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  _money(e['amount']),
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.text,
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(tag, style: AppText.rowSub.copyWith(fontSize: 11)),
+                    Text(
+                      _money(shown),
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: tag == 'not involved' ? AppColors.muted : AppColors.text,
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(width: 4),
                 const Icon(
@@ -2570,161 +2537,6 @@ class _S extends State<SplitGroupDetailScreen>
         },
       ),
     );
-  }
-
-  Widget _balTab() {
-    final m = List<Map<String, dynamic>>.from(_g!['members'] ?? []);
-    final allSettled = m.every(
-      (x) => (double.tryParse(x['net_balance'].toString()) ?? 0).abs() < 0.01,
-    );
-
-    return RefreshIndicator(
-      onRefresh: _load,
-      color: AppColors.dark,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Padding(
-                padding: EdgeInsets.only(left: 4),
-                child: Text(
-                  'Member Balances',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.text,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ...m.map((x) {
-            final b = double.tryParse(x['net_balance'].toString()) ?? 0;
-            final isSettled = b.abs() < 0.01;
-            final isOwner = _myId != null && _myId == _g!['created_by_id'];
-            final isSelf = _myId != null && _myId == x['id'];
-            final canRemove = isSettled && (isOwner || isSelf);
-
-            Widget memberCard = Container(
-              padding: const EdgeInsets.all(14),
-              decoration: const BoxDecoration(
-                color: AppColors.card,
-                // Shadow moved to outer if needed, or kept here if not swipable, but swipe requires no inner radius
-              ),
-              child: Row(
-                children: [
-                  UserAvatar(
-                    initial: x['initial'] ?? '?',
-                    avatarUrl: x['avatar_url'],
-                    size: 44,
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          x['display_name'] ?? x['username'] as String,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.text,
-                          ),
-                        ),
-                        if (b > 0)
-                          Text(
-                            'Gets back ${_currencySymbol}${b.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: AppColors.muted,
-                            ),
-                          )
-                        else if (b < 0)
-                          Text(
-                            'To pay ${_currencySymbol}${b.abs().toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: AppColors.muted,
-                            ),
-                          )
-                        else
-                          const Text(
-                            'Settled up',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppColors.muted,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  if (isSettled)
-                    const Icon(
-                      Icons.check_circle_rounded,
-                      size: 22,
-                      color: AppColors.dark,
-                    )
-                  else
-                    _amountPill(
-                      '${b > 0 ? "+" : "-"}${_currencySymbol}${b.abs().toStringAsFixed(0)}',
-                      receive: b > 0,
-                    ),
-                ],
-              ),
-            );
-
-            Widget finalCard;
-            if (canRemove) {
-              finalCard = EspereSwipeAction(
-                dismissKey: ValueKey('member_${x['id']}'),
-                direction: DismissDirection.startToEnd,
-                confirmDismiss: (direction) async {
-                  _removeMember(x);
-                  return false;
-                },
-                bgIcon: Icons.person_remove,
-                bgColor: AppColors.dark,
-                bgIconColor: AppColors.accent,
-                bgAlignment: Alignment.centerLeft,
-                borderRadius: BorderRadius.circular(20),
-                child: memberCard,
-              );
-            } else {
-              finalCard = memberCard;
-            }
-
-            final memberKey = _memberSnapKeys.putIfAbsent(
-              x['id'] as int,
-              () => GlobalKey<ThanosSnapWidgetState>(),
-            );
-            return ThanosSnapWidget(
-              key: memberKey,
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(AppRadius.xxl),
-                  boxShadow: AppShadows.card,
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(AppRadius.xxl),
-                  child: finalCard,
-                ),
-              ),
-            );
-          }).toList(),
-        ],
-      ),
-    );
-  }
-
-  void _editMember(Map<String, dynamic> member) {
-    // Logic for editing a member (e.g. changing display name or role)
-    _showTopMessage('Member details can be edited from their profile.');
   }
 
   void _removeMember(Map<String, dynamic> member) async {
@@ -2860,7 +2672,7 @@ class _S extends State<SplitGroupDetailScreen>
           const Padding(
             padding: EdgeInsets.only(left: 4, bottom: 8),
             child: Text(
-              'Suggested Settlements',
+              'Who pays whom',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -2910,26 +2722,39 @@ class _S extends State<SplitGroupDetailScreen>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                x['from_user'] as String,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.text,
-                                ),
+                                x['from_user_id'] == _myId
+                                    ? 'You pay ${x['to_user']}'
+                                    : x['to_user_id'] == _myId
+                                        ? '${x['from_user']} pays you'
+                                        : '${x['from_user']} pays ${x['to_user']}',
+                                style: AppText.rowTitle,
                               ),
                               Text(
-                                'to pay ${x['to_user']}',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: AppColors.muted,
-                                ),
+                                x['to_user_id'] == _myId
+                                    ? 'Remind them, or mark it received'
+                                    : x['from_user_id'] == _myId
+                                        ? 'Pay them, then mark it paid'
+                                        : 'Between them',
+                                style: AppText.rowSub,
                               ),
                             ],
                           ),
                         ),
-                        _amountPill('${_currencySymbol}${x['amount']}', receive: _myId == x['to_user_id']),
+                        _amountPill(_money(x['amount']), receive: _myId == x['to_user_id']),
                       ],
                     ),
+                    if (_myId == x['from_user_id']) ...[
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 44,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _settle(x),
+                          icon: const Icon(Icons.check_rounded, size: 18),
+                          label: const Text('Mark as paid'),
+                        ),
+                      ),
+                    ],
                     if (_myId == x['to_user_id']) ...[
                       const SizedBox(height: 10),
                       const Divider(color: AppColors.border, height: 1),
@@ -3024,7 +2849,7 @@ class _S extends State<SplitGroupDetailScreen>
                                 ),
                               ),
                               child: const Text(
-                                'Settle',
+                                'Received',
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,

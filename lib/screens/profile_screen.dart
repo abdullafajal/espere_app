@@ -3,6 +3,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import '../theme/motion.dart';
 import '../widgets/espere_header.dart';
 import 'package:image_cropper/image_cropper.dart';
@@ -806,6 +807,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  /// Shares the app's download page, with the user's username as the referrer.
+  Future<void> _shareApp() async {
+    final ref = (_user?.username ?? '').trim();
+    final link = ref.isEmpty ? 'https://espere.in' : 'https://espere.in/?ref=$ref';
+    await Share.share(
+      'I track my spending and split bills with friends on Espere. It works offline and '
+      'adds expenses in a tap. Get it here: $link',
+      subject: 'Try Espere',
+    );
+  }
+
   /// Name and photo.
   Future<void> _editProfile() async {
     final saved = await showModalBottomSheet<bool>(
@@ -977,6 +989,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ReminderSetting(!_reminders[slot]!.on, _reminders[slot]!.minutes),
                               ),
                             ),
+                        ]),
+                        _group('SPREAD THE WORD', [
+                          _row(
+                            icon: Icons.share_rounded,
+                            label: 'Share Espere',
+                            hint: 'Invite friends to track and split together',
+                            onTap: _shareApp,
+                          ),
                         ]),
                         _group('SECURITY', [
                           _row(
