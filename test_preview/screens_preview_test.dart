@@ -37,6 +37,11 @@ void main() {
         ]),
       ), size: const Size(320, 300)));
   testWidgets('notifications', (t) => shot(t, 'notifications', const NotificationsScreen(), scaffold: false));
+  testWidgets('notifications_delete', (t) => shot(t, 'notifications_delete', const NotificationsScreen(), scaffold: false,
+          act: (t) async {
+        await t.drag(find.text('Goa Trip: new expense'), const Offset(-300, 0));
+        await t.pumpAndSettle();
+      }));
   testWidgets('home_past_month', (t) => shot(t, 'home_past_month', const DashboardScreen(), act: (t) async {
         await t.tap(find.byIcon(Icons.expand_more_rounded).first);
         await t.pumpAndSettle();

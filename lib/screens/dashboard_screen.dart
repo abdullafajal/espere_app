@@ -384,7 +384,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                 children: [
                   Text('Good ${d.greeting.toLowerCase()}', style: AppText.rowSub),
                   Text(
-                    firstName,
+                    d.user.displayName.trim().isEmpty ? firstName : d.user.displayName.trim(),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.text),

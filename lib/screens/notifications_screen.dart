@@ -13,6 +13,7 @@ import '../services/notification_inbox.dart';
 import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/espere_header.dart';
+import '../widgets/thanos_snap_widget.dart';
 import 'auto_track_review_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
@@ -75,6 +76,30 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     NotificationService.openAction(data);
   }
 
+  final Map<int, GlobalKey<ThanosSnapWidgetState>> _snapKeys = {};
+
+  Future<void> _delete(InboxItem i) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('Delete this notification?'),
+            content: Text('"${i.title}" will be removed from this list.'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+              TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+            ],
+          ),
+    );
+    if (ok != true || !mounted) return;
+    AppHaptics.confirm();
+    await _snapKeys[i.id]?.currentState?.startSnap();
+    if (!mounted) return;
+    setState(() => _items = _items.where((x) => x.id != i.id).toList());
+    _snapKeys.remove(i.id);
+    await NotificationInbox.delete(i.id);
+  }
+
   Future<void> _openReview() async {
     await Navigator.push(context, MaterialPageRoute(builder: (_) => const AutoTrackReviewScreen()));
     _load();
@@ -125,12 +150,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             EspereHeader(
               title: 'Notifications',
               onBack: () => Navigator.pop(context),
-              trailing: unread == 0
-                  ? null
-                  : TextButton(
-                      onPressed: () => NotificationInbox.markRead(),
-                      child: const Text('Mark all read'),
-                    ),
+              trailing:
+                  unread == 0
+                      ? null
+                      : TextButton(onPressed: () => NotificationInbox.markRead(), child: const Text('Mark all read')),
             ),
             Expanded(
               child: RefreshIndicator(
@@ -139,10 +162,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
                   children: [
-                    if (_review > 0) ...[
-                      _reviewCard(),
-                      const SizedBox(height: 16),
-                    ],
+                    if (_review > 0) ...[_reviewCard(), const SizedBox(height: 16)],
                     if (_offline && _items.isNotEmpty)
                       const Padding(
                         padding: EdgeInsets.only(bottom: 12),
@@ -214,10 +234,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(6, 0, 6, 6),
-            child: Text(title, style: AppText.label),
-          ),
+          Padding(padding: const EdgeInsets.fromLTRB(6, 0, 6, 6), child: Text(title, style: AppText.label)),
           Container(
             decoration: BoxDecoration(
               color: AppColors.card,
@@ -249,67 +266,70 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         padding: const EdgeInsets.only(right: 20),
         child: Icon(Icons.delete_outline_rounded, color: AppColors.accent),
       ),
-      onDismissed: (_) {
-        AppHaptics.confirm();
-        setState(() => _items = _items.where((x) => x.id != i.id).toList());
-        NotificationInbox.delete(i.id);
+      // Ask first, then play the delete animation (if it is on) instead of sliding away.
+      confirmDismiss: (_) async {
+        await _delete(i);
+        return false;
       },
-      child: Material(
-        color: i.isRead ? AppColors.card : AppColors.accentSoft,
-        child: InkWell(
-          onTap: () => _openItem(i),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: i.isRead ? AppColors.surface : AppColors.card,
-                    shape: BoxShape.circle,
+      child: ThanosSnapWidget(
+        key: _snapKeys.putIfAbsent(i.id, () => GlobalKey<ThanosSnapWidgetState>()),
+        child: Material(
+          color: i.isRead ? AppColors.card : AppColors.accentSoft,
+          child: InkWell(
+            onTap: () => _openItem(i),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: i.isRead ? AppColors.surface : AppColors.card,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(_icon(i), size: 21, color: AppColors.dark),
                   ),
-                  child: Icon(_icon(i), size: 21, color: AppColors.dark),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              i.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppText.rowTitle.copyWith(
-                                fontWeight: i.isRead ? FontWeight.w600 : FontWeight.w800,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                i.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppText.rowTitle.copyWith(
+                                  fontWeight: i.isRead ? FontWeight.w600 : FontWeight.w800,
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(_when(i.createdAt), style: AppText.rowSub.copyWith(fontSize: 11)),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(i.message, style: AppText.rowSub, maxLines: 3, overflow: TextOverflow.ellipsis),
-                    ],
-                  ),
-                ),
-                if (!i.isRead) ...[
-                  const SizedBox(width: 8),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 6),
-                    child: Container(
-                      width: 9,
-                      height: 9,
-                      decoration: const BoxDecoration(color: AppColors.dark, shape: BoxShape.circle),
+                            const SizedBox(width: 8),
+                            Text(_when(i.createdAt), style: AppText.rowSub.copyWith(fontSize: 11)),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(i.message, style: AppText.rowSub, maxLines: 3, overflow: TextOverflow.ellipsis),
+                      ],
                     ),
                   ),
+                  if (!i.isRead) ...[
+                    const SizedBox(width: 8),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Container(
+                        width: 9,
+                        height: 9,
+                        decoration: const BoxDecoration(color: AppColors.dark, shape: BoxShape.circle),
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),
@@ -332,7 +352,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           const Text('You are all caught up', style: AppText.section),
           const SizedBox(height: 4),
           Text(
-            _offline ? 'Connect to the internet to check for new ones.' : 'Daily reminders and split updates show up here.',
+            _offline
+                ? 'Connect to the internet to check for new ones.'
+                : 'Daily reminders and split updates show up here.',
             style: AppText.rowSub,
             textAlign: TextAlign.center,
           ),
