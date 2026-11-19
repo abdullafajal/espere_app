@@ -5,7 +5,7 @@ import '../theme/app_theme.dart';
 /// Dropdown-style filter chip used on list screens (same height, shape and active state
 /// everywhere). Active = ink with white text.
 class EspereFilterChip extends StatelessWidget {
-  static const double height = 40;
+  static const double height = 36;
 
   final String label;
   final VoidCallback onTap;
@@ -20,6 +20,9 @@ class EspereFilterChip extends StatelessWidget {
   /// Show the dropdown arrow (false for plain toggle chips).
   final bool dropdown;
 
+  /// Optional icon before the label.
+  final IconData? icon;
+
   const EspereFilterChip({
     super.key,
     required this.label,
@@ -28,6 +31,7 @@ class EspereFilterChip extends StatelessWidget {
     this.active = false,
     this.expand = false,
     this.dropdown = true,
+    this.icon,
   });
 
   @override
@@ -46,7 +50,7 @@ class EspereFilterChip extends StatelessWidget {
         child: Container(
           height: height,
           width: expand ? double.infinity : null,
-          padding: EdgeInsets.only(left: 16, right: dropdown ? 8 : 16),
+          padding: EdgeInsets.only(left: icon != null ? 12 : 16, right: dropdown ? 8 : 16),
           decoration: BoxDecoration(
             color: bg,
             borderRadius: BorderRadius.circular(height / 2),
@@ -55,6 +59,10 @@ class EspereFilterChip extends StatelessWidget {
           child: Row(
             mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
             children: [
+              if (icon != null) ...[
+                Icon(icon, size: 16, color: fg),
+                const SizedBox(width: 4),
+              ],
               Flexible(
                 fit: expand ? FlexFit.tight : FlexFit.loose,
                 child: Text(

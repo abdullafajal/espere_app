@@ -48,6 +48,12 @@ Touch targets are at least 44 px.
 
 Floating dark bar: **Home · Activity · ( + ) · Budgets · Split**. The middle `+` opens
 **Quick add** (`lib/screens/quick_add_screen.dart`): keypad, tap a category to save, Undo.
+Editing a transaction and checking a scanned receipt use the same screen
+(`QuickAddScreen.edit` / `.prefilled`): a category tap selects it and the lime Save button
+stores the change; the bin icon deletes.
+
+Settings (avatar on Home) holds Currency, Categories, Reports, Auto-track, reminders,
+password and Log out. Export is the share button on Activity.
 Friends is inside Split (`SplitSwitcher`: Groups | Friends).
 
 ## Checking screens without a phone
