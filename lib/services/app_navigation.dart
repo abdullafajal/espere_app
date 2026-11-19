@@ -12,4 +12,8 @@ class AppNavigation {
   static final ValueNotifier<int?> requestedTab = ValueNotifier<int?>(null);
 
   static void openTab(int index) => requestedTab.value = index;
+
+  /// Whether the floating nav bar is showing (it hides while scrolling down). Lists use
+  /// it to size the space under their last item (see NavBottomSpace).
+  static final ValueNotifier<bool> navVisible = ValueNotifier<bool>(true);
 }

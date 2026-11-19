@@ -88,3 +88,7 @@ Friends is inside Split (`SplitSwitcher`: Groups | Friends).
   Quick add keys and categories, review buttons.
 - `AppHaptics`: `tap` (selection), `press` (light), `confirm` (medium), `warn` (heavy),
   `land` (light tick when the nav pill arrives). Never call `HapticFeedback` directly.
+- Scrolling: `EspereScrollBehavior` (set on MaterialApp) makes every list bounce at its
+  ends on `AppMotion.move`; main.dart gives one `land` tick when a list reaches its end.
+- Tab lists end with `NavBottomSpace` instead of a fixed bottom padding: room for the nav
+  bar while it shows, a small margin while it is hidden.

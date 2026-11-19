@@ -944,27 +944,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           _row(
                             icon: Icons.palette_rounded,
                             label: 'App colour',
-                            hint: 'Buttons, selected items and highlights',
+                            hint: 'Buttons and highlights',
                             value: AppAccent.current.name,
                             onTap: _pickAccent,
                           ),
-                        ]),
-                        _group('REMINDERS', [
-                          for (final slot in ReminderSlot.values)
-                            _row(
-                              icon: slot == ReminderSlot.morning ? Icons.wb_sunny_rounded : Icons.nightlight_round,
-                              label: slot == ReminderSlot.morning ? 'Morning reminder' : 'Night reminder',
-                              hint: slot == ReminderSlot.morning
-                                  ? "Yesterday's total, plan the day"
-                                  : "Today's total, add what's left",
-                              value: DailyReminders.label(_reminders[slot]!.minutes),
-                              on: _reminders[slot]!.on,
-                              onTap: () => _pickReminderTime(slot),
-                              onToggle: () => _setReminder(
-                                slot,
-                                ReminderSetting(!_reminders[slot]!.on, _reminders[slot]!.minutes),
-                              ),
-                            ),
                           _row(
                             icon: Icons.auto_awesome_rounded,
                             label: 'Delete animation',
@@ -976,6 +959,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               await prefs.setBool('enable_shredder_anim', _shredderAnimation);
                             },
                           ),
+                        ]),
+                        _group('REMINDERS', [
+                          for (final slot in ReminderSlot.values)
+                            _row(
+                              icon: slot == ReminderSlot.morning ? Icons.wb_sunny_rounded : Icons.nightlight_round,
+                              label: slot == ReminderSlot.morning ? 'Morning reminder' : 'Night reminder',
+                              hint: _reminders[slot]!.on
+                                  ? 'At ${DailyReminders.label(_reminders[slot]!.minutes)} · tap to change'
+                                  : 'Off',
+                              on: _reminders[slot]!.on,
+                              onTap: () => _pickReminderTime(slot),
+                              onToggle: () => _setReminder(
+                                slot,
+                                ReminderSetting(!_reminders[slot]!.on, _reminders[slot]!.minutes),
+                              ),
+                            ),
                         ]),
                         _group('SECURITY', [
                           _row(

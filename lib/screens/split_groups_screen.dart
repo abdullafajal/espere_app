@@ -5,6 +5,7 @@ import '../widgets/espere_header.dart';
 import '../widgets/split_switcher.dart';
 import '../widgets/espere_swipe_action.dart';
 import '../theme/app_theme.dart';
+import '../widgets/nav_space.dart';
 import '../widgets/espere_action_button.dart';
 import '../utils/app_toast.dart';
 import '../widgets/espere_back_button.dart';
@@ -466,10 +467,13 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
                     onRefresh: _loadGroups,
                     color: AppColors.dark,
                     child: ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
-                      itemCount: _groups.length + 1,
-                      itemBuilder: (_, i) =>
-                          i == 0 ? _buildOverview() : _buildGroupCard(i - 1),
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                      itemCount: _groups.length + 2,
+                      itemBuilder: (_, i) => i == 0
+                          ? _buildOverview()
+                          : i > _groups.length
+                              ? const NavBottomSpace()
+                              : _buildGroupCard(i - 1),
                     ),
                   ),
             ),
