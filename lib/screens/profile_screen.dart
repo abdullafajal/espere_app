@@ -1,9 +1,9 @@
-/// Profile Screen — exact match of profile.html.
-///
-import 'dart:io';
+/// Settings: profile card (Edit opens name and photo), then MONEY, REMINDERS and
+/// SECURITY rows, and Log out.
+library;
+
 import 'package:flutter/material.dart';
 import '../widgets/espere_header.dart';
-import 'package:image/image.dart' as img;
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import '../theme/app_theme.dart';
@@ -13,11 +13,11 @@ import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/cache_service.dart';
 import '../services/connectivity_service.dart';
-import '../widgets/espere_back_button.dart';
 import '../services/sync_service.dart';
 import '../services/widget_service.dart';
 import '../services/auto_expense_service.dart';
 import 'auto_track_settings_screen.dart';
+import 'reports_screen.dart';
 import '../widgets/espere_input.dart';
 import '../utils/app_toast.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -62,6 +62,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     _loadProfile();
+    _loadCounts();
     _loadAutoTrack();
   }
 
@@ -503,32 +504,247 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return '$b$a';
   }
 
-  Widget _buildSectionHeader(String title) {
+  int _categoryCount = 0;
+  int _pending = 0;
+
+  Future<void> _loadCounts() async {
+    final cats = await CacheService.getCachedCategories();
+    final pending = await SyncService.pendingCount();
+    if (!mounted) return;
+    setState(() {
+      _categoryCount = ((cats?['categories'] as List?) ?? const []).length;
+      _pending = pending;
+    });
+  }
+
+  /// "MONEY" etc. above a white group card.
+  Widget _group(String title, List<Widget> rows) {
+    final children = <Widget>[];
+    for (var i = 0; i < rows.length; i++) {
+      if (i > 0) children.add(const Divider(height: 1, thickness: 1, color: Color(0xFFF0F1EC)));
+      children.add(rows[i]);
+    }
     return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 8, top: 24),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 2,
-          color: AppColors.muted,
+      padding: const EdgeInsets.only(top: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(6, 0, 6, 6),
+            child: Text(title, style: AppText.label.copyWith(letterSpacing: 0.6)),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: BorderRadius.circular(22),
+              boxShadow: AppShadows.soft,
+            ),
+            child: Column(children: children),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// One settings row: grey rounded icon, label + hint, then a value and chevron or a
+  /// switch.
+  Widget _row({
+    required IconData icon,
+    required String label,
+    String? hint,
+    String? value,
+    bool? on,
+    required VoidCallback onTap,
+  }) {
+    return Semantics(
+      button: on == null,
+      toggled: on,
+      child: InkWell(
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 60),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(14)),
+                  child: Icon(icon, size: 21, color: AppColors.dark),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(label, style: AppText.rowTitle),
+                      if (hint != null) ...[
+                        const SizedBox(height: 1),
+                        Text(hint, style: AppText.rowSub),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (on != null)
+                  _switch(on)
+                else ...[
+                  if (value != null)
+                    Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.muted)),
+                  const Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.muted),
+                ],
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildCard({required List<Widget> children}) {
+  Widget _avatar(double size) {
+    final initials = _user?.initials ?? '?';
+    final fallback = Center(
+      child: Text(initials,
+          style: TextStyle(fontSize: size * 0.36, fontWeight: FontWeight.w800, color: AppColors.dark)),
+    );
     return Container(
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(AppRadius.xxl),
-        boxShadow: AppShadows.card,
-      ),
-      child: Column(
-        children: children,
+      width: size,
+      height: size,
+      decoration: const BoxDecoration(color: AppColors.accent, shape: BoxShape.circle),
+      child: _getAvatarUrl().isNotEmpty
+          ? ClipOval(child: CachedAvatarImage(url: _getAvatarUrl(), size: size, fallback: fallback))
+          : fallback,
+    );
+  }
+
+  Widget _profileCard() {
+    final synced = _pending == 0;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: AppColors.dark, borderRadius: BorderRadius.circular(24)),
+      child: Row(
+        children: [
+          _avatar(56),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _user?.displayName ?? '',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Colors.white),
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Icon(synced ? Icons.cloud_done_rounded : Icons.cloud_upload_rounded,
+                        size: 15, color: AppColors.accent),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        synced ? 'Synced' : '$_pending change${_pending == 1 ? '' : 's'} waiting to sync',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12, color: AppColors.darkMuted),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Material(
+            color: const Color(0xFF262924),
+            borderRadius: BorderRadius.circular(19),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(19),
+              onTap: _editProfile,
+              child: const SizedBox(
+                height: 38,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 14),
+                  child: Center(
+                    child: Text('Edit', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white)),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
+  }
+
+  /// Name and photo.
+  Future<void> _editProfile() async {
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.card,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(ctx).viewInsets.bottom),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Edit profile', style: AppText.section),
+              const SizedBox(height: 16),
+              Center(
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _pickImage();
+                  },
+                  child: Stack(
+                    children: [
+                      _avatar(80),
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: AppColors.dark,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                          child: const Icon(Icons.photo_camera_rounded, size: 14, color: AppColors.accent),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Center(child: Text('Tap to change photo', style: AppText.rowSub)),
+              const SizedBox(height: 16),
+              EspereInput(label: 'First name', hint: 'First name', controller: _firstNameController),
+              const SizedBox(height: 12),
+              EspereInput(label: 'Last name', hint: 'Last name', controller: _lastNameController),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (saved == true) {
+      await _save();
+    } else if (_user != null) {
+      _firstNameController.text = _user!.firstName;
+      _lastNameController.text = _user!.lastName;
+    }
   }
 
   /// On/off switch drawn like the app's switches (ink track, lime knob).
@@ -549,101 +765,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       );
 
-  Widget _buildRow({
-    IconData? icon,
-    Widget? customIcon,
-    required String title,
-    String? value,
-    String? subtitle,
-    Widget? trailing,
-    bool showDivider = true,
-    Color? iconColor,
-    Color? textColor,
-    Color? backgroundColor,
-    VoidCallback? onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppRadius.xxl),
-      child: Container(
-        decoration: BoxDecoration(
-          color: backgroundColor ?? Colors.transparent,
-          borderRadius: BorderRadius.circular(AppRadius.xxl),
-        ),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-              child: Row(
-                children: [
-                  if (customIcon != null) ...[
-                    customIcon,
-                    const SizedBox(width: 16),
-                  ] else if (icon != null) ...[
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: const BoxDecoration(
-                        color: AppColors.surface,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(icon, size: 20, color: AppColors.dark),
-                    ),
-                    const SizedBox(width: 16),
-                  ] else ...[
-                    const SizedBox(width: 52), // Matches icon size + spacing
-                  ],
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: textColor ?? AppColors.text,
-                          ),
-                        ),
-                        if (value != null) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            value,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: textColor ?? AppColors.text,
-                            ),
-                          ),
-                        ],
-                        if (subtitle != null) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            subtitle,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.muted,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  if (trailing != null) trailing,
-                ],
-              ),
-            ),
-            if (showDivider)
-              const Divider(height: 1, thickness: 1, indent: 16, endIndent: 16, color: AppColors.border),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    // Current currency symbol for custom icon
     final currentCurrency = _currencies.firstWhere((c) => c.$1 == _currency, orElse: () => _currencies.first);
 
     return Scaffold(
@@ -653,252 +776,92 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ? const Center(child: CircularProgressIndicator(color: AppColors.dark))
             : Column(
                 children: [
-                  EspereHeader(
-                    title: 'Settings',
-                    onBack: () => Navigator.pop(context),
-                  ),
+                  EspereHeader(title: 'Settings', onBack: () => Navigator.pop(context)),
                   Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          // ─── Avatar Section ────────────────────
-                        GestureDetector(
-                          onTap: _pickImage,
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              Container(
-                                width: 88,
-                                height: 88,
-                                decoration: const BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: AppColors.dark,
-                                ),
-                                child: _getAvatarUrl().isNotEmpty
-                                    ? ClipOval(
-                                        child: CachedAvatarImage(
-                                          url: _getAvatarUrl(),
-                                          size: 88,
-                                          fallback: Center(
-                                            child: Text(
-                                              _user?.initials ?? '?',
-                                              style: const TextStyle(
-                                                fontSize: 32,
-                                                fontWeight: FontWeight.w800,
-                                                color: AppColors.accent,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      )
-                                    : Center(
-                                        child: Text(
-                                          _user?.initials ?? '?',
-                                          style: const TextStyle(
-                                            fontSize: 32,
-                                            fontWeight: FontWeight.w800,
-                                            color: AppColors.accent,
-                                          ),
-                                        ),
-                                      ),
-                              ),
-                              Positioned(
-                                right: 0,
-                                bottom: 0,
-                                child: Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.accent,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.white, width: 2),
-                                  ),
-                                  child: const Icon(
-                                    Icons.edit_rounded,
-                                    size: 14,
-                                    color: AppColors.dark,
-                                  ),
-                                ),
-                              ),
-                            ],
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
+                      children: [
+                        _profileCard(),
+                        _group('MONEY', [
+                          _row(
+                            icon: Icons.currency_rupee_rounded,
+                            label: 'Currency',
+                            hint: currentCurrency.$3,
+                            value: _currency,
+                            onTap: _showCurrencyPicker,
                           ),
-                        ),
+                          _row(
+                            icon: Icons.category_rounded,
+                            label: 'Categories',
+                            hint: 'Names and icons',
+                            value: _categoryCount > 0 ? '$_categoryCount' : null,
+                            onTap: () async {
+                              await Navigator.pushNamed(context, '/categories');
+                              _loadCounts();
+                            },
+                          ),
+                          _row(
+                            icon: Icons.pie_chart_rounded,
+                            label: 'Reports',
+                            hint: 'Where your money goes',
+                            onTap: () => Navigator.push(
+                                context, MaterialPageRoute(builder: (_) => const ReportsScreen())),
+                          ),
+                          if (_autoTrackAvailable)
+                            _row(
+                              icon: Icons.bolt_rounded,
+                              label: 'Auto-track payments',
+                              hint: 'From UPI & bank notifications',
+                              on: _autoTrackOn,
+                              onTap: _toggleAutoTrack,
+                            ),
+                        ]),
+                        _group('REMINDERS', [
+                          _row(
+                            icon: Icons.notifications_rounded,
+                            label: 'Daily reminder',
+                            hint: 'A nudge to log your spending',
+                            on: _emailReminders,
+                            onTap: () {
+                              setState(() => _emailReminders = !_emailReminders);
+                              _save();
+                            },
+                          ),
+                          _row(
+                            icon: Icons.auto_awesome_rounded,
+                            label: 'Delete animation',
+                            hint: 'Entries fade away when deleted',
+                            on: _shredderAnimation,
+                            onTap: () async {
+                              setState(() => _shredderAnimation = !_shredderAnimation);
+                              final prefs = await SharedPreferences.getInstance();
+                              await prefs.setBool('enable_shredder_anim', _shredderAnimation);
+                            },
+                          ),
+                        ]),
+                        _group('SECURITY', [
+                          _row(
+                            icon: Icons.lock_rounded,
+                            label: 'Change password',
+                            hint: _user?.email,
+                            onTap: _showChangePasswordDialog,
+                          ),
+                        ]),
                         const SizedBox(height: 16),
-                        Text(
-                          _user?.displayName ?? '',
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.text,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _user?.email ?? '',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: AppColors.muted,
-                          ),
-                        ),
-                        
-                        const SizedBox(height: 24),
-                        
-                        // ─── Sections ────────────────────
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: _buildSectionHeader('PERSONAL INFORMATION'),
-                        ),
-                        _buildCard(
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.all(20),
-                              child: Column(
-                                children: [
-                                  EspereInput(
-                                    label: 'First Name',
-                                    hint: 'First name',
-                                    controller: _firstNameController,
-                                  ),
-                                  const SizedBox(height: 16),
-                                  EspereInput(
-                                    label: 'Last Name',
-                                    hint: 'Last name',
-                                    controller: _lastNameController,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: _buildSectionHeader('PREFERENCES'),
-                        ),
-                        _buildCard(
-                          children: [
-                            _buildRow(
-                              icon: Icons.payments_rounded,
-                              title: 'Currency',
-                              subtitle: currentCurrency.$3,
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    _currency,
-                                    style: const TextStyle(fontSize: 14, color: AppColors.text, fontWeight: FontWeight.w500),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  const Icon(Icons.chevron_right_rounded, color: AppColors.text, size: 20),
-                                ],
-                              ),
-                              onTap: _showCurrencyPicker,
-                            ),
-                            if (_autoTrackAvailable)
-                              _buildRow(
-                                icon: Icons.bolt_rounded,
-                                title: 'Auto-track payments',
-                                subtitle: _autoTrackOn
-                                    ? 'On · from UPI & bank notifications'
-                                    : 'Add expenses from payment notifications',
-                                onTap: _openAutoTrack,
-                                trailing: GestureDetector(
-                                  onTap: _toggleAutoTrack,
-                                  child: _switch(_autoTrackOn),
-                                ),
-                              ),
-                            _buildRow(
-                              icon: Icons.notifications_rounded,
-                              title: 'Daily Reminders',
-                              subtitle: 'Alerts for tracking limits',
-                              showDivider: false,
-                              trailing: GestureDetector(
-                                onTap: () {
-                                  setState(() => _emailReminders = !_emailReminders);
-                                  _save();
-                                },
-                                child: _switch(_emailReminders),
-                              ),
-                            ),
-
-                            _buildRow(
-                              icon: Icons.animation_rounded,
-                              title: 'Delete Animation',
-                              showDivider: false,
-                              trailing: GestureDetector(
-                                onTap: () async {
-                                  setState(() => _shredderAnimation = !_shredderAnimation);
-                                  final prefs = await SharedPreferences.getInstance();
-                                  await prefs.setBool('enable_shredder_anim', _shredderAnimation);
-                                },
-                                child: _switch(_shredderAnimation),
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: _buildSectionHeader('SECURITY'),
-                        ),
-                        _buildCard(
-                          children: [
-                            _buildRow(
-                              icon: Icons.lock_outline_rounded,
-                              title: 'Change Password',
-                              trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.text, size: 20),
-                              onTap: _showChangePasswordDialog,
-                            ),
-                            _buildRow(
-                              icon: Icons.logout_rounded,
-                              iconColor: AppColors.error,
-                              textColor: AppColors.error,
-                              title: 'Log Out',
-                              showDivider: false,
-                              onTap: _logout,
-                            ),
-                          ],
-                        ),
-                        
-                        const SizedBox(height: 40),
-                        
-                        // Save button
                         SizedBox(
-                          width: double.infinity,
-                          height: 52,
-                          child: ElevatedButton(
-                            onPressed: _isSaving ? null : _save,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.dark,
-                              foregroundColor: AppColors.accent,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(AppRadius.xl),
-                              ),
-                            ),
-                            child: _isSaving
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: AppColors.accent,
-                                    ),
-                                  )
-                                : const Text(
-                                    'Save Changes',
-                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                                  ),
+                          height: 48,
+                          child: TextButton.icon(
+                            onPressed: _isSaving ? null : _logout,
+                            icon: const Icon(Icons.logout_rounded, size: 20),
+                            label: const Text('Log out', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                            style: TextButton.styleFrom(foregroundColor: AppColors.dark),
                           ),
                         ),
-
-                        const SizedBox(height: 32),
                       ],
                     ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
       ),
     );
   }

@@ -1,7 +1,7 @@
 name: espere_app
 description: "Espere — Modern Expense & Income Tracker"
 publish_to: 'none'
-version: 1.1.0+7
+version: 1.1.1+8
 
 environment:
   sdk: ^3.7.0
