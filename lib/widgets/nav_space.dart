@@ -1,12 +1,10 @@
-/// Space at the end of a tab's list for the floating nav bar: the bar's height while it
-/// shows, a small margin while it is hidden (it hides when you scroll down), so there is
-/// never an empty band under the last card. Outside the tabs (pushed screens) it is just
-/// the margin.
+/// Space at the end of a tab's list for the floating nav bar, which the home shell always
+/// shows at the end of a list, so the last card is never hidden and no empty band is
+/// left. Outside the tabs (pushed screens) it is just a margin.
 library;
 
 import 'package:flutter/material.dart';
 
-import '../services/app_navigation.dart';
 
 /// Marks the home tabs, where the nav bar floats over the content.
 class NavScope extends InheritedWidget {
@@ -25,17 +23,12 @@ class NavBottomSpace extends StatelessWidget {
   static const double _withNav = 96;
   static const double _margin = 20;
 
+  /// Fixed height: changing it while a list bounces at its end made the bounce jerk.
+  /// The home shell brings the nav bar back at the end of a list, so this space is never
+  /// left empty there.
   @override
   Widget build(BuildContext context) {
     final inset = MediaQuery.paddingOf(context).bottom;
-    if (!NavScope.isIn(context)) return SizedBox(height: _margin + inset);
-    return ValueListenableBuilder<bool>(
-      valueListenable: AppNavigation.navVisible,
-      builder: (_, visible, __) => AnimatedContainer(
-        duration: const Duration(milliseconds: 420),
-        curve: visible ? Curves.easeOutBack : Curves.easeOutCubic,
-        height: (visible ? _withNav : _margin) + inset,
-      ),
-    );
+    return SizedBox(height: (NavScope.isIn(context) ? _withNav : _margin) + inset);
   }
 }

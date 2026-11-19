@@ -1,4 +1,3 @@
-import 'package:espere_app/services/app_navigation.dart';
 import 'package:espere_app/theme/motion.dart';
 import 'package:espere_app/widgets/nav_space.dart';
 import 'package:flutter/material.dart';
@@ -35,19 +34,11 @@ void main() {
     expect(controller.offset, closeTo(0, 0.5));
   });
 
-  testWidgets('space under a tab list follows the nav bar', (t) async {
-    AppNavigation.navVisible.value = true;
+  testWidgets('space under a tab list stays fixed (room for the nav bar)', (t) async {
     await t.pumpWidget(const MaterialApp(home: NavScope(child: Column(children: [NavBottomSpace()]))));
-    expect(t.getSize(find.byType(AnimatedContainer)).height, 96);
-    AppNavigation.navVisible.value = false;
-    await t.pumpAndSettle();
-    expect(t.getSize(find.byType(AnimatedContainer)).height, 20);
-    AppNavigation.navVisible.value = true;
-    await t.pumpAndSettle();
-    expect(t.getSize(find.byType(AnimatedContainer)).height, 96);
-
+    expect(t.getSize(find.byType(NavBottomSpace)).height, 96);
     // Outside the tabs (pushed screens): just the margin.
     await t.pumpWidget(const MaterialApp(home: Column(children: [NavBottomSpace()])));
-    expect(t.getSize(find.byType(SizedBox).last).height, 20);
+    expect(t.getSize(find.byType(NavBottomSpace)).height, 20);
   });
 }

@@ -4,12 +4,12 @@
 /// With [showActions] the row also has a visible "⋮" button (Edit / Delete) and keeps the
 /// swipe gestures as a shortcut.
 import 'package:flutter/material.dart';
-import '../theme/motion.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../models/transaction.dart';
 import '../utils/icon_mapper.dart';
 import 'espere_swipe_action.dart';
+import 'spring_menu.dart';
 
 class TransactionTile extends StatelessWidget {
   final TransactionModel transaction;
@@ -88,24 +88,12 @@ class TransactionTile extends StatelessWidget {
               const SizedBox(width: 8),
               Text(amountText(t, currencySymbol), style: AppText.amount),
               if (showActions)
-                PopupMenuButton<String>(
-                  tooltip: 'More',
-                  icon: const Icon(Icons.more_vert_rounded, size: 20, color: AppColors.muted),
+                SpringMenuButton<String>(
+                  items: SpringMenuButton.editDelete(),
                   onSelected: (v) {
-                    AppHaptics.tap();
                     if (v == 'edit') onEdit?.call();
                     if (v == 'delete') onDelete?.call();
                   },
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(
-                      value: 'edit',
-                      child: Row(children: [Icon(Icons.edit_rounded, size: 20), SizedBox(width: 10), Text('Edit')]),
-                    ),
-                    PopupMenuItem(
-                      value: 'delete',
-                      child: Row(children: [Icon(Icons.delete_outline_rounded, size: 20), SizedBox(width: 10), Text('Delete')]),
-                    ),
-                  ],
                 ),
             ],
           ),

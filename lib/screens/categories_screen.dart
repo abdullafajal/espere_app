@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../theme/motion.dart';
 import '../utils/app_toast.dart';
 import '../theme/app_theme.dart';
+import '../widgets/spring_menu.dart';
 import '../widgets/espere_action_button.dart';
 import '../widgets/espere_header.dart';
 import '../widgets/espere_filter_chip.dart';
@@ -374,14 +375,9 @@ class _CategoryTile extends StatelessWidget {
             ),
           ),
           if (canEdit)
-            PopupMenuButton<String>(
-              tooltip: 'More',
-              icon: const Icon(Icons.more_vert_rounded, size: 20, color: AppColors.muted),
+            SpringMenuButton<String>(
+              items: SpringMenuButton.editDelete(),
               onSelected: (v) => v == 'edit' ? onEdit?.call() : onDelete?.call(),
-              itemBuilder: (_) => const [
-                PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_rounded, size: 20), SizedBox(width: 10), Text('Edit')])),
-                PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline_rounded, size: 20), SizedBox(width: 10), Text('Delete')])),
-              ],
             ),
         ],
       ),
