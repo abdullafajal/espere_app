@@ -320,20 +320,113 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
     await TransactionStore.remove(s.id);
   }
 
+  /// "When": one small sheet with day chips and time chips, so most entries need no
+  /// calendar or clock. "Other date" / "Exact time" open the full pickers.
   Future<void> _pickDate() async {
     final now = DateTime.now();
-    final base = _date ?? now;
-    final day = await showDatePicker(
+    final today = DateUtils.dateOnly(now);
+    var day = DateUtils.dateOnly(_date ?? now);
+    TimeOfDay? time = _date == null ? null : TimeOfDay.fromDateTime(_date!); // null = now
+
+    const slots = [
+      ('Morning', TimeOfDay(hour: 9, minute: 0)),
+      ('Afternoon', TimeOfDay(hour: 13, minute: 0)),
+      ('Evening', TimeOfDay(hour: 19, minute: 0)),
+      ('Night', TimeOfDay(hour: 22, minute: 0)),
+    ];
+
+    final picked = await showModalBottomSheet<DateTime>(
       context: context,
-      initialDate: base,
-      firstDate: DateTime(now.year - 5),
-      lastDate: now,
+      isScrollControlled: true, // as tall as its content, no inner scrolling
+      backgroundColor: AppColors.card,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, ss) {
+        final isToday = day == today;
+        Widget chip(String label, bool on, VoidCallback onTap) => SpringPress(
+              onTap: onTap,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                height: 40,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  color: on ? AppColors.dark : AppColors.surface,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Center(
+                  widthFactor: 1,
+                  child: Text(label,
+                    style: TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w700, color: on ? AppColors.accent : AppColors.text)),
+                ),
+              ),
+            );
+        final days = [today, today.subtract(const Duration(days: 1)), today.subtract(const Duration(days: 2))];
+        final customDay = !days.contains(day);
+        final customTime = time != null && !slots.any((s) => s.$2 == time);
+        String fmt(TimeOfDay t) => DateFormat('h:mm a').format(DateTime(2000, 1, 1, t.hour, t.minute));
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('When', style: AppText.section),
+                const SizedBox(height: 14),
+                const Text('DAY', style: AppText.label),
+                const SizedBox(height: 8),
+                Wrap(spacing: 8, runSpacing: 8, children: [
+                  chip('Today', day == days[0], () => ss(() => day = days[0])),
+                  chip('Yesterday', day == days[1], () => ss(() => day = days[1])),
+                  chip(DateFormat('EEE, d MMM').format(days[2]), day == days[2], () => ss(() => day = days[2])),
+                  chip(customDay ? DateFormat('d MMM yyyy').format(day) : 'Other date…', customDay, () async {
+                    final d = await showDatePicker(
+                      context: ctx,
+                      initialDate: day,
+                      firstDate: DateTime(now.year - 5),
+                      lastDate: now,
+                    );
+                    if (d != null) ss(() => day = DateUtils.dateOnly(d));
+                  }),
+                ]),
+                const SizedBox(height: 18),
+                const Text('TIME', style: AppText.label),
+                const SizedBox(height: 8),
+                Wrap(spacing: 8, runSpacing: 8, children: [
+                  if (isToday) chip('Now', time == null, () => ss(() => time = null)),
+                  for (final s in slots)
+                    if (!isToday || s.$2.hour * 60 + s.$2.minute <= now.hour * 60 + now.minute)
+                      chip('${s.$1} · ${fmt(s.$2)}', time == s.$2, () => ss(() => time = s.$2)),
+                  chip(customTime ? fmt(time!) : 'Exact time…', customTime, () async {
+                    final t = await showTimePicker(
+                      context: ctx,
+                      initialTime: time ?? TimeOfDay.fromDateTime(now),
+                    );
+                    if (t != null) ss(() => time = t);
+                  }),
+                ]),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      final t = time ?? (isToday ? null : const TimeOfDay(hour: 12, minute: 0));
+                      Navigator.pop(
+                        ctx,
+                        t == null ? DateTime(0) : DateTime(day.year, day.month, day.day, t.hour, t.minute),
+                      );
+                    },
+                    child: const Text('Done'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }),
     );
-    if (day == null || !mounted) return;
-    final time = await showTimePicker(context: context, initialTime: TimeOfDay.fromDateTime(base));
-    if (!mounted) return;
-    final t = time ?? TimeOfDay.fromDateTime(base);
-    setState(() => _date = DateTime(day.year, day.month, day.day, t.hour, t.minute));
+    if (picked == null || !mounted) return;
+    setState(() => _date = picked.year == 0 ? null : picked);
   }
 
   Future<void> _pickMethod() async {

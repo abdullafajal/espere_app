@@ -405,12 +405,28 @@ class AppTheme {
         dayForegroundColor: WidgetStateProperty.resolveWith(
             (s) => s.contains(WidgetState.selected) ? AppColors.dark : null),
       ),
+      // Selected hour / minute / AM-PM: ink box with accent text (like the app's main
+      // buttons); the rest grey with ink text, so the choice is always readable.
       timePickerTheme: TimePickerThemeData(
         backgroundColor: AppColors.card,
-        dialHandColor: AppColors.dark,
+        helpTextStyle: AppText.label,
+        hourMinuteShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        hourMinuteColor: WidgetStateColor.resolveWith(
+            (s) => s.contains(WidgetState.selected) ? AppColors.dark : AppColors.surface),
+        hourMinuteTextColor: WidgetStateColor.resolveWith(
+            (s) => s.contains(WidgetState.selected) ? AppColors.accent : AppColors.text),
+        dayPeriodShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        dayPeriodBorderSide: const BorderSide(color: AppColors.border),
+        dayPeriodColor: WidgetStateColor.resolveWith(
+            (s) => s.contains(WidgetState.selected) ? AppColors.dark : AppColors.card),
+        dayPeriodTextColor: WidgetStateColor.resolveWith(
+            (s) => s.contains(WidgetState.selected) ? AppColors.accent : AppColors.muted),
         dialBackgroundColor: AppColors.surface,
-        hourMinuteColor: AppColors.surface,
-        dayPeriodColor: AppColors.accent,
+        dialHandColor: AppColors.dark,
+        dialTextColor: WidgetStateColor.resolveWith(
+            (s) => s.contains(WidgetState.selected) ? AppColors.accent : AppColors.text),
+        entryModeIconColor: AppColors.dark,
+        timeSelectorSeparatorColor: const WidgetStatePropertyAll(AppColors.text),
       ),
       textSelectionTheme: TextSelectionThemeData(
         cursorColor: AppColors.dark,
