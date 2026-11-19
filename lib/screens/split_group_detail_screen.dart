@@ -2027,9 +2027,9 @@ class _S extends State<SplitGroupDetailScreen>
                           width: 44,
                           height: 44,
                           decoration: BoxDecoration(
-                            color: AppColors.card,
+                            color: AppColors.accent,
                             shape: BoxShape.circle,
-                            boxShadow: AppShadows.soft,
+                            boxShadow: AppShadows.accent,
                           ),
                           child: const Icon(Icons.more_vert_rounded, color: AppColors.dark, size: 20),
                         ),

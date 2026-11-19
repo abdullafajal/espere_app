@@ -9,7 +9,7 @@ class EspereActionButton extends StatelessWidget {
   final VoidCallback? onPressed;
 
   /// The screen's main action (such as "add"): a firmer haptic. Every header button
-  /// looks the same, white with an ink icon, in any app colour.
+  /// looks the same: the app colour with an ink icon.
   final bool primary;
 
   /// Shows a small lime dot in the top-right corner.
@@ -29,7 +29,7 @@ class EspereActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const bg = AppColors.card;
+    final bg = AppColors.accent;
     final button = SpringPress(
       haptic: primary ? HapticKind.press : HapticKind.tap,
       onTap: onPressed,
@@ -45,7 +45,7 @@ class EspereActionButton extends StatelessWidget {
               decoration: BoxDecoration(
                 color: bg,
                 shape: BoxShape.circle,
-                boxShadow: AppShadows.soft,
+                boxShadow: AppShadows.accent,
               ),
               child: Icon(icon, color: AppColors.dark, size: 22),
             ),
@@ -57,9 +57,9 @@ class EspereActionButton extends StatelessWidget {
                   width: 10,
                   height: 10,
                   decoration: BoxDecoration(
-                    color: AppColors.accent,
+                    color: AppColors.dark,
                     shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.dark, width: 2),
+                    border: Border.all(color: bg, width: 2),
                   ),
                 ),
               ),
