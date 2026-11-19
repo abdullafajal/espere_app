@@ -3,6 +3,7 @@ import '../theme/motion.dart';
 import '../widgets/espere_header.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
+import '../widgets/nav_space.dart';
 import '../widgets/espere_action_button.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
@@ -368,9 +369,10 @@ class BudgetsScreenState extends State<BudgetsScreen> {
                     onRefresh: _handleRefresh,
                     color: AppColors.dark,
                     child: ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
-                      itemCount: _budgets.length,
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+                      itemCount: _budgets.length + 1,
                       itemBuilder: (context, index) {
+                        if (index == _budgets.length) return const NavBottomSpace();
                         final budget = _budgets[index];
                         final snapKey = _budgetSnapKeys.putIfAbsent(budget['id'], () => GlobalKey<ThanosSnapWidgetState>());
                         return ThanosSnapWidget(

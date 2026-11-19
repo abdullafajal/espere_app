@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../widgets/espere_header.dart';
 import '../widgets/split_switcher.dart';
 import '../theme/app_theme.dart';
+import '../widgets/nav_space.dart';
 import '../widgets/espere_action_button.dart';
 import '../widgets/espere_swipe_action.dart';
 import '../services/api_service.dart';
@@ -504,9 +505,10 @@ class FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderS
           ),
         Expanded(
           child: ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
-            itemCount: _friends.length,
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            itemCount: _friends.length + 1,
             itemBuilder: (ctx, i) {
+              if (i == _friends.length) return const NavBottomSpace();
               final f = _friends[i];
               final fid = f['id'] as int;
               final isSelected = _selectedFriendIds.contains(fid);

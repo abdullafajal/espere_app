@@ -7,6 +7,7 @@ import '../theme/motion.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
+import '../widgets/nav_space.dart';
 import '../widgets/espere_action_button.dart';
 import '../widgets/export_sheet.dart';
 import '../services/auto_expense_service.dart';
@@ -405,7 +406,7 @@ class TransactionListScreenState extends State<TransactionListScreen> {
             onRefresh: _handleRefresh,
             color: AppColors.dark,
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
               children: [
                 _buildTopCard(),
                 const SizedBox(height: 14),
@@ -444,6 +445,7 @@ class TransactionListScreenState extends State<TransactionListScreen> {
                   SizedBox(height: 380, child: _buildEmpty())
                 else
                   for (final (day, items) in sections) _daySection(day, items),
+                const NavBottomSpace(),
               ],
             ),
           ),

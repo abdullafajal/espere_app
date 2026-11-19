@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'dart:math' as math;
 import '../theme/app_theme.dart';
+import '../widgets/nav_space.dart';
 import '../theme/motion.dart';
 import '../models/dashboard.dart';
 import '../services/cache_service.dart';
@@ -853,8 +854,8 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
       onRefresh: _handleRefresh,
       color: AppColors.dark,
       child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
+        physics: const EspereScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -876,6 +877,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
               symbol: d.currencySymbol,
               onSelect: _selectMonth,
             ),
+            const NavBottomSpace(),
 
           ],
         ),

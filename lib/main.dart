@@ -80,6 +80,7 @@ class EspereApp extends StatefulWidget {
 class _EspereAppState extends State<EspereApp> {
   // Use Stopwatch instead of DateTime to prevent GC allocation lag on low-end devices
   final Stopwatch _throttleStopwatch = Stopwatch()..start();
+  bool _atEdge = false;
 
   @override
   Widget build(BuildContext context) {
@@ -91,24 +92,20 @@ class _EspereAppState extends State<EspereApp> {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.light,
+      scrollBehavior: const EspereScrollBehavior(),
 
       builder: (context, child) {
         return NotificationListener<ScrollNotification>(
+          // One light tick when a list reaches its end (it then bounces on the app's
+          // spring, see EspereScrollPhysics). Not again until it is back in range.
           onNotification: (notification) {
-            // Ultra-fast zero-allocation check for overscroll boundaries
-            bool isEdge = false;
-            if (notification is OverscrollNotification) {
-              isEdge = true;
-            } else if (notification.metrics.outOfRange) {
-              isEdge = true;
+            if (notification.metrics.axis != Axis.vertical) return false;
+            final out = notification.metrics.outOfRange || notification is OverscrollNotification;
+            if (out && !_atEdge && _throttleStopwatch.elapsedMilliseconds > 700) {
+              AppHaptics.land();
+              _throttleStopwatch.reset();
             }
-
-            if (isEdge) {
-              if (_throttleStopwatch.elapsedMilliseconds > 300) {
-                AppHaptics.confirm();
-                _throttleStopwatch.reset();
-              }
-            }
+            _atEdge = out;
             return false;
           },
           child: child ?? const SizedBox.shrink(),

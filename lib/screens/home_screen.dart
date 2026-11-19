@@ -4,6 +4,7 @@
 /// Savings, and Split Groups tabs.
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../widgets/nav_space.dart';
 import '../widgets/bottom_nav_bar.dart';
 import 'dashboard_screen.dart';
 import 'transaction_list_screen.dart';
@@ -31,6 +32,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _currentIndex = 0;
   bool _isBottomNavVisible = true;
 
+  /// Call inside setState: updates the bar and tells the lists (NavBottomSpace).
+  void _setNav(bool visible) {
+    _isBottomNavVisible = visible;
+    AppNavigation.navVisible.value = visible;
+  }
+
   final _dashboardKey = GlobalKey<DashboardScreenState>();
   final _transactionListKey = GlobalKey<TransactionListScreenState>();
   final _budgetsKey = GlobalKey<BudgetsScreenState>();
@@ -57,7 +64,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         onTabChange: (index) {
           setState(() {
             _currentIndex = index;
-            _isBottomNavVisible = true;
+            _setNav(true);
           });
           _refreshTab(index);
         },
@@ -88,7 +95,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     AppNavigation.requestedTab.value = null;
     setState(() {
       _currentIndex = index;
-      _isBottomNavVisible = true;
+      _setNav(true);
     });
     _refreshTab(index);
   }
@@ -187,22 +194,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
                 if (currentOffset <= 0) {
                   if (!_isBottomNavVisible)
-                    setState(() => _isBottomNavVisible = true);
+                    setState(() => _setNav(true));
                 } else if (velocity > 10 &&
                     _isBottomNavVisible &&
                     currentOffset > 80) {
                   // Scrolling down
-                  setState(() => _isBottomNavVisible = false);
+                  setState(() => _setNav(false));
                 } else if (velocity < -10 && !_isBottomNavVisible) {
                   // Scrolling up
-                  setState(() => _isBottomNavVisible = true);
+                  setState(() => _setNav(true));
                 }
               }
               return false;
             },
             child: SafeArea(
               bottom: false, // Let content flow under floating nav
-              child: IndexedStack(index: _currentIndex, children: _screens),
+              child: NavScope(child: IndexedStack(index: _currentIndex, children: _screens)),
             ),
           ),
           Positioned(
@@ -215,7 +222,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               onTap: (index) {
                 setState(() {
                   _currentIndex = index;
-                  _isBottomNavVisible = true;
+                  _setNav(true);
                 });
                 _refreshTab(index);
               },

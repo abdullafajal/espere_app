@@ -6,11 +6,13 @@
 /// - [AppHaptics]: tap (selection), press (light), confirm (medium), warn (heavy), and
 ///   land (the light tick when a moving thing arrives).
 /// - [SpringPress]: wrap any tappable to get the press spring + haptic.
+/// - [EspereScrollBehavior]: every list in the app bounces at its ends on [AppMotion.move]
+///   (the nav pill's spring), with one light tick when the end is reached (see main.dart).
 library;
 
+import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
 
 class AppMotion {
   AppMotion._();
@@ -115,4 +117,28 @@ class _SpringPressState extends State<SpringPress> with SingleTickerProviderStat
       ),
     );
   }
+}
+
+/// Bounces past the end of a list and springs back on [AppMotion.move] (the same spring
+/// as the nav pill), so the ends of lists feel like the rest of the app.
+class EspereScrollPhysics extends BouncingScrollPhysics {
+  const EspereScrollPhysics({super.parent});
+
+  @override
+  EspereScrollPhysics applyTo(ScrollPhysics? ancestor) => EspereScrollPhysics(parent: buildParent(ancestor));
+
+  @override
+  SpringDescription get spring => AppMotion.move;
+}
+
+/// App-wide scrolling: [EspereScrollPhysics] everywhere, no Android glow or stretch.
+class EspereScrollBehavior extends MaterialScrollBehavior {
+  const EspereScrollBehavior();
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) =>
+      const EspereScrollPhysics(parent: AlwaysScrollableScrollPhysics());
+
+  @override
+  Widget buildOverscrollIndicator(BuildContext context, Widget child, ScrollableDetails details) => child;
 }
