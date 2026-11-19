@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
+import 'quick_add_screen.dart';
 import '../models/category.dart';
 import '../models/transaction.dart';
 import '../services/api_service.dart';
@@ -42,6 +43,8 @@ class TransactionFormScreen extends StatefulWidget {
   });
 
   /// Helper to show this form as a bottom sheet
+  /// Edits / adds a transaction. Uses the Quick add screen (keypad + categories), so
+  /// adding and editing look the same.
   static void show(
     BuildContext context, {
     int? transactionId,
@@ -49,20 +52,14 @@ class TransactionFormScreen extends StatefulWidget {
     VoidCallback? onSaved,
     TransactionPrefill? prefill,
   }) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.card,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => TransactionFormScreen(
-        transactionId: transactionId,
-        presetType: presetType,
-        onSaved: onSaved,
-        prefill: prefill,
-      ),
-    );
+    final Future<bool> done = transactionId != null
+        ? QuickAddScreen.edit(context, transactionId)
+        : prefill != null
+            ? QuickAddScreen.prefilled(context, prefill)
+            : QuickAddScreen.open(context, type: presetType ?? 'expense');
+    done.then((saved) {
+      if (saved) onSaved?.call();
+    });
   }
 
   @override

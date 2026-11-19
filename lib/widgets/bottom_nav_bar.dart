@@ -55,8 +55,9 @@ class EspereBottomNav extends StatelessWidget {
               boxShadow: AppShadows.nav,
             ),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                ..._left.map((i) => Expanded(child: _tab(i))),
+                ..._left.map(_tab),
                 Semantics(
                   button: true,
                   label: 'Add transaction',
@@ -68,13 +69,12 @@ class EspereBottomNav extends StatelessWidget {
                     child: Container(
                       width: 52,
                       height: 52,
-                      margin: const EdgeInsets.symmetric(horizontal: 4),
                       decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
                       child: const Icon(Icons.add_rounded, size: 28, color: AppColors.dark),
                     ),
                   ),
                 ),
-                ..._right.map((i) => Expanded(child: _tab(i))),
+                ..._right.map(_tab),
               ],
             ),
           ),
@@ -83,6 +83,8 @@ class EspereBottomNav extends StatelessWidget {
     );
   }
 
+  /// Active tab: lime pill with icon and label side by side. Others: icon over a small
+  /// grey label.
   Widget _tab(_NavItem item) {
     final active = _isActive(item);
     return Semantics(
@@ -96,34 +98,35 @@ class EspereBottomNav extends StatelessWidget {
           HapticFeedback.selectionClick();
           onTap(item.index);
         },
-        child: Center(
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOut,
-            height: 52,
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            decoration: BoxDecoration(
-              color: active ? AppColors.accent : Colors.transparent,
-              borderRadius: BorderRadius.circular(26),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(item.icon, size: 22, color: active ? AppColors.dark : AppColors.darkMuted),
-                const SizedBox(height: 2),
-                Text(
-                  item.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.visible,
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: active ? FontWeight.w800 : FontWeight.w600,
-                    color: active ? AppColors.dark : AppColors.darkMuted,
-                  ),
-                ),
-              ],
-            ),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          height: 52,
+          width: active ? null : 56,
+          padding: EdgeInsets.symmetric(horizontal: active ? 14 : 0),
+          decoration: BoxDecoration(
+            color: active ? AppColors.accent : Colors.transparent,
+            borderRadius: BorderRadius.circular(26),
           ),
+          child: active
+              ? Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(item.icon, size: 22, color: AppColors.dark),
+                    const SizedBox(width: 6),
+                    Text(item.label,
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.dark)),
+                  ],
+                )
+              : Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(item.icon, size: 22, color: AppColors.darkMuted),
+                    const SizedBox(height: 1),
+                    Text(item.label,
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.darkMuted)),
+                  ],
+                ),
         ),
       ),
     );

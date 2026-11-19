@@ -4,6 +4,10 @@
 /// Time, payment method and note have sensible defaults (now, the last method used, empty)
 /// and can be changed with the chips under the amount. "Scan" reads a receipt screenshot;
 /// "New" opens Categories.
+///
+/// The same screen edits a transaction ([QuickAddScreen.edit]) and checks what was read
+/// from a receipt ([QuickAddScreen.prefilled]): then tapping a category only selects it,
+/// and the lime Save button stores the change.
 library;
 
 import 'dart:async';
@@ -15,6 +19,7 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/category.dart';
+import '../models/transaction.dart';
 import '../services/cache_service.dart';
 import '../services/receipt_service.dart';
 import '../services/transaction_store.dart';
@@ -26,7 +31,13 @@ class QuickAddScreen extends StatefulWidget {
   /// 'expense' (default) or 'income'.
   final String type;
 
-  const QuickAddScreen({super.key, this.type = 'expense'});
+  /// Transaction being edited (by id; looked up in the cache).
+  final int? editId;
+
+  /// Values read from a receipt, to check and save.
+  final TransactionPrefill? prefill;
+
+  const QuickAddScreen({super.key, this.type = 'expense', this.editId, this.prefill});
 
   /// Opens Quick add full screen. Resolves to true when something was added.
   static Future<bool> open(BuildContext context, {String type = 'expense'}) async {
@@ -34,6 +45,25 @@ class QuickAddScreen extends StatefulWidget {
       MaterialPageRoute(builder: (_) => QuickAddScreen(type: type), fullscreenDialog: true),
     );
     return added == true;
+  }
+
+  /// Opens the transaction [id] for editing. Resolves to true when it was saved or deleted.
+  static Future<bool> edit(BuildContext context, int id) async {
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => QuickAddScreen(editId: id), fullscreenDialog: true),
+    );
+    return saved == true;
+  }
+
+  /// Opens with values read from a receipt. Resolves to true when it was saved.
+  static Future<bool> prefilled(BuildContext context, TransactionPrefill prefill) async {
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => QuickAddScreen(type: prefill.type, prefill: prefill),
+        fullscreenDialog: true,
+      ),
+    );
+    return saved == true;
   }
 
   @override
@@ -65,6 +95,12 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
   bool _addedAny = false;
   bool _busy = false;
 
+  /// Edit / receipt mode: a category tap selects, Save stores.
+  bool get _formMode => widget.editId != null || widget.prefill != null;
+  bool get _isEdit => widget.editId != null;
+  TransactionModel? _old;
+  int? _categoryId;
+
   @override
   void initState() {
     super.initState();
@@ -80,10 +116,35 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
     final cached = await CacheService.getCachedCategories();
+    TransactionModel? old;
+    if (_isEdit) {
+      old = await TransactionStore.find(widget.editId!);
+      if (old != null) _type = old.type;
+    }
     final cats = await TransactionStore.categoriesByUse(_type);
     if (!mounted) return;
+    if (_isEdit && old == null) {
+      AppToast.error(context, 'This transaction is not on this phone yet. Pull to refresh and try again.');
+      Navigator.of(context).pop(false);
+      return;
+    }
     setState(() {
       _method = prefs.getString(_kMethod) ?? 'upi';
+      final p = widget.prefill;
+      if (old != null) {
+        _old = old;
+        _amount = _trim(double.tryParse(old.amount) ?? 0);
+        _date = old.date.toLocal();
+        _method = old.paymentMethod;
+        _note = old.notes;
+        _categoryId = old.category.id == 0 ? null : old.category.id;
+      } else if (p != null) {
+        if (p.amount != null) _amount = _trim(p.amount!);
+        _date = p.date;
+        _method = p.paymentMethod;
+        _note = p.notes ?? '';
+        _categoryId = p.categoryId;
+      }
       _symbol = cached?['currency_symbol'] as String? ?? '₹';
       _categories = cats;
       _loading = false;
@@ -93,10 +154,16 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
   Future<void> _setType(String type) async {
     if (type == _type) return;
     HapticFeedback.selectionClick();
-    setState(() => _type = type);
+    setState(() {
+      _type = type;
+      _categoryId = null;
+    });
     final cats = await TransactionStore.categoriesByUse(type);
     if (mounted) setState(() => _categories = cats);
   }
+
+  static String _trim(double v) =>
+      v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(2);
 
   double get _value => double.tryParse(_amount) ?? 0;
   bool get _hasAmount => _value > 0;
@@ -129,6 +196,11 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
   }
 
   Future<void> _save(CategoryModel? category) async {
+    if (_formMode) {
+      HapticFeedback.selectionClick();
+      setState(() => _categoryId = category?.id);
+      return;
+    }
     if (_busy) return;
     if (!_hasAmount) {
       HapticFeedback.heavyImpact();
@@ -166,6 +238,68 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
     } finally {
       _busy = false;
     }
+  }
+
+  /// Edit / receipt mode: store the values.
+  Future<void> _commit() async {
+    if (_busy) return;
+    if (!_hasAmount) {
+      HapticFeedback.heavyImpact();
+      AppToast.info(context, 'Type the amount first');
+      return;
+    }
+    _busy = true;
+    HapticFeedback.mediumImpact();
+    final category = _categories.where((c) => c.id == _categoryId).firstOrNull;
+    try {
+      if (_old != null) {
+        await TransactionStore.update(
+          old: _old!,
+          amount: _value,
+          type: _type,
+          category: category,
+          date: _date ?? DateTime.now(),
+          paymentMethod: _method,
+          notes: _note.trim(),
+        );
+      } else {
+        await TransactionStore.create(
+          amount: _value,
+          type: _type,
+          category: category,
+          date: _date,
+          paymentMethod: _method,
+          notes: _note.trim(),
+        );
+      }
+      if (!mounted) return;
+      AppToast.success(context, _old != null ? 'Saved' : 'Added');
+      Navigator.of(context).pop(true);
+    } finally {
+      _busy = false;
+    }
+  }
+
+  Future<void> _delete() async {
+    final old = _old;
+    if (old == null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete this entry?'),
+        content: Text('${old.isIncome ? '+' : '−'}$_symbol$_amountLabel will be removed.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    HapticFeedback.mediumImpact();
+    await TransactionStore.remove(old.id);
+    if (!mounted) return;
+    AppToast.success(context, 'Deleted');
+    Navigator.of(context).pop(true);
   }
 
   void _dismissSaved() {
@@ -274,7 +408,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
     if (mounted) setState(() => _categories = cats);
   }
 
-  void _close() => Navigator.of(context).pop(_addedAny);
+  void _close() => Navigator.of(context).pop(_formMode ? false : _addedAny);
 
   // ─── UI ─────────────────────────────────────────────────────────────────
 
@@ -390,7 +524,12 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
                 child: Row(children: [_typeButton('expense', 'Expense'), _typeButton('income', 'Income')]),
               ),
               const Spacer(),
-              _circle(Icons.document_scanner_rounded, 'Scan receipt', _scan),
+              if (_isEdit)
+                _circle(Icons.delete_outline_rounded, 'Delete', _delete)
+              else if (_formMode)
+                const SizedBox(width: 44)
+              else
+                _circle(Icons.document_scanner_rounded, 'Scan receipt', _scan),
             ],
           ),
           const SizedBox(height: 18),
@@ -424,7 +563,9 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            _hasAmount ? 'Now tap a category below' : 'Type the amount',
+            _formMode
+                ? (_isEdit ? 'Change anything, then Save' : 'Check the details, then Save')
+                : (_hasAmount ? 'Now tap a category below' : 'Type the amount'),
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
@@ -459,7 +600,9 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
             padding: const EdgeInsets.fromLTRB(22, 16, 22, 6),
             child: Row(
               children: [
-                const Expanded(child: Text('Pick a category to save', style: AppText.section)),
+                Expanded(
+                  child: Text(_formMode ? 'Category' : 'Pick a category to save', style: AppText.section),
+                ),
                 Text(
                   _categories.length > 8 ? '${_categories.length} · scroll' : '${_categories.length}',
                   style: AppText.rowSub,
@@ -468,6 +611,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
             ),
           ),
           Expanded(child: _grid()),
+          if (_formMode) _saveBar(),
           _keypad(),
         ],
       ),
@@ -479,7 +623,8 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
       return const Center(child: CircularProgressIndicator(strokeWidth: 2));
     }
     final tiles = <Widget>[
-      for (final c in _categories) _categoryTile(c.name, IconMapper.map(c.icon), () => _save(c)),
+      for (final c in _categories)
+        _categoryTile(c.name, IconMapper.map(c.icon), () => _save(c), selected: _formMode && c.id == _categoryId),
       _categoryTile('New', Icons.add_rounded, _newCategory, dashed: true),
     ];
     if (_categories.isEmpty) {
@@ -487,7 +632,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
     }
     return AnimatedOpacity(
       duration: const Duration(milliseconds: 150),
-      opacity: _hasAmount ? 1 : 0.5,
+      opacity: _hasAmount || _formMode ? 1 : 0.5,
       child: GridView.count(
         crossAxisCount: 4,
         padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
@@ -497,10 +642,11 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
     );
   }
 
-  Widget _categoryTile(String label, IconData icon, VoidCallback onTap, {bool dashed = false}) {
+  Widget _categoryTile(String label, IconData icon, VoidCallback onTap, {bool dashed = false, bool selected = false}) {
     return Semantics(
       button: true,
-      label: dashed ? 'New category' : 'Save to $label',
+      selected: selected,
+      label: dashed ? 'New category' : (_formMode ? label : 'Save to $label'),
       excludeSemantics: true,
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
@@ -508,15 +654,16 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
               width: 50,
               height: 50,
               decoration: BoxDecoration(
-                color: dashed ? Colors.transparent : AppColors.categoryFill,
+                color: dashed ? Colors.transparent : (selected ? AppColors.dark : AppColors.categoryFill),
                 borderRadius: BorderRadius.circular(18),
                 border: dashed ? Border.all(color: AppColors.mutedLight, width: 1.5) : null,
               ),
-              child: Icon(icon, size: 24, color: AppColors.categoryInk),
+              child: Icon(icon, size: 24, color: selected ? AppColors.accent : AppColors.categoryInk),
             ),
             const SizedBox(height: 6),
             Text(
@@ -526,6 +673,27 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
               style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.text),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _saveBar() {
+    final cat = _categories.where((c) => c.id == _categoryId).firstOrNull;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+      child: SizedBox(
+        width: double.infinity,
+        height: 54,
+        child: FilledButton.icon(
+          onPressed: _commit,
+          icon: const Icon(Icons.check_rounded),
+          label: Text(
+            '${_isEdit ? 'Save' : 'Add'} ${_type == 'income' ? '+' : '−'}$_symbol$_amountLabel'
+            '${cat != null ? ' · ${cat.name}' : ''}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
       ),
     );

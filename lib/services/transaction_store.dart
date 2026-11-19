@@ -3,6 +3,8 @@
 library;
 
 import '../models/category.dart';
+import '../models/transaction.dart';
+import 'auto_expense_service.dart';
 import 'cache_service.dart';
 import 'connectivity_service.dart';
 import 'sync_service.dart';
@@ -95,6 +97,72 @@ class TransactionStore {
     await SyncService.queueOperation(action: 'delete', entity: 'transaction', entityId: current);
     if (ConnectivityService.isOnline) SyncService.syncAll();
     WidgetService.refreshAllWidgets();
+  }
+
+  /// Saves changes to an existing transaction [old]: cache, dashboard and budgets update
+  /// at once and the change is queued for sync.
+  static Future<void> update({
+    required TransactionModel old,
+    required double amount,
+    required String type,
+    required CategoryModel? category,
+    required DateTime date,
+    String paymentMethod = 'upi',
+    String notes = '',
+  }) async {
+    final id = SyncService.transactionIdRemap[old.id] ?? old.id;
+    final amountText = amount.toStringAsFixed(2);
+    final full = {
+      'id': id,
+      'amount': amountText,
+      'type': type,
+      'category': category?.toJson() ?? {'name': 'Other', 'icon': 'category'},
+      'date': date.toUtc().toIso8601String(),
+      'payment_method': paymentMethod,
+      'payment_method_display': _methodDisplay[paymentMethod] ?? 'Other',
+      'notes': notes,
+    };
+    final oldAmount = double.tryParse(old.amount) ?? 0.0;
+    await CacheService.updateTransactionInCache(id, full);
+    await CacheService.reverseDashboardImpact(old.type, oldAmount, id, categoryName: old.category.name);
+    await CacheService.updateDashboardOptimistically(type, amount, full);
+    if (old.type == 'expense' && old.category.id != 0) {
+      await CacheService.updateBudgetOptimistically(old.category.id, oldAmount, isDelete: true);
+    }
+    if (type == 'expense' && category != null) {
+      await CacheService.updateBudgetOptimistically(category.id, amount);
+    }
+    await SyncService.queueOperation(
+      action: 'update',
+      entity: 'transaction',
+      entityId: id,
+      data: {
+        'amount': amountText,
+        'type': type,
+        'category_id': category?.id,
+        'date': date.toUtc().toIso8601String(),
+        'payment_method': paymentMethod,
+        'notes': notes,
+      },
+    );
+    if (ConnectivityService.isOnline) SyncService.syncAll();
+    WidgetService.refreshAllWidgets();
+    AutoExpenseService.learnFromEdit(txnId: id, categoryId: category?.id);
+  }
+
+  /// Finds a transaction in the cached lists (Activity first, then Home's recent list).
+  static Future<TransactionModel?> find(int id) async {
+    final current = SyncService.transactionIdRemap[id] ?? id;
+    final txns = await CacheService.getCachedTransactions();
+    final dash = await CacheService.getCachedDashboard();
+    for (final list in [txns?['transactions'], dash?['recent_transactions']]) {
+      for (final t in ((list as List?) ?? const []).whereType<Map>()) {
+        if (t['id']?.toString() == current.toString()) {
+          return TransactionModel.fromJson(Map<String, dynamic>.from(t));
+        }
+      }
+    }
+    return null;
   }
 
   /// Categories of [type], the ones used most in the cached transactions first.

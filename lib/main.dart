@@ -10,7 +10,6 @@ import 'screens/otp_verification_screen.dart';
 import 'screens/forgot_password_screen.dart';
 import 'screens/reset_password_screen.dart';
 import 'screens/home_screen.dart';
-import 'screens/transaction_form_screen.dart';
 import 'screens/quick_add_screen.dart';
 import 'screens/categories_screen.dart';
 import 'screens/profile_screen.dart';
@@ -142,7 +141,8 @@ class _EspereAppState extends State<EspereApp> {
           case '/transaction/edit':
             final id = settings.arguments as int;
             return MaterialPageRoute(
-              builder: (_) => TransactionFormScreen(transactionId: id),
+              fullscreenDialog: true,
+              builder: (_) => QuickAddScreen(editId: id),
             );
 
           case '/invite':
