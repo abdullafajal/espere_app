@@ -905,7 +905,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   /// Shares the app's download page, with the user's username as the referrer.
   Future<void> _shareApp() async {
     final ref = (_user?.username ?? '').trim();
-    final link = ref.isEmpty ? 'https://espere.in' : 'https://espere.in/?ref=$ref';
+    // The site opens in the sharer's app colour (?c=pink); lime is the site's default.
+    final c = AppAccent.current.name.toLowerCase();
+    final params = [if (ref.isNotEmpty) 'ref=$ref', if (c != 'lime') 'c=$c'];
+    final link = params.isEmpty ? 'https://espere.in' : 'https://espere.in/?${params.join('&')}';
     await Share.share(
       'I track my spending and split bills with friends on Espere. It works offline and '
       'adds expenses in a tap. Get it here: $link',
