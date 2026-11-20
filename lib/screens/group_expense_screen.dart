@@ -463,6 +463,7 @@ class _GroupExpenseScreenState extends State<GroupExpenseScreen> with SingleTick
 
   Widget _sheet() {
     return Container(
+      clipBehavior: Clip.antiAlias, // scrolled content stays inside the rounded top
       decoration: const BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xxxl)),

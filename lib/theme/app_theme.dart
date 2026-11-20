@@ -379,6 +379,7 @@ class AppTheme {
         surfaceTintColor: Colors.transparent,
         modalBackgroundColor: AppColors.card,
         showDragHandle: false,
+        clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xxxl))),
       ),
       popupMenuTheme: PopupMenuThemeData(
