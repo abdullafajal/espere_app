@@ -26,7 +26,7 @@ void main() {
   testWidgets('settings_colour', (t) => shot(t, 'settings_colour', const ProfileScreen(), scaffold: false, act: (t) async {
         await t.tap(find.text('App colour'));
         await t.pumpAndSettle();
-        await t.tap(find.text('Mint'));
+        await t.tap(find.text('Mint').last);
         await t.pumpAndSettle();
       }));
   testWidgets('icon_prompt', (t) => shot(t, 'icon_prompt', const ProfileScreen(), scaffold: false, act: (t) async {
@@ -34,7 +34,7 @@ void main() {
             const MethodChannel('com.example.espere_app/app_icon'), (c) async => c.method == 'current' ? 'Lime' : true);
         await t.tap(find.text('App colour'));
         await t.pumpAndSettle();
-        await t.tap(find.text('Pink'));
+        await t.tap(find.text('Pink').last);
         await t.pumpAndSettle();
         await t.tap(find.text('Done'));
         await t.pumpAndSettle();

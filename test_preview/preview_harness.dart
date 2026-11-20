@@ -269,6 +269,11 @@ Future<void> shot(WidgetTester tester, String name, Widget screen,
     {Map<String, Object>? prefs, Size size = const Size(390, 844), bool scaffold = true,
     Future<void> Function(WidgetTester t)? act}) async {
   debugDisableShadows = false;
+  // flutter test --dart-define=ACCENT=4 renders every screen in that app colour into
+  // goldens/accent_4/ (used for the website's colour picker).
+  const accent = int.fromEnvironment('ACCENT', defaultValue: -1);
+  if (accent >= 0) AppAccent.debugIndex = accent;
+  final path = accent >= 0 ? 'goldens/accent_$accent/$name.png' : 'goldens/$name.png';
   SharedPreferences.setMockInitialValues(prefs ?? baseCache());
   tester.view.devicePixelRatio = 2;
   tester.view.physicalSize = Size(size.width * 2, size.height * 2);
@@ -293,7 +298,7 @@ Future<void> shot(WidgetTester tester, String name, Widget screen,
     }
   }
   try {
-    await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/$name.png'));
+    await expectLater(find.byType(MaterialApp), matchesGoldenFile(path));
   } finally {
     debugDisableShadows = true;
   }
