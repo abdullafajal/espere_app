@@ -13,7 +13,17 @@ class SpringTabs extends StatefulWidget {
   final TabController controller;
   final List<String> labels;
 
-  const SpringTabs({super.key, required this.controller, required this.labels});
+  /// Track colour; null = white card with a soft shadow.
+  final Color? background;
+  final double height;
+
+  const SpringTabs({
+    super.key,
+    required this.controller,
+    required this.labels,
+    this.background,
+    this.height = 52,
+  });
 
   @override
   State<SpringTabs> createState() => _SpringTabsState();
@@ -85,12 +95,12 @@ class _SpringTabsState extends State<SpringTabs> with SingleTickerProviderStateM
   Widget build(BuildContext context) {
     final n = widget.labels.length;
     return Container(
-      height: 52,
+      height: widget.height,
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(26), // fully round, like every switch
-        boxShadow: AppShadows.soft,
+        color: widget.background ?? AppColors.card,
+        borderRadius: BorderRadius.circular(widget.height / 2), // fully round, like every switch
+        boxShadow: widget.background == null ? AppShadows.soft : null,
       ),
       child: LayoutBuilder(
         builder: (context, box) {
@@ -107,7 +117,7 @@ class _SpringTabsState extends State<SpringTabs> with SingleTickerProviderStateM
                     bottom: 0,
                     width: w,
                     child: Container(
-                      decoration: BoxDecoration(color: AppColors.dark, borderRadius: BorderRadius.circular(22)),
+                      decoration: BoxDecoration(color: AppColors.dark, borderRadius: BorderRadius.circular(widget.height / 2 - 4)),
                     ),
                   ),
                   Row(
