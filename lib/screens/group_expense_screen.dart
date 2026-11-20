@@ -170,11 +170,12 @@ class _GroupExpenseScreenState extends State<GroupExpenseScreen> with SingleTick
     final sum = _people.fold<double>(0, (s, m) => s + _valueOf(m['id'] as int));
     if (_mode == 'exact') {
       final left = _total - sum;
-      if (left.abs() < 0.01) return '${_money(sum)} of ${_money(_total)} ✓';
+      if (_total <= 0) return 'Type the amount first';
+      if (left.abs() < 0.01) return 'All ${_money(_total)} shared';
       return left > 0 ? '${_money(left)} left' : '${_money(-left)} too much';
     }
     final left = 100 - sum;
-    if (left.abs() < 0.01) return '100% ✓';
+    if (left.abs() < 0.01) return 'All 100% shared';
     return left > 0 ? '${left.toStringAsFixed(left == left.roundToDouble() ? 0 : 1)}% left' : '${(-left).toStringAsFixed(0)}% too much';
   }
 

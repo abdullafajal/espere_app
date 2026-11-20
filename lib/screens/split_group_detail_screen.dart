@@ -7,6 +7,7 @@ import '../widgets/spring_menu.dart';
 import '../widgets/spring_tabs.dart';
 import 'group_invite_screen.dart';
 import 'group_expense_screen.dart';
+import 'group_form_screen.dart';
 import '../utils/icon_mapper.dart';
 import '../utils/avatar_cache.dart';
 import '../services/api_service.dart';
@@ -252,105 +253,11 @@ class _S extends State<SplitGroupDetailScreen>
     Future.delayed(const Duration(seconds: 2), () => entry.remove());
   }
 
-  /// Rename the group or change its icon.
-  void _editGroup() {
-    final nc = TextEditingController(text: (_g?['name'] ?? widget.groupName).toString());
-    bool saving = false;
-    String color = (_g?['color'] ?? '#C8E64A').toString();
-    String icon = (_g?['icon'] ?? 'groups').toString();
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.card,
-      isScrollControlled: true,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, ss) => Padding(
-          padding: EdgeInsets.fromLTRB(16, 10, 16, 16 + MediaQuery.of(ctx).viewInsets.bottom),
-          child: SafeArea(
-            top: false,
-            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
-                ),
-              ),
-              const SizedBox(height: 14),
-              const Center(child: Text('Edit group', style: AppText.section)),
-              const SizedBox(height: 16),
-              const Padding(padding: EdgeInsets.only(left: 4, bottom: 6), child: Text('NAME', style: AppText.label)),
-              Container(
-                height: 50,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(25)),
-                alignment: Alignment.centerLeft,
-                child: TextField(
-                  controller: nc,
-                  textCapitalization: TextCapitalization.words,
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.text),
-                  decoration: const InputDecoration(
-                    hintText: 'Group name',
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    filled: false,
-                    isDense: true,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              IconColorPicker(
-                currentName: nc.text,
-                initialColor: color,
-                initialIcon: icon,
-                onSelected: (c, i) {
-                  color = c;
-                  icon = i;
-                },
-              ),
-              const SizedBox(height: 18),
-              SpringPress(
-                haptic: HapticKind.none,
-                onTap: saving
-                    ? null
-                    : () async {
-                        if (nc.text.trim().isEmpty) return;
-                        ss(() => saving = true);
-                        final r = await ApiService.updateSplitGroup(widget.groupId, {
-                          'name': nc.text.trim(),
-                          'color': color,
-                          'icon': icon,
-                          'members_can_invite': _g?['members_can_invite'] ?? true,
-                        });
-                        if (!ctx.mounted) return;
-                        Navigator.pop(ctx);
-                        if (r.isSuccess) {
-                          AppHaptics.confirm();
-                          _load();
-                        } else {
-                          _showTopMessage(r.error ?? 'Error', isError: true);
-                        }
-                      },
-                child: Container(
-                  height: 54,
-                  decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(27)),
-                  alignment: Alignment.center,
-                  child: saving
-                      ? const SizedBox(
-                          width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.dark))
-                      : const Row(mainAxisSize: MainAxisSize.min, children: [
-                          Icon(Icons.check_rounded, size: 22, color: AppColors.dark),
-                          SizedBox(width: 8),
-                          Text('Save changes', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.dark)),
-                        ]),
-                ),
-              ),
-            ]),
-          ),
-        ),
-      ),
-    );
+  /// Rename the group, change its icon or who may invite (same screen as New group).
+  Future<void> _editGroup() async {
+    if (_g == null) return;
+    final saved = await GroupFormScreen.open(context, group: {..._g!, 'id': _g!['id'] ?? widget.groupId});
+    if (saved) _load();
   }
 
   void _showLoading(BuildContext ctx) {
