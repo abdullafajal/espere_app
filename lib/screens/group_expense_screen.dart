@@ -597,7 +597,7 @@ class _GroupExpenseScreenState extends State<GroupExpenseScreen> with SingleTick
 
   Widget _modes() => SpringTabs(
         controller: _tabs,
-        labels: const ['Equally', 'Exact ₹', 'By %'],
+        labels: ['Equally', 'Exact ${widget.currencySymbol}', 'By %'],
         background: AppColors.surface,
         height: 46,
       );

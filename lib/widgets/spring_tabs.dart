@@ -1,6 +1,6 @@
 /// Segmented tabs whose dark pill moves exactly like the nav bar's: a tick on tap, the
-/// pill flows to the new tab on [AppMotion.move] with a soft overshoot, and a light tick
-/// when it lands. Swiping the pages moves the pill with the finger.
+/// pill flows to the new tab on [AppMotion.move] with a soft overshoot (one vibration per
+/// change, none on landing). Swiping the pages moves the pill with the finger.
 library;
 
 import 'package:flutter/material.dart';
@@ -67,15 +67,14 @@ class _SpringTabsState extends State<SpringTabs> with SingleTickerProviderStateM
     if (_springing || widget.controller.indexIsChanging) return;
     if (_target != widget.controller.index.toDouble()) {
       _target = widget.controller.index.toDouble();
-      AppHaptics.land();
+      AppHaptics.tap();
     }
   }
 
   void _checkLanding() {
     if (_landed) return;
     if ((_pos.value - _target).abs() < 0.06) {
-      _landed = true;
-      AppHaptics.land();
+      _landed = true; // no second buzz on landing: one tap, one vibration
     }
   }
 
