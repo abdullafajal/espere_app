@@ -15,6 +15,7 @@ import 'screens/quick_add_screen.dart';
 import 'screens/categories_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/invite_screen.dart';
+import 'services/app_icon_service.dart';
 import 'services/notification_service.dart';
 import 'services/connectivity_service.dart';
 import 'services/sync_service.dart';
@@ -67,6 +68,8 @@ void main() async {
   ));
 
   await AppAccent.load();
+  // Keep the start-up splash in the chosen app colour (Android 13+; takes effect next start).
+  AppIconService.setSplash(AppAccent.current.name);
   runApp(const EspereApp());
 }
 

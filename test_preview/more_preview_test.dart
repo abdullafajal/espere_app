@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -27,6 +28,26 @@ void main() {
         await t.pumpAndSettle();
         await t.tap(find.text('Mint'));
         await t.pumpAndSettle();
+      }));
+  testWidgets('icon_prompt', (t) => shot(t, 'icon_prompt', const ProfileScreen(), scaffold: false, act: (t) async {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+            const MethodChannel('com.example.espere_app/app_icon'), (c) async => c.method == 'current' ? 'Lime' : true);
+        await t.tap(find.text('App colour'));
+        await t.pumpAndSettle();
+        await t.tap(find.text('Pink'));
+        await t.pumpAndSettle();
+        await t.tap(find.text('Done'));
+        await t.pumpAndSettle();
+        await t.tap(find.text('App icon'));
+        for (var k = 0; k < 12; k++) {
+          await t.pump(const Duration(milliseconds: 100));
+        }
+        await t.runAsync(() async {
+          for (final e in find.byType(Image).evaluate()) {
+            await precacheImage((e.widget as Image).image, e);
+          }
+        });
+        await t.pump();
       }));
   testWidgets('auto_track', (t) => shot(t, 'auto_track', const AutoTrackSettingsScreen(), scaffold: false));
   testWidgets('auto_review', (t) => shot(t, 'auto_review', const AutoTrackReviewScreen(), scaffold: false));

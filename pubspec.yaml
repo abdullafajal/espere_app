@@ -1,7 +1,7 @@
 name: espere_app
 description: "Espere — Modern Expense & Income Tracker"
 publish_to: 'none'
-version: 1.3.8+25
+version: 1.3.9+26
 
 environment:
   sdk: ^3.7.0
@@ -64,6 +64,13 @@ flutter:
     - assets/logo.png
     - assets/logo_splash.png
     - assets/icons/google.png
+    - assets/icons/app_icon_lime.png
+    - assets/icons/app_icon_mint.png
+    - assets/icons/app_icon_sky.png
+    - assets/icons/app_icon_lavender.png
+    - assets/icons/app_icon_pink.png
+    - assets/icons/app_icon_peach.png
+    - assets/icons/app_icon_sun.png
 
   # Plus Jakarta Sans (SIL Open Font License, see assets/fonts/PlusJakartaSans-OFL.txt)
   fonts:

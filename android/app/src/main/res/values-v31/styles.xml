@@ -19,4 +19,24 @@
     <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:windowBackground">?android:colorBackground</item>
     </style>
+
+    <!-- Splash in each app colour (chosen at runtime with SplashScreen.setSplashScreenTheme, Android 13+) -->
+    <style name="LaunchTheme.Mint" parent="LaunchTheme">
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/android12splash_mint</item>
+    </style>
+    <style name="LaunchTheme.Sky" parent="LaunchTheme">
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/android12splash_sky</item>
+    </style>
+    <style name="LaunchTheme.Lavender" parent="LaunchTheme">
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/android12splash_lavender</item>
+    </style>
+    <style name="LaunchTheme.Pink" parent="LaunchTheme">
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/android12splash_pink</item>
+    </style>
+    <style name="LaunchTheme.Peach" parent="LaunchTheme">
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/android12splash_peach</item>
+    </style>
+    <style name="LaunchTheme.Sun" parent="LaunchTheme">
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/android12splash_sun</item>
+    </style>
 </resources>

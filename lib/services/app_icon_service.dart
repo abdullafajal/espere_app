@@ -24,6 +24,17 @@ class AppIconService {
     }
   }
 
+  /// Uses [name]'s colour for the launch splash from the next start (Android 13+).
+  static Future<void> setSplash(String name) async {
+    if (!supported) return;
+    try {
+      await _channel.invokeMethod<bool>('setSplash', name);
+    } catch (_) {}
+  }
+
+  /// The logo picture in a colour, for showing in the app ("Lime" -> assets/icons/app_icon_lime.png).
+  static String logoAsset(String name) => 'assets/icons/app_icon_${name.toLowerCase()}.png';
+
   /// Shows the icon in [name]'s colour. Returns false if the phone did not allow it.
   static Future<bool> set(String name) async {
     if (!supported) return false;

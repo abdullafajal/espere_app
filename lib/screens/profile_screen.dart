@@ -475,6 +475,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           }
                         },
                   style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
                     backgroundColor: AppColors.dark,
                     foregroundColor: AppColors.accent,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -744,31 +745,57 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.card,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-        title: Row(children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(color: AppColors.dark, shape: BoxShape.circle),
-            alignment: Alignment.center,
-            child: Container(
-              width: 26,
-              height: 26,
-              decoration: BoxDecoration(color: AppAccent.current.color, shape: BoxShape.circle),
-            ),
+        title: Column(children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(26),
+            child: Image.asset(AppIconService.logoAsset(name), width: 88, height: 88),
           ),
-          const SizedBox(width: 12),
-          Expanded(child: Text('Make the app icon $name too?', style: AppText.section)),
+          const SizedBox(height: 16),
+          Text('Make the app icon $name too?', textAlign: TextAlign.center, style: AppText.section),
         ]),
         content: const Text(
           'The Espere icon on your phone will change to this colour. On some phones the icon on '
           'the home screen is removed when it changes; add it again from the app list.',
+          textAlign: TextAlign.center,
           style: AppText.rowSub,
         ),
-        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        actionsPadding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Not now')),
-          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Change icon')),
+          Row(children: [
+            Expanded(
+              child: SizedBox(
+                height: 52,
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    foregroundColor: AppColors.dark,
+                    side: const BorderSide(color: AppColors.border, width: 1.5),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+                  ),
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Not now', maxLines: 1, softWrap: false, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: SizedBox(
+                height: 52,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    backgroundColor: AppColors.dark,
+                    foregroundColor: AppColors.accent,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+                  ),
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Change icon', maxLines: 1, softWrap: false, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                ),
+              ),
+            ),
+          ]),
         ],
       ),
     );
@@ -869,7 +896,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
     );
-    if (!mounted || AppAccent.index == before) return;
+    if (AppAccent.index == before) return;
+    AppIconService.setSplash(AppAccent.current.name); // the start-up splash follows the colour
+    if (!mounted) return;
     await _offerIcon();
   }
 
@@ -1032,7 +1061,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             _row(
                               icon: Icons.apps_rounded,
                               label: 'App icon',
-                              hint: _iconName == null || _iconName == AppAccent.current.name
+                              hint: (_iconName ?? 'Lime') == AppAccent.current.name
                                   ? 'Matches your app colour'
                                   : 'Tap to match ${AppAccent.current.name}',
                               value: _iconName ?? 'Lime',
