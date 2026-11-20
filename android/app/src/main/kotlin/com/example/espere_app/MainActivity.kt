@@ -7,6 +7,7 @@ import com.example.espere_app.autocapture.AutoCaptureBridge
 import com.example.espere_app.receipt.ReceiptBridge
 import com.example.espere_app.reminders.DailyReminder
 import com.example.espere_app.haptics.Haptics
+import com.example.espere_app.appicon.AppIcon
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -30,6 +31,8 @@ class MainActivity : FlutterActivity() {
         DailyReminder.register(this, flutterEngine.dartExecutor.binaryMessenger)
         // Haptics on the vibrator directly (reliable on every phone)
         Haptics.register(this, flutterEngine.dartExecutor.binaryMessenger)
+        // Launcher icon in the app colour (Settings -> App colour)
+        AppIcon.register(this, flutterEngine.dartExecutor.binaryMessenger)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             if (call.method == "pickImage") {
                 pendingResult = result

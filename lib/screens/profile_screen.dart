@@ -22,6 +22,7 @@ import '../services/auto_expense_service.dart';
 import 'auto_track_settings_screen.dart';
 import 'reports_screen.dart';
 import '../services/daily_reminders.dart';
+import '../services/app_icon_service.dart';
 import '../widgets/espere_input.dart';
 import '../utils/app_toast.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -69,6 +70,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadCounts();
     _loadReminders();
     _loadAutoTrack();
+    _loadIconName();
   }
 
   Future<void> _loadAutoTrack() async {
@@ -721,7 +723,69 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   /// Accent colour picker: a few light colours that keep ink text readable.
+  String? _iconName;
+
+  Future<void> _loadIconName() async {
+    final n = await AppIconService.current();
+    if (mounted) setState(() => _iconName = n);
+  }
+
+  /// Ask whether the launcher icon should follow the app colour too.
+  Future<void> _offerIcon({bool fromRow = false}) async {
+    if (!AppIconService.supported) return;
+    final name = AppAccent.current.name;
+    final now = _iconName ?? await AppIconService.current();
+    if (now == name) {
+      if (fromRow && mounted) AppToast.success(context, 'The app icon is already $name.');
+      return;
+    }
+    if (!mounted) return;
+    final yes = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        title: Row(children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(color: AppColors.dark, shape: BoxShape.circle),
+            alignment: Alignment.center,
+            child: Container(
+              width: 26,
+              height: 26,
+              decoration: BoxDecoration(color: AppAccent.current.color, shape: BoxShape.circle),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: Text('Make the app icon $name too?', style: AppText.section)),
+        ]),
+        content: const Text(
+          'The Espere icon on your phone will change to this colour. On some phones the icon on '
+          'the home screen is removed when it changes; add it again from the app list.',
+          style: AppText.rowSub,
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Not now')),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Change icon')),
+        ],
+      ),
+    );
+    if (yes != true) return;
+    final ok = await AppIconService.set(name);
+    if (!mounted) return;
+    if (ok) {
+      AppHaptics.confirm();
+      setState(() => _iconName = name);
+      AppToast.success(context, 'App icon changed to $name.');
+    } else {
+      AppToast.error(context, 'Could not change the app icon on this phone.');
+    }
+  }
+
   Future<void> _pickAccent() async {
+    final before = AppAccent.index;
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: AppColors.card,
@@ -805,6 +869,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
     );
+    if (!mounted || AppAccent.index == before) return;
+    await _offerIcon();
   }
 
   /// Shares the app's download page, with the user's username as the referrer.
@@ -962,6 +1028,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             value: AppAccent.current.name,
                             onTap: _pickAccent,
                           ),
+                          if (AppIconService.supported)
+                            _row(
+                              icon: Icons.apps_rounded,
+                              label: 'App icon',
+                              hint: _iconName == null || _iconName == AppAccent.current.name
+                                  ? 'Matches your app colour'
+                                  : 'Tap to match ${AppAccent.current.name}',
+                              value: _iconName ?? 'Lime',
+                              onTap: () => _offerIcon(fromRow: true),
+                            ),
                           _row(
                             icon: Icons.auto_awesome_rounded,
                             label: 'Delete animation',
