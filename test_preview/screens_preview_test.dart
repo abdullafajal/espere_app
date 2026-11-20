@@ -150,7 +150,14 @@ void main() {
   testWidgets('sheet_group_expense', (t) => shot(t, 'sheet_group_expense', const SplitGroupDetailScreen(groupId: 1, groupName: 'Goa Trip'),
       scaffold: false, act: (t) => t.tap(find.text('Add expense'))));
   testWidgets('sheet_new_group', (t) => shot(t, 'sheet_new_group', SplitGroupsScreen(onBack: () {}),
-      scaffold: false, act: (t) => t.tap(find.byTooltip('New group'))));
+      scaffold: false, act: (t) async {
+        await t.tap(find.byTooltip('New group'));
+        await t.pump();
+        await t.pump(const Duration(milliseconds: 700));
+        await t.pump(const Duration(milliseconds: 700));
+        await t.enterText(find.byType(TextField).first, 'Goa Trip');
+        await t.pump(const Duration(milliseconds: 400));
+      }));
   testWidgets('sheet_budget', (t) => shot(t, 'sheet_budget', const BudgetsScreen(),
       act: (t) => t.tap(find.byTooltip('New budget'))));
 }

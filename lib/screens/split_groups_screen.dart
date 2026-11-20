@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'group_form_screen.dart';
 import '../theme/motion.dart';
 import 'package:intl/intl.dart';
 import '../widgets/espere_header.dart';
@@ -265,134 +266,8 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
     );
   }
 
-  void _showCreateGroupSheet() async {
-    final nameCtrl = TextEditingController();
-    List<Map<String, dynamic>> friends = [];
-    List<int> selectedIds = [];
-    bool loadingFriends = true;
-    bool isSaving = false;
-    String selectedColor = '#C8E64A';
-    String selectedIcon = 'groups';
-
-    final res = await ApiService.getFriends();
-    if (res.isSuccess) {
-      friends = List<Map<String, dynamic>>.from(res.data!['friends']);
-    }
-    loadingFriends = false;
-
-    if (!mounted) return;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.background,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, ss) => Container(
-          padding: EdgeInsets.fromLTRB(24, 12, 24, MediaQuery.of(ctx).viewInsets.bottom + 24),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: AppColors.muted.withOpacity(0.2), borderRadius: BorderRadius.circular(2)))),
-                const SizedBox(height: 24),
-                const Center(
-                  child: Text('Create Group', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.text)),
-                ),
-                const SizedBox(height: 32),
-                const Text('Group Name', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.muted)),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: nameCtrl,
-                  onChanged: (v) => ss(() {}),
-                  style: const TextStyle(fontSize: 15, color: AppColors.text),
-                  decoration: _inputDeco('e.g. Trip to Goa'),
-                ),
-                const SizedBox(height: 24),
-                IconColorPicker(
-                  currentName: nameCtrl.text,
-                  onSelected: (color, icon) {
-                    selectedColor = color;
-                    selectedIcon = icon;
-                  },
-                ),
-                const SizedBox(height: 32),
-                const Text('Add Members', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.muted)),
-                const SizedBox(height: 12),
-                if (loadingFriends)
-                  const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator(color: AppColors.dark)))
-                else if (friends.isEmpty)
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    width: double.infinity,
-                    decoration: BoxDecoration(color: AppColors.card, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.border)),
-                    child: const Text('No friends yet. You can add them later.', style: TextStyle(color: AppColors.muted, fontSize: 13)),
-                  )
-                else
-                  ConstrainedBox(
-                    constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.3),
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: friends.length,
-                      itemBuilder: (ctx, i) {
-                        final f = friends[i];
-                        final fid = f['id'] as int;
-                        final isSelected = selectedIds.contains(fid);
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: isSelected ? AppColors.accent.withOpacity(0.05) : AppColors.card,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: isSelected ? AppColors.accent : AppColors.border),
-                            ),
-                            child: CheckboxListTile(
-                              value: isSelected,
-                              onChanged: (v) => ss(() { if (v!) selectedIds.add(fid); else selectedIds.remove(fid); }),
-                              title: Text(f['display_name'] ?? f['username'] ?? '', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.text)),
-                              secondary: UserAvatar(initial: f['initial'] ?? '?', avatarUrl: f['avatar_url'], size: 36),
-                              activeColor: AppColors.accent,
-                              checkColor: AppColors.dark,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                const SizedBox(height: 32),
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.dark, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-                    onPressed: isSaving ? null : () async {
-                      if (nameCtrl.text.trim().isEmpty) return;
-                      ss(() => isSaving = true);
-                      final body = {'name': nameCtrl.text.trim(), 'members': selectedIds, 'color': selectedColor, 'icon': selectedIcon};
-                      final r = await ApiService.createSplitGroup(body);
-                      if (!ctx.mounted) return;
-                      Navigator.pop(ctx);
-                      if (r.isSuccess) {
-                        AppHaptics.confirm();
-                        _loadGroups();
-                      } else {
-                        _showTopMessage(r.error ?? 'Error', isError: true);
-                      }
-                    },
-                    child: isSaving 
-                        ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: AppColors.dark, strokeWidth: 2))
-                        : Text('Create Group', style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold, fontSize: 16)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+  Future<void> _showCreateGroupSheet() async {
+    if (await GroupFormScreen.open(context)) _loadGroups();
   }
 
   InputDecoration _inputDeco(String hint) => InputDecoration(
@@ -880,76 +755,8 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
     );
   }
 
-  void _editGroupSheet(Map<String, dynamic> group) {
-    final nameCtrl = TextEditingController(text: group['name']);
-    String selectedColor = group['color'] ?? '#C8E64A';
-    String selectedIcon = group['icon'] ?? 'groups';
-    bool isSaving = false;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.background,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, ss) => Container(
-          padding: EdgeInsets.fromLTRB(24, 12, 24, MediaQuery.of(ctx).viewInsets.bottom + 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: AppColors.muted.withOpacity(0.2), borderRadius: BorderRadius.circular(2)))),
-              const SizedBox(height: 24),
-              const Center(
-                child: Text('Edit Group', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.text)),
-              ),
-              const SizedBox(height: 32),
-              const Text('Group Name', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.muted)),
-              const SizedBox(height: 8),
-              TextField(
-                controller: nameCtrl,
-                onChanged: (v) => ss(() {}),
-                style: const TextStyle(fontSize: 15, color: AppColors.text),
-                decoration: _inputDeco('e.g. Trip to Goa'),
-              ),
-              const SizedBox(height: 24),
-              IconColorPicker(
-                initialColor: selectedColor,
-                initialIcon: selectedIcon,
-                currentName: nameCtrl.text,
-                onSelected: (color, icon) {
-                  selectedColor = color;
-                  selectedIcon = icon;
-                },
-              ),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.dark, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-                  onPressed: isSaving ? null : () async {
-                    if (nameCtrl.text.trim().isEmpty) return;
-                    ss(() => isSaving = true);
-                    final body = {'name': nameCtrl.text.trim(), 'color': selectedColor, 'icon': selectedIcon};
-                    final res = await ApiService.updateSplitGroup(group['id'] as int, body);
-                    if (!ctx.mounted) return;
-                    Navigator.pop(ctx);
-                    if (res.isSuccess) {
-                      AppHaptics.confirm();
-                      _loadGroups();
-                    }
-                  },
-                  child: isSaving 
-                      ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: AppColors.dark, strokeWidth: 2))
-                      : Text('Save Changes', style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold, fontSize: 16)),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+  Future<void> _editGroupSheet(Map<String, dynamic> group) async {
+    if (await GroupFormScreen.open(context, group: group)) _loadGroups();
   }
 
   void _deleteGroup(GlobalKey<ThanosSnapWidgetState> snapKey, Map<String, dynamic> group) async {
