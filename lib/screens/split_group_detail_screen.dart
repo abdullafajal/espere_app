@@ -441,7 +441,7 @@ class _S extends State<SplitGroupDetailScreen>
                       width: 52,
                       height: 52,
                       decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(18)),
-                      child: Icon(expenseIcon('${e['description'] ?? ''}'), size: 26, color: AppColors.dark),
+                      child: Icon(groupExpenseIcon(e), size: 26, color: AppColors.dark),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -1446,21 +1446,27 @@ class _S extends State<SplitGroupDetailScreen>
   Widget _face(dynamic id, String name, {double size = 40, Color? border, Color? bg}) {
     final m = _member(id);
     final url = (m?['avatar_url'] ?? '').toString();
+    final inner = border == null ? size : size - 4;
     final text = Text(_initials(name, m?['initial']?.toString()),
         style: TextStyle(fontSize: size * 0.33, fontWeight: FontWeight.w800, color: AppColors.dark));
+    final face = ClipOval(
+      child: Container(
+        width: inner,
+        height: inner,
+        color: bg ?? (id == _myId ? AppColors.accent : AppColors.surface),
+        alignment: Alignment.center,
+        child: url.isEmpty
+            ? text
+            : Image.network(url, width: inner, height: inner, fit: BoxFit.cover, errorBuilder: (_, __, ___) => text),
+      ),
+    );
+    if (border == null) return face;
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: bg ?? (id == _myId ? AppColors.accent : AppColors.surface),
-        border: border == null ? null : Border.all(color: border, width: 2),
-      ),
-      clipBehavior: Clip.antiAlias,
-      alignment: Alignment.center,
-      child: url.isEmpty
-          ? text
-          : Image.network(url, width: size, height: size, fit: BoxFit.cover, errorBuilder: (_, __, ___) => text),
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(color: border, shape: BoxShape.circle),
+      child: face,
     );
   }
 
@@ -1858,7 +1864,7 @@ class _S extends State<SplitGroupDetailScreen>
     }
     final desc = (e['description'] ?? '').toString();
     Widget row = _activityRow(
-      icon: expenseIcon(desc),
+      icon: groupExpenseIcon(e),
       title: desc,
       sub: payer == null ? _money(total) : '${paidByMe ? 'You' : payer} paid ${_money(total)}',
       tag: tag,

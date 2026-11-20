@@ -57,6 +57,13 @@ class _GroupExpenseScreenState extends State<GroupExpenseScreen> {
   final Map<int, TextEditingController> _values = {};
   String? _error;
   bool _saving = false;
+  /// Picked by hand; otherwise it follows the words.
+  late String? _category = (widget.editData?['category'] ?? '').toString().isEmpty
+      ? null
+      : widget.editData!['category'].toString();
+
+  GroupCategory get _cat =>
+      groupCategoryByKey(_category) ?? guessGroupCategory(_desc.text) ?? groupCategories.last;
 
   List<Map<String, dynamic>> get _people => widget.members;
 
@@ -189,6 +196,7 @@ class _GroupExpenseScreenState extends State<GroupExpenseScreen> {
       'amount': _total.toStringAsFixed(2),
       'date': _date.toUtc().toIso8601String(),
       'paid_by': _payer,
+      'category': _cat.key,
     };
     if (_mode == 'equal') {
       if (_included.isEmpty) return _fail('Pick at least one person to split with.');
@@ -346,7 +354,7 @@ class _GroupExpenseScreenState extends State<GroupExpenseScreen> {
               decoration: InputDecoration(
                 hintText: 'What was it for?',
                 hintStyle: const TextStyle(color: AppColors.darkFaint),
-                prefixIcon: Icon(expenseIcon(_desc.text), size: 20, color: AppColors.accent),
+                prefixIcon: Icon(_cat.icon, size: 20, color: AppColors.accent),
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
@@ -355,6 +363,8 @@ class _GroupExpenseScreenState extends State<GroupExpenseScreen> {
               ),
             ),
           ),
+          const SizedBox(height: 10),
+          _categories(),
           const SizedBox(height: 10),
           SpringPress(
             onTap: _pickDate,
@@ -370,6 +380,44 @@ class _GroupExpenseScreenState extends State<GroupExpenseScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// One row of category chips; the current one is lit.
+  Widget _categories() {
+    final cur = _cat;
+    final list = [cur, ...groupCategories.where((c) => c.key != cur.key)];
+    return SizedBox(
+      height: 36,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        clipBehavior: Clip.none,
+        itemCount: list.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (_, i) {
+          final c = list[i];
+          final on = c.key == cur.key;
+          return SpringPress(
+            onTap: () => setState(() => _category = c.key),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              height: 36,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: on ? AppColors.accent : AppColors.darkCard,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(c.icon, size: 16, color: on ? AppColors.dark : Colors.white),
+                const SizedBox(width: 6),
+                Text(c.label,
+                    style: TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.w700, color: on ? AppColors.dark : Colors.white)),
+              ]),
+            ),
+          );
+        },
       ),
     );
   }
@@ -608,30 +656,51 @@ class _GroupExpenseScreenState extends State<GroupExpenseScreen> {
   }
 }
 
-/// A fitting icon for an expense from its words.
-IconData expenseIcon(String text) {
-  final t = text.toLowerCase();
-  const map = <List<String>, IconData>{
-    ['dinner', 'lunch', 'breakfast', 'food', 'restaurant', 'meal', 'pizza', 'biryani', 'snack', 'thali']:
-        Icons.restaurant_rounded,
-    ['coffee', 'tea', 'chai', 'cafe']: Icons.local_cafe_rounded,
-    ['fuel', 'petrol', 'diesel', 'gas']: Icons.local_gas_station_rounded,
-    ['hotel', 'stay', 'room', 'airbnb', 'hostel']: Icons.hotel_rounded,
-    ['flight', 'plane', 'air']: Icons.flight_rounded,
-    ['train', 'rail']: Icons.train_rounded,
-    ['cab', 'taxi', 'uber', 'ola', 'auto', 'ride']: Icons.local_taxi_rounded,
-    ['scooter', 'bike', 'rent a']: Icons.two_wheeler_rounded,
-    ['bus']: Icons.directions_bus_rounded,
-    ['grocery', 'groceries', 'vegetable', 'milk', 'mart']: Icons.local_grocery_store_rounded,
-    ['movie', 'cinema', 'ticket', 'show']: Icons.local_activity_rounded,
-    ['drink', 'beer', 'bar', 'party']: Icons.local_bar_rounded,
-    ['rent', 'house']: Icons.home_rounded,
-    ['electric', 'bill', 'wifi', 'internet', 'recharge']: Icons.receipt_rounded,
-    ['shop', 'shopping', 'clothes', 'gift']: Icons.shopping_bag_rounded,
-    ['medicine', 'doctor', 'hospital']: Icons.medical_services_rounded,
-  };
-  for (final e in map.entries) {
-    if (e.key.any(t.contains)) return e.value;
-  }
-  return Icons.receipt_long_rounded;
+/// Categories a group expense can have: key, label, icon, and words that suggest it.
+class GroupCategory {
+  final String key;
+  final String label;
+  final IconData icon;
+  final List<String> words;
+  const GroupCategory(this.key, this.label, this.icon, this.words);
 }
+
+const groupCategories = <GroupCategory>[
+  GroupCategory('food', 'Food', Icons.restaurant_rounded,
+      ['dinner', 'lunch', 'breakfast', 'food', 'restaurant', 'meal', 'pizza', 'biryani', 'snack', 'thali', 'khana', 'zomato', 'swiggy']),
+  GroupCategory('cafe', 'Cafe', Icons.local_cafe_rounded, ['coffee', 'tea', 'chai', 'cafe']),
+  GroupCategory('groceries', 'Groceries', Icons.local_grocery_store_rounded,
+      ['grocery', 'groceries', 'vegetable', 'sabzi', 'milk', 'doodh', 'dahi', 'curd', 'mart', 'ration', 'fruit', 'atta', 'eggs']),
+  GroupCategory('travel', 'Travel', Icons.flight_rounded, ['flight', 'plane', 'train', 'rail', 'bus', 'trip', 'ticket']),
+  GroupCategory('transport', 'Cab', Icons.local_taxi_rounded,
+      ['cab', 'taxi', 'uber', 'ola', 'auto', 'ride', 'scooter', 'bike', 'rapido', 'metro', 'parking', 'toll']),
+  GroupCategory('fuel', 'Fuel', Icons.local_gas_station_rounded, ['fuel', 'petrol', 'diesel', 'gas', 'cng']),
+  GroupCategory('stay', 'Stay', Icons.hotel_rounded, ['hotel', 'stay', 'room', 'airbnb', 'hostel', 'resort']),
+  GroupCategory('fun', 'Fun', Icons.local_activity_rounded,
+      ['movie', 'cinema', 'show', 'game', 'party', 'drink', 'beer', 'bar', 'club', 'netflix']),
+  GroupCategory('shopping', 'Shopping', Icons.shopping_bag_rounded, ['shop', 'shopping', 'clothes', 'gift', 'amazon', 'flipkart']),
+  GroupCategory('home', 'Rent', Icons.home_rounded, ['rent', 'house', 'flat', 'maid', 'cook']),
+  GroupCategory('bills', 'Bills', Icons.receipt_rounded,
+      ['electric', 'bill', 'wifi', 'internet', 'recharge', 'water', 'cylinder']),
+  GroupCategory('health', 'Health', Icons.medical_services_rounded, ['medicine', 'doctor', 'hospital', 'pharmacy']),
+  GroupCategory('other', 'Other', Icons.receipt_long_rounded, []),
+];
+
+GroupCategory? groupCategoryByKey(String? key) =>
+    key == null || key.isEmpty ? null : groupCategories.where((c) => c.key == key).firstOrNull;
+
+/// The category the words suggest, or null.
+GroupCategory? guessGroupCategory(String text) {
+  final t = text.toLowerCase();
+  for (final c in groupCategories) {
+    if (c.words.any(t.contains)) return c;
+  }
+  return null;
+}
+
+/// A fitting icon for an expense from its words.
+IconData expenseIcon(String text) => guessGroupCategory(text)?.icon ?? Icons.receipt_long_rounded;
+
+/// The icon for a saved expense: its category, else a guess from its words.
+IconData groupExpenseIcon(Map<String, dynamic> e) =>
+    groupCategoryByKey(e['category']?.toString())?.icon ?? expenseIcon('${e['description'] ?? ''}');
