@@ -63,44 +63,6 @@ object Haptics {
                 v.vibrate(ms)
             }
         } catch (_: Exception) {
-            null
-        }
-        MethodChannel(messenger, CHANNEL).setMethodCallHandler { call, result ->
-            if (call.method == "play") {
-                play(vibrator, call.arguments as? String ?: "tap")
-                result.success(null)
-            } else {
-                result.notImplemented()
-            }
-        }
-    }
-
-    private fun play(vibrator: Vibrator?, kind: String) {
-        val v = vibrator ?: return
-        try {
-            if (!v.hasVibrator()) return
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val effect = when (kind) {
-                    "tap", "land" -> VibrationEffect.EFFECT_TICK
-                    "press", "confirm" -> VibrationEffect.EFFECT_CLICK
-                    "warn" -> VibrationEffect.EFFECT_HEAVY_CLICK
-                    else -> VibrationEffect.EFFECT_TICK
-                }
-                v.vibrate(VibrationEffect.createPredefined(effect))
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val (ms, amp) = when (kind) {
-                    "tap", "land" -> 8L to 70
-                    "press" -> 12L to 120
-                    "confirm" -> 16L to 180
-                    "warn" -> 28L to 255
-                    else -> 8L to 70
-                }
-                v.vibrate(VibrationEffect.createOneShot(ms, amp))
-            } else {
-                @Suppress("DEPRECATION")
-                v.vibrate(if (kind == "warn") 28L else 12L)
-            }
-        } catch (_: Exception) {
         }
     }
 }
