@@ -1,6 +1,6 @@
 /// Segmented tabs whose dark pill moves exactly like the nav bar's: a tick on tap, the
-/// pill flows to the new tab on [AppMotion.move] with a soft overshoot, and a light tick
-/// when it lands. Swiping the pages moves the pill with the finger.
+/// pill flows to the new tab on [AppMotion.move] with a soft overshoot (one vibration per
+/// change, none on landing). Swiping the pages moves the pill with the finger.
 library;
 
 import 'package:flutter/material.dart';
@@ -13,7 +13,17 @@ class SpringTabs extends StatefulWidget {
   final TabController controller;
   final List<String> labels;
 
-  const SpringTabs({super.key, required this.controller, required this.labels});
+  /// Track colour; null = white card with a soft shadow.
+  final Color? background;
+  final double height;
+
+  const SpringTabs({
+    super.key,
+    required this.controller,
+    required this.labels,
+    this.background,
+    this.height = 52,
+  });
 
   @override
   State<SpringTabs> createState() => _SpringTabsState();
@@ -57,15 +67,14 @@ class _SpringTabsState extends State<SpringTabs> with SingleTickerProviderStateM
     if (_springing || widget.controller.indexIsChanging) return;
     if (_target != widget.controller.index.toDouble()) {
       _target = widget.controller.index.toDouble();
-      AppHaptics.land();
+      AppHaptics.tap();
     }
   }
 
   void _checkLanding() {
     if (_landed) return;
     if ((_pos.value - _target).abs() < 0.06) {
-      _landed = true;
-      AppHaptics.land();
+      _landed = true; // no second buzz on landing: one tap, one vibration
     }
   }
 
@@ -85,12 +94,12 @@ class _SpringTabsState extends State<SpringTabs> with SingleTickerProviderStateM
   Widget build(BuildContext context) {
     final n = widget.labels.length;
     return Container(
-      height: 52,
+      height: widget.height,
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(26), // fully round, like every switch
-        boxShadow: AppShadows.soft,
+        color: widget.background ?? AppColors.card,
+        borderRadius: BorderRadius.circular(widget.height / 2), // fully round, like every switch
+        boxShadow: widget.background == null ? AppShadows.soft : null,
       ),
       child: LayoutBuilder(
         builder: (context, box) {
@@ -107,7 +116,7 @@ class _SpringTabsState extends State<SpringTabs> with SingleTickerProviderStateM
                     bottom: 0,
                     width: w,
                     child: Container(
-                      decoration: BoxDecoration(color: AppColors.dark, borderRadius: BorderRadius.circular(22)),
+                      decoration: BoxDecoration(color: AppColors.dark, borderRadius: BorderRadius.circular(widget.height / 2 - 4)),
                     ),
                   ),
                   Row(

@@ -419,6 +419,17 @@ class CacheService {
     return await _read(_userKey);
   }
 
+  static const _symbols = {'USD': '\$', 'EUR': '€', 'GBP': '£', 'INR': '₹', 'PKR': 'Rs'};
+
+  /// The symbol for the user's chosen currency (from the currency code first, so a stale
+  /// cached symbol never wins).
+  static String symbolFor(Map<String, dynamic>? user) {
+    final code = (user?['currency'] ?? '').toString().toUpperCase();
+    return _symbols[code] ?? (user?['currency_symbol'] as String?) ?? '₹';
+  }
+
+  static Future<String> currencySymbol() async => symbolFor(await getCachedUser());
+
   // ─── Reports ─────────────────────────────────────────────────────────
 
   static Future<void> cacheReports(Map<String, dynamic> data) async {

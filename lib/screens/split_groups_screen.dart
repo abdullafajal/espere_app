@@ -51,7 +51,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
     if (cachedUser != null && mounted) {
       setState(() {
         _myId = cachedUser['id'];
-        _currencySymbol = cachedUser['currency_symbol'] as String? ?? '₹';
+        _currencySymbol = CacheService.symbolFor(cachedUser);
       });
     }
 

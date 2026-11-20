@@ -13,6 +13,7 @@ import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/motion.dart';
 import '../utils/pickers.dart';
+import '../widgets/spring_tabs.dart';
 
 class GroupExpenseScreen extends StatefulWidget {
   final int groupId;
@@ -47,7 +48,9 @@ class GroupExpenseScreen extends StatefulWidget {
   State<GroupExpenseScreen> createState() => _GroupExpenseScreenState();
 }
 
-class _GroupExpenseScreenState extends State<GroupExpenseScreen> {
+class _GroupExpenseScreenState extends State<GroupExpenseScreen> with SingleTickerProviderStateMixin {
+  static const _modeIds = ['equal', 'exact', 'percentage'];
+  late final TabController _tabs;
   late final _amount = TextEditingController(text: _initialAmount());
   late final _desc = TextEditingController(text: widget.editData?['description']?.toString() ?? '');
   late DateTime _date = DateTime.tryParse(widget.editData?['date']?.toString() ?? '')?.toLocal() ?? DateTime.now();
@@ -114,10 +117,21 @@ class _GroupExpenseScreenState extends State<GroupExpenseScreen> {
       }
     }
     _amount.addListener(() => setState(() {}));
+    _tabs = TabController(length: 3, vsync: this, initialIndex: _modeIds.indexOf(_mode));
+    _tabs.addListener(() {
+      final m = _modeIds[_tabs.index];
+      if (m != _mode) {
+        setState(() {
+          _mode = m;
+          _error = null;
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
+    _tabs.dispose();
     _amount.dispose();
     _desc.dispose();
     for (final c in _values.values) {
@@ -364,60 +378,85 @@ class _GroupExpenseScreenState extends State<GroupExpenseScreen> {
             ),
           ),
           const SizedBox(height: 10),
-          _categories(),
-          const SizedBox(height: 10),
-          SpringPress(
-            onTap: _pickDate,
-            child: Container(
-              height: 36,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(color: AppColors.darkCard, borderRadius: BorderRadius.circular(18)),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                const Icon(Icons.schedule_rounded, size: 17, color: Colors.white),
-                const SizedBox(width: 6),
-                Text(when, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
-              ]),
-            ),
-          ),
+          Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            _topChip(_cat.icon, _cat.label, _pickCategory, lit: true),
+            const SizedBox(width: 8),
+            _topChip(Icons.schedule_rounded, when, _pickDate),
+          ]),
         ],
       ),
     );
   }
 
-  /// One row of category chips; the current one is lit.
-  Widget _categories() {
-    final cur = _cat;
-    final list = [cur, ...groupCategories.where((c) => c.key != cur.key)];
-    return SizedBox(
-      height: 36,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        clipBehavior: Clip.none,
-        itemCount: list.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (_, i) {
-          final c = list[i];
-          final on = c.key == cur.key;
-          return SpringPress(
-            onTap: () => setState(() => _category = c.key),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 160),
-              height: 36,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                color: on ? AppColors.accent : AppColors.darkCard,
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(c.icon, size: 16, color: on ? AppColors.dark : Colors.white),
-                const SizedBox(width: 6),
-                Text(c.label,
-                    style: TextStyle(
-                        fontSize: 12, fontWeight: FontWeight.w700, color: on ? AppColors.dark : Colors.white)),
-              ]),
+  Widget _topChip(IconData icon, String label, VoidCallback onTap, {bool lit = false}) => SpringPress(
+        onTap: onTap,
+        child: Container(
+          height: 38,
+          padding: const EdgeInsets.only(left: 12, right: 10),
+          decoration: BoxDecoration(
+            color: lit ? AppColors.accent : AppColors.darkCard,
+            borderRadius: BorderRadius.circular(19),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(icon, size: 17, color: lit ? AppColors.dark : Colors.white),
+            const SizedBox(width: 6),
+            Text(label,
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: lit ? AppColors.dark : Colors.white)),
+            const SizedBox(width: 2),
+            Icon(Icons.expand_more_rounded, size: 18, color: lit ? AppColors.dark : AppColors.darkMuted),
+          ]),
+        ),
+      );
+
+  /// All categories in a grid; tap one to pick it.
+  void _pickCategory() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.card,
+      builder: (ctx) => SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
             ),
-          );
-        },
+            const SizedBox(height: 14),
+            const Text('Category', style: AppText.section),
+            const SizedBox(height: 14),
+            GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: 4,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 0.95,
+              children: [
+                for (final c in groupCategories)
+                  SpringPress(
+                    onTap: () {
+                      setState(() => _category = c.key);
+                      Navigator.pop(ctx);
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: c.key == _cat.key ? AppColors.accent : AppColors.surface,
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                        Icon(c.icon, size: 24, color: AppColors.dark),
+                        const SizedBox(height: 6),
+                        Text(c.label,
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.dark)),
+                      ]),
+                    ),
+                  ),
+              ],
+            ),
+          ]),
+        ),
       ),
     );
   }
@@ -436,7 +475,16 @@ class _GroupExpenseScreenState extends State<GroupExpenseScreen> {
               children: [
                 const Text('PAID BY', style: AppText.label),
                 const SizedBox(height: 8),
-                Wrap(spacing: 8, runSpacing: 8, children: [for (final m in _people) _payerChip(m)]),
+                SizedBox(
+                  height: 40,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    clipBehavior: Clip.none,
+                    itemCount: _people.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (_, i) => _payerChip(_people[i]),
+                  ),
+                ),
                 const SizedBox(height: 18),
                 Row(children: [
                   const Expanded(child: Text('SPLIT', style: AppText.label)),
@@ -457,6 +505,11 @@ class _GroupExpenseScreenState extends State<GroupExpenseScreen> {
                     ],
                   ]),
                 ),
+                if (_mode == 'equal')
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(6, 8, 6, 0),
+                    child: Text('Tap someone to leave them out of this bill.', style: AppText.rowSub),
+                  ),
                 if (_error != null) ...[
                   const SizedBox(height: 12),
                   Container(
@@ -542,38 +595,12 @@ class _GroupExpenseScreenState extends State<GroupExpenseScreen> {
     );
   }
 
-  Widget _modes() {
-    const modes = [('equal', 'Equally'), ('exact', 'Exact ₹'), ('percentage', 'By %')];
-    return Container(
-      height: 44,
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(22)),
-      child: Row(children: [
-        for (final (id, label) in modes)
-          Expanded(
-            child: SpringPress(
-              onTap: () => setState(() {
-                _mode = id;
-                _error = null;
-              }),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                decoration: BoxDecoration(
-                  color: _mode == id ? AppColors.dark : Colors.transparent,
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                alignment: Alignment.center,
-                child: Text(label,
-                    style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: _mode == id ? AppColors.accent : AppColors.muted)),
-              ),
-            ),
-          ),
-      ]),
-    );
-  }
+  Widget _modes() => SpringTabs(
+        controller: _tabs,
+        labels: ['Equally', 'Exact ${widget.currencySymbol}', 'By %'],
+        background: AppColors.surface,
+        height: 46,
+      );
 
   Widget _personRow(Map<String, dynamic> m) {
     final id = m['id'] as int;
@@ -611,7 +638,15 @@ class _GroupExpenseScreenState extends State<GroupExpenseScreen> {
         ),
       );
     }
-    return Padding(
+    void toggle() => setState(() {
+          if (included) {
+            _out.add(id);
+          } else {
+            _out.remove(id);
+          }
+          _error = null;
+        });
+    final row = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Row(children: [
         if (_mode == 'equal') ...[
@@ -619,14 +654,7 @@ class _GroupExpenseScreenState extends State<GroupExpenseScreen> {
             checked: included,
             label: 'Include $name',
             child: SpringPress(
-              onTap: () => setState(() {
-                if (included) {
-                  _out.add(id);
-                } else {
-                  _out.remove(id);
-                }
-                _error = null;
-              }),
+              onTap: toggle,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 150),
                 width: 26,
@@ -652,6 +680,14 @@ class _GroupExpenseScreenState extends State<GroupExpenseScreen> {
         ),
         trailing,
       ]),
+    );
+    if (_mode != 'equal') return row;
+    return InkWell(
+      onTap: () {
+        AppHaptics.tap();
+        toggle();
+      },
+      child: row,
     );
   }
 }

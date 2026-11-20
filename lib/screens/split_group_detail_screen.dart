@@ -74,7 +74,7 @@ class _S extends State<SplitGroupDetailScreen>
     final cached = await CacheService.getCachedUser();
     if (cached != null) {
       _myId = cached['id'];
-      _currencySymbol = cached['currency_symbol'] as String? ?? '₹';
+      _currencySymbol = CacheService.symbolFor(cached);
     }
 
     // 1. Try to load full detail from cache first
@@ -122,6 +122,8 @@ class _S extends State<SplitGroupDetailScreen>
     final pr = await ApiService.getProfile();
     if (pr.isSuccess && mounted) {
       _myId = pr.data?.id;
+      final sym = CacheService.symbolFor({'currency': pr.data?.currency, 'currency_symbol': pr.data?.currencySymbol});
+      if (sym != _currencySymbol) setState(() => _currencySymbol = sym);
     }
 
     // 2. Fetch fresh detail from API silently in background
