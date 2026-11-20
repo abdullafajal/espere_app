@@ -599,6 +599,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
 
   Widget _sheet() {
     return Container(
+      clipBehavior: Clip.antiAlias,
       decoration: const BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xxxl)),
