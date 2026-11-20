@@ -49,11 +49,11 @@ class AppHaptics {
     }
   }
 
-  static void tap() => _play('tap', HapticFeedback.selectionClick);
-  static void press() => _play('press', HapticFeedback.lightImpact);
-  static void confirm() => _play('confirm', HapticFeedback.mediumImpact);
+  static void tap() => _play('tap', HapticFeedback.mediumImpact);
+  static void press() => _play('press', HapticFeedback.mediumImpact);
+  static void confirm() => _play('confirm', HapticFeedback.heavyImpact);
   static void warn() => _play('warn', HapticFeedback.heavyImpact);
-  static void land() => _play('land', HapticFeedback.lightImpact);
+  static void land() => _play('land', HapticFeedback.mediumImpact);
 
   static void of(HapticKind kind) {
     switch (kind) {
