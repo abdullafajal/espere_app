@@ -9,6 +9,7 @@ import '../theme/app_theme.dart';
 import '../models/transaction.dart';
 import '../utils/icon_mapper.dart';
 import 'espere_swipe_action.dart';
+import 'morph_text.dart';
 import 'spring_menu.dart';
 
 class TransactionTile extends StatelessWidget {
@@ -79,14 +80,14 @@ class TransactionTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, style: AppText.rowTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    MorphText(title, id: t.id, style: AppText.rowTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 2),
-                    Text(sub, style: AppText.rowSub, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    MorphText(sub, id: t.id, style: AppText.rowSub, maxLines: 1, overflow: TextOverflow.ellipsis),
                   ],
                 ),
               ),
               const SizedBox(width: 8),
-              Text(amountText(t, currencySymbol), style: AppText.amount),
+              MorphText(amountText(t, currencySymbol), id: t.id, style: AppText.amount),
               if (showActions)
                 SpringMenuButton<String>(
                   items: SpringMenuButton.editDelete(),

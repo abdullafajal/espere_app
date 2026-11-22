@@ -2,6 +2,7 @@
 ///
 /// Displays system categories (read-only) and user categories (deletable).
 /// Includes a form to add new categories with icon and color pickers.
+import '../widgets/morph_text.dart';
 import 'package:flutter/material.dart';
 import '../theme/motion.dart';
 import '../utils/app_toast.dart';
@@ -359,12 +360,12 @@ class _CategoryTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                MorphText(id: category.id, 
                   category.name,
                   style: AppText.rowTitle,
                 ),
                 const SizedBox(height: 2),
-                Text(
+                MorphText(id: category.id, 
                   '${category.type == 'income' ? 'Income' : 'Expense'} · ${category.isSystem ? 'Built-in' : 'Yours'}',
                   style: const TextStyle(
                     fontSize: 12,

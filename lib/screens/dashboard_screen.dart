@@ -1,6 +1,7 @@
 /// Home: greeting + notifications bell → spend hero card (pick a month; last 7 days for
 /// this month, weeks for an earlier one; average per day) → Add expense / Scan →
 /// one-tap repeats → payments to review + recent.
+import '../widgets/morph_text.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -384,7 +385,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Good ${d.greeting.toLowerCase()}', style: AppText.rowSub),
-                  Text(
+                  MorphText(id: 'home-name', 
                     d.user.displayName.trim().isEmpty ? firstName : d.user.displayName.trim(),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -499,11 +500,11 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                 crossAxisAlignment: CrossAxisAlignment.baseline,
                 textBaseline: TextBaseline.alphabetic,
                 children: [
-                  Text(_money(spent, d.currencySymbol),
+                  MorphText(id: 'home-spent', _money(spent, d.currencySymbol),
                       style: AppText.hero.copyWith(color: Colors.white, fontSize: 34, letterSpacing: -1)),
                   if (limit > 0) ...[
                     const SizedBox(width: 8),
-                    Text('of ${_money(limit, d.currencySymbol)}',
+                    MorphText(id: 'home-spent', 'of ${_money(limit, d.currencySymbol)}',
                         style: const TextStyle(fontSize: 13, color: AppColors.darkMuted)),
                   ],
                 ],

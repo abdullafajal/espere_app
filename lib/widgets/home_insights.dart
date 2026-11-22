@@ -4,6 +4,7 @@
 /// [MonthlyTrendCard] — spending for the last 6 months; tap a bar to open that month.
 library;
 
+import 'morph_text.dart';
 import 'dart:math' as math;
 import '../theme/motion.dart';
 
@@ -206,17 +207,17 @@ class _CategoryBreakdownCardState extends State<CategoryBreakdownCard> {
                           child: Text(s.name, style: AppText.rowTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
                         ),
                         const SizedBox(width: 8),
-                        Text(_money(s.total, widget.symbol), style: AppText.amount),
+                        MorphText(id: s.name, _money(s.total, widget.symbol), style: AppText.amount),
                       ],
                     ),
                     const SizedBox(height: 2),
                     Row(
                       children: [
                         Expanded(
-                          child: Text('${s.count} ${s.count == 1 ? 'entry' : 'entries'}',
+                          child: MorphText(id: s.name, '${s.count} ${s.count == 1 ? 'entry' : 'entries'}',
                               style: AppText.rowSub, maxLines: 1),
                         ),
-                        Text('${(pct * 100).round()}%',
+                        MorphText(id: s.name, '${(pct * 100).round()}%',
                             style: AppText.rowSub.copyWith(fontWeight: FontWeight.w700, color: AppColors.text)),
                       ],
                     ),

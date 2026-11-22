@@ -1,3 +1,4 @@
+import '../widgets/morph_text.dart';
 import 'dart:async';
 import '../theme/motion.dart';
 import 'package:flutter/material.dart';
@@ -1097,12 +1098,12 @@ class _S extends State<SplitGroupDetailScreen>
             const SizedBox(width: 12),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text((_g!['name'] ?? widget.groupName).toString(),
+                MorphText(id: 'group', (_g!['name'] ?? widget.groupName).toString(),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Colors.white)),
                 const SizedBox(height: 2),
-                Text(
+                MorphText(id: 'group', 
                   '${joined.length} ${joined.length == 1 ? 'member' : 'members'}${_isOwner ? ' · you are admin' : ''}',
                   style: const TextStyle(fontSize: 12, color: AppColors.darkMuted),
                 ),
@@ -1410,7 +1411,7 @@ class _S extends State<SplitGroupDetailScreen>
           const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-              Text((_g?['name'] ?? widget.groupName).toString(),
+              MorphText(id: 'group', (_g?['name'] ?? widget.groupName).toString(),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, letterSpacing: -0.3, color: AppColors.text)),
@@ -1501,18 +1502,18 @@ class _S extends State<SplitGroupDetailScreen>
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(color: AppColors.dark, borderRadius: BorderRadius.circular(24)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(
+          MorphText(id: 'group', 
             settled ? 'Overall, you are settled up' : (bal > 0 ? 'Overall, you get back' : 'Overall, you owe'),
             style: const TextStyle(fontSize: 12, color: AppColors.darkMuted),
           ),
           const SizedBox(height: 2),
-          Text(
+          MorphText(id: 'group', 
             settled ? _money(0) : '${bal > 0 ? '+' : '−'}${_money(bal.abs())}',
             style: TextStyle(fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: -1, color: AppColors.accent),
           ),
           if (summary.isNotEmpty) ...[
             const SizedBox(height: 2),
-            Text(summary,
+            MorphText(id: 'group', summary,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontSize: 12, color: AppColors.darkMuted)),
@@ -1711,6 +1712,7 @@ class _S extends State<SplitGroupDetailScreen>
     required String amount,
     bool faded = false,
     VoidCallback? onTap,
+    Object? id,
   }) =>
       InkWell(
         onTap: onTap,
@@ -1731,16 +1733,16 @@ class _S extends State<SplitGroupDetailScreen>
               const SizedBox(width: 12),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                  Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.rowTitle),
+                  MorphText(id: id, title, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.rowTitle),
                   const SizedBox(height: 1),
-                  Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.rowSub),
+                  MorphText(id: id, sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.rowSub),
                 ]),
               ),
               const SizedBox(width: 8),
               Column(crossAxisAlignment: CrossAxisAlignment.end, mainAxisSize: MainAxisSize.min, children: [
-                Text(tag, style: AppText.rowSub.copyWith(fontSize: 11)),
+                MorphText(id: id, tag, style: AppText.rowSub.copyWith(fontSize: 11)),
                 const SizedBox(height: 1),
-                Text(amount,
+                MorphText(id: id, amount,
                     style: TextStyle(
                         fontSize: 14, fontWeight: FontWeight.w800, color: faded ? AppColors.muted : AppColors.text)),
               ]),
@@ -1780,6 +1782,7 @@ class _S extends State<SplitGroupDetailScreen>
       amount: _money(shown),
       faded: tag == 'not involved',
       onTap: () => _showExpenseDetail(e),
+      id: 'e${e['id']}',
     );
     if (canEdit) {
       row = EspereSwipeAction(
@@ -1831,6 +1834,7 @@ class _S extends State<SplitGroupDetailScreen>
       tag: byMe ? 'paid' : (toMe ? 'received' : 'settled'),
       amount: _money(x['amount']),
       faded: !byMe && !toMe,
+      id: 's${x['id']}',
     );
   }
 

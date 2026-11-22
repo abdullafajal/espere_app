@@ -2,6 +2,7 @@
 ///
 /// Features: search bar, type/category filter chips, month navigator,
 /// grouped transaction list with edit/delete actions
+import '../widgets/morph_text.dart';
 import 'dart:async';
 import '../theme/motion.dart';
 import 'package:flutter/material.dart';
@@ -613,7 +614,7 @@ class TransactionListScreenState extends State<TransactionListScreen> {
             child: Row(
               children: [
                 Expanded(child: Text(_dayLabel(day), style: AppText.label)),
-                Text(_signed(net), style: AppText.label.copyWith(letterSpacing: 0, fontWeight: FontWeight.w600)),
+                MorphText(id: day, _signed(net), style: AppText.label.copyWith(letterSpacing: 0, fontWeight: FontWeight.w600)),
               ],
             ),
           ),

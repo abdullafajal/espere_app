@@ -1,3 +1,4 @@
+import '../widgets/morph_text.dart';
 import 'package:flutter/material.dart';
 import 'group_form_screen.dart';
 import '../theme/motion.dart';
@@ -479,7 +480,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
                     style: const TextStyle(fontSize: 11, color: AppColors.darkMuted),
                   ),
                   const SizedBox(height: 2),
-                  Text(
+                  MorphText(id: 'groups-$label', 
                     '$_currencySymbol${NumberFormat.decimalPattern('en_IN').format(value.round())}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -509,7 +510,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          MorphText(id: 'groups-overall', 
             'Overall balance · $acceptedCount ${acceptedCount == 1 ? 'group' : 'groups'}',
             style: const TextStyle(
               fontSize: 12,
@@ -518,7 +519,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
             ),
           ),
           const SizedBox(height: 4),
-          Text(
+          MorphText(id: 'groups-overall', 
             net.abs() < 0.5
                 ? 'All settled up'
                 : '${net > 0 ? '+' : '−'}$_currencySymbol${NumberFormat.decimalPattern('en_IN').format(net.abs().round())}',
@@ -594,7 +595,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        MorphText(id: group['id'], 
                           group['name'] ?? 'Group',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -609,7 +610,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
                           children: [
                             const Icon(Icons.people_alt_outlined, size: 13, color: AppColors.muted),
                             const SizedBox(width: 4),
-                            Text(
+                            MorphText(id: group['id'], 
                               '$memberCount ${memberCount == 1 ? 'member' : 'members'}',
                               style: const TextStyle(
                                 fontSize: 12,
@@ -641,7 +642,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
                       ),
                     )
                   else
-                    _buildBalanceChip(netBalance),
+                    _buildBalanceChip(netBalance, group['id']),
                 ],
               ),
             ),
@@ -703,7 +704,7 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
   }
 
   /// Right-aligned balance chip: lime = you get back, dark = you owe.
-  Widget _buildBalanceChip(double balance) {
+  Widget _buildBalanceChip(double balance, Object? id) {
     final amount = '$_currencySymbol${NumberFormat.decimalPattern('en_IN').format(balance.abs().round())}';
     Color bg;
     Color fg;
@@ -738,11 +739,11 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
           if (value == '✓')
             Icon(Icons.check_rounded, size: 18, color: fg)
           else
-            Text(
+            MorphText(id: id, 
               value,
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: fg),
             ),
-          Text(
+          MorphText(id: id, 
             caption,
             style: TextStyle(
               fontSize: 10,

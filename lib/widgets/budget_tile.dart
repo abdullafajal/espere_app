@@ -1,3 +1,4 @@
+import 'morph_text.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
@@ -62,11 +63,11 @@ class _BudgetTileState extends State<BudgetTile> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    MorphText(id: widget.budget['id'], 
                       category['name'] ?? 'Category',
                       style: AppText.rowTitle,
                     ),
-                    Text(
+                    MorphText(id: widget.budget['id'], 
                       DateFormat('MMMM yyyy').format(
                         DateTime.parse(widget.budget['month']),
                       ),
@@ -90,14 +91,14 @@ class _BudgetTileState extends State<BudgetTile> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
+              MorphText(id: widget.budget['id'], 
                 '${_m(widget.budget['spent'])} spent',
                 style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              Text(
+              MorphText(id: widget.budget['id'], 
                 '${pct.toStringAsFixed(0)}%',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
@@ -126,7 +127,7 @@ class _BudgetTileState extends State<BudgetTile> {
                   color: AppColors.muted,
                 ),
               ),
-              Text(
+              MorphText(id: widget.budget['id'], 
                 'Limit: ${_m(widget.budget['amount'])}',
                 style: const TextStyle(
                   fontSize: 11,
@@ -158,7 +159,7 @@ class _BudgetTileState extends State<BudgetTile> {
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(
+                    child: MorphText(id: widget.budget['id'], 
                       'Budget exceeded by ${_m(double.parse(widget.budget['spent'].toString()) - double.parse(widget.budget['amount'].toString()))}',
                       style: TextStyle(
                         color: AppColors.accent,
