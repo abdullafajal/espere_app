@@ -328,13 +328,16 @@ class TransactionListScreenState extends State<TransactionListScreen> {
     return '${v >= 0 ? '+' : '−'}$_currencySymbol${f.format(v.abs())}';
   }
 
-  Widget _typeChip(String type, String label) => Padding(
-        padding: const EdgeInsets.only(right: 8),
-        child: EspereFilterChip(
-          label: label,
-          active: _typeFilter == type,
-          dropdown: false,
-          onTap: () => _setType(type),
+  Widget _typeChip(String type, String label, {bool last = false}) => Expanded(
+        child: Padding(
+          padding: EdgeInsets.only(right: last ? 0 : 8),
+          child: EspereFilterChip(
+            label: label,
+            active: _typeFilter == type,
+            dropdown: false,
+            expand: true,
+            onTap: () => _setType(type),
+          ),
         ),
       );
 
@@ -380,16 +383,13 @@ class TransactionListScreenState extends State<TransactionListScreen> {
                 const SizedBox(height: 14),
                 _searchRow(),
                 const SizedBox(height: 14),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  clipBehavior: Clip.none,
-                  child: Row(
-                    children: [
-                      _typeChip('', 'All'),
-                      _typeChip('expense', 'Spent'),
-                      _typeChip('income', 'Received'),
-                    ],
-                  ),
+                // The three filters share the full width.
+                Row(
+                  children: [
+                    _typeChip('', 'All'),
+                    _typeChip('expense', 'Spent'),
+                    _typeChip('income', 'Received', last: true),
+                  ],
                 ),
                 if (_filterSummary != null) ...[
                   const SizedBox(height: 10),
