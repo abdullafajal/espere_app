@@ -207,7 +207,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             },
             child: SafeArea(
               bottom: false, // Let content flow under floating nav
-              child: NavScope(child: IndexedStack(index: _currentIndex, children: _screens)),
+              // Hidden tabs stay alive but do not animate (or vibrate): only the tab on screen
+              // ticks. Without this, a hidden tab refreshing after a sync played the edit
+              // animation's vibration where nobody could see it.
+              child: NavScope(
+                child: IndexedStack(
+                  index: _currentIndex,
+                  children: [
+                    for (var i = 0; i < _screens.length; i++)
+                      TickerMode(enabled: i == _currentIndex, child: _screens[i]),
+                  ],
+                ),
+              ),
             ),
           ),
           Positioned(
