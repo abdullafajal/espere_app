@@ -5,6 +5,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import '../theme/motion.dart';
+import '../widgets/morph_text.dart';
 import '../widgets/espere_header.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
@@ -682,7 +683,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                MorphText(id: 'me', 
                   _user?.displayName ?? '',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -1079,6 +1080,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               setState(() => _shredderAnimation = !_shredderAnimation);
                               final prefs = await SharedPreferences.getInstance();
                               await prefs.setBool('enable_shredder_anim', _shredderAnimation);
+                            },
+                          ),
+                          _row(
+                            icon: Icons.auto_fix_high_rounded,
+                            label: 'Edit animation',
+                            hint: 'Only what changed turns to dust',
+                            on: EditAnimation.enabled,
+                            onTap: () async {
+                              AppHaptics.tap();
+                              await EditAnimation.set(!EditAnimation.enabled);
+                              if (mounted) setState(() {});
                             },
                           ),
                         ]),

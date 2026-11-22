@@ -2,6 +2,7 @@
 ///
 /// Features: search bar, type/category filter chips, month navigator,
 /// grouped transaction list with edit/delete actions
+import '../widgets/morph_text.dart';
 import 'dart:async';
 import '../theme/motion.dart';
 import 'package:flutter/material.dart';
@@ -10,8 +11,6 @@ import '../theme/app_theme.dart';
 import '../widgets/nav_space.dart';
 import '../widgets/espere_action_button.dart';
 import '../widgets/export_sheet.dart';
-import '../services/auto_expense_service.dart';
-import 'auto_track_review_screen.dart';
 import '../widgets/espere_header.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
@@ -50,15 +49,11 @@ class TransactionListScreenState extends State<TransactionListScreen> {
 
   final _searchController = TextEditingController();
 
-  List<ReviewItem> _reviews = const [];
-  StreamSubscription<void>? _autoSub;
 
   @override
   void initState() {
     super.initState();
     _loadData();
-    _loadReviews();
-    _autoSub = AutoExpenseService.changes.listen((_) => _loadReviews());
 
     // Listen for background sync completions
     _syncSub = SyncService.onSyncComplete.listen((_) {
@@ -70,31 +65,6 @@ class TransactionListScreenState extends State<TransactionListScreen> {
   /// Public method for parent to trigger a data reload.
   void reload() {
     _loadTransactions();
-    _loadReviews();
-  }
-
-  Future<void> _loadReviews() async {
-    final items = await AutoExpenseService.reviewItems();
-    if (mounted) setState(() => _reviews = items);
-  }
-
-  Future<void> _openReview() async {
-    await Navigator.push(context, MaterialPageRoute(builder: (_) => const AutoTrackReviewScreen()));
-    _loadReviews();
-    _loadTransactions();
-  }
-
-  Future<void> _confirmReview(ReviewItem item) async {
-    AppHaptics.confirm();
-    await AutoExpenseService.confirmReview(item, categoryId: item.txn.categoryId);
-    await _loadReviews();
-    await _loadTransactions();
-  }
-
-  Future<void> _ignoreReview(ReviewItem item) async {
-    AppHaptics.tap();
-    await AutoExpenseService.discardReview(item);
-    await _loadReviews();
   }
 
   Future<void> _loadData() async {
@@ -335,7 +305,6 @@ class TransactionListScreenState extends State<TransactionListScreen> {
   void dispose() {
     _searchController.dispose();
     _syncSub?.cancel();
-    _autoSub?.cancel();
     super.dispose();
   }
 
@@ -360,13 +329,16 @@ class TransactionListScreenState extends State<TransactionListScreen> {
     return '${v >= 0 ? '+' : '−'}$_currencySymbol${f.format(v.abs())}';
   }
 
-  Widget _typeChip(String type, String label) => Padding(
-        padding: const EdgeInsets.only(right: 8),
-        child: EspereFilterChip(
-          label: label,
-          active: _typeFilter == type,
-          dropdown: false,
-          onTap: () => _setType(type),
+  Widget _typeChip(String type, String label, {bool last = false}) => Expanded(
+        child: Padding(
+          padding: EdgeInsets.only(right: last ? 0 : 8),
+          child: EspereFilterChip(
+            label: label,
+            active: _typeFilter == type,
+            dropdown: false,
+            expand: true,
+            onTap: () => _setType(type),
+          ),
         ),
       );
 
@@ -412,33 +384,19 @@ class TransactionListScreenState extends State<TransactionListScreen> {
                 const SizedBox(height: 14),
                 _searchRow(),
                 const SizedBox(height: 14),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  clipBehavior: Clip.none,
-                  child: Row(
-                    children: [
-                      _typeChip('', 'All'),
-                      _typeChip('expense', 'Spent'),
-                      _typeChip('income', 'Received'),
-                      EspereFilterChip(
-                        label: _reviews.isEmpty ? 'To review' : 'To review · ${_reviews.length}',
-                        icon: Icons.bolt_rounded,
-                        active: false,
-                        dropdown: false,
-                        onTap: _openReview,
-                      ),
-                    ],
-                  ),
+                // The three filters share the full width.
+                Row(
+                  children: [
+                    _typeChip('', 'All'),
+                    _typeChip('expense', 'Spent'),
+                    _typeChip('income', 'Received', last: true),
+                  ],
                 ),
                 if (_filterSummary != null) ...[
                   const SizedBox(height: 10),
                   _filterBar(_filterSummary!),
                 ],
                 const SizedBox(height: 14),
-                if (_reviews.isNotEmpty) ...[
-                  _reviewCard(_reviews.first),
-                  const SizedBox(height: 14),
-                ],
                 if (_isLoading && _transactions.isEmpty)
                   SizedBox(height: 360, child: _buildSkeleton())
                 else if (_transactions.isEmpty)
@@ -641,83 +599,6 @@ class TransactionListScreenState extends State<TransactionListScreen> {
     );
   }
 
-  Widget _reviewCard(ReviewItem item) {
-    final t = item.txn;
-    final cat = _categories.where((c) => c.id == t.categoryId).firstOrNull;
-    final f = NumberFormat.decimalPatternDigits(
-        locale: 'en_IN', decimalDigits: t.amount == t.amount.roundToDouble() ? 0 : 2);
-    final source = t.sourceApp.isEmpty ? 'a notification' : t.sourceApp;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: AppShadows.soft,
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(color: AppColors.accent, shape: BoxShape.circle),
-                child: Icon(IconMapper.map(cat?.icon ?? 'category'), size: 22, color: AppColors.dark),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(t.payee ?? cat?.name ?? 'Payment', style: AppText.rowTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
-                    const SizedBox(height: 1),
-                    Text(
-                      'Auto-tracked from $source · ${DateFormat('h:mm a').format(t.time.toLocal())}',
-                      style: AppText.rowSub,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text('${t.type == 'income' ? '+' : '−'}$_currencySymbol${f.format(t.amount)}',
-                  style: AppText.amount.copyWith(fontSize: 15)),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _pillButton('Ignore', AppColors.surface, AppColors.text, () => _ignoreReview(item)),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _pillButton(
-                  t.type == 'income' ? 'Add income' : 'Add expense',
-                  AppColors.dark,
-                  Colors.white,
-                  () => _confirmReview(item),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _pillButton(String label, Color bg, Color fg, VoidCallback onTap) => SpringPress(
-        haptic: HapticKind.none,
-        onTap: onTap,
-        child: Container(
-          height: 42,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(21)),
-          child: Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: fg)),
-        ),
-      );
-
   Widget _daySection(DateTime day, List<TransactionModel> items) {
     final net = items.fold<double>(0, (sum, t) {
       final v = double.tryParse(t.amount) ?? 0;
@@ -733,7 +614,7 @@ class TransactionListScreenState extends State<TransactionListScreen> {
             child: Row(
               children: [
                 Expanded(child: Text(_dayLabel(day), style: AppText.label)),
-                Text(_signed(net), style: AppText.label.copyWith(letterSpacing: 0, fontWeight: FontWeight.w600)),
+                MorphText(id: day, _signed(net), style: AppText.label.copyWith(letterSpacing: 0, fontWeight: FontWeight.w600)),
               ],
             ),
           ),

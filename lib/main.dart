@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 import 'theme/app_theme.dart';
+import 'widgets/morph_text.dart';
 import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
@@ -68,6 +69,7 @@ void main() async {
   ));
 
   await AppAccent.load();
+  await EditAnimation.load();
   // Keep the start-up splash in the chosen app colour (Android 13+; takes effect next start).
   AppIconService.setSplash(AppAccent.current.name);
   runApp(const EspereApp());
