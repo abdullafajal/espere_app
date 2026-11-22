@@ -139,7 +139,9 @@ class TransactionStore {
       data: {
         'amount': amountText,
         'type': type,
-        'category_id': category?.id,
+        // No category picked: leave it as it is. Older servers reject category_id null on
+        // an edit, which threw the whole edit away and brought the old amount back.
+        if (category != null) 'category_id': category.id,
         'date': date.toUtc().toIso8601String(),
         'payment_method': paymentMethod,
         'notes': notes,
