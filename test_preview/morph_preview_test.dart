@@ -19,7 +19,7 @@ void main() {
     final d = DateTime(2026, 11, 22, 6, 56).toUtc().toIso8601String();
     final d2 = DateTime(2026, 11, 22, 8, 30).toUtc().toIso8601String();
     final a = TransactionModel.fromJson(txn(7, '20', 'expense', categories[0], 'Chai', d));
-    final b = TransactionModel.fromJson(txn(7, '45', 'expense', categories[0], 'Coffee', d2));
+    final b = TransactionModel.fromJson(txn(7, '45', 'expense', categories[2], 'Coffee', d2));
     final n = ValueNotifier(a);
     await tester.pumpWidget(MaterialApp(
       debugShowCheckedModeBanner: false,

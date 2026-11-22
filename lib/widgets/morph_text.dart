@@ -36,21 +36,14 @@ class EditAnimation {
     await p.setBool(prefKey, on);
   }
 
-  /// One light tick per burst of edits, however many fields change together.
+  /// The same buzz as the delete animation: a tick every 50 ms while dust moves. Shared by
+  /// every changing text, so several fields changing together still buzz as one.
   static DateTime _lastTick = DateTime(0);
   static void _tick() {
     final now = DateTime.now();
-    if (now.difference(_lastTick).inMilliseconds < 90) return;
+    if (now.difference(_lastTick).inMilliseconds < 50) return;
     _lastTick = now;
     AppHaptics.tap();
-  }
-
-  static DateTime _lastConfirm = DateTime(0);
-  static void _confirm() {
-    final now = DateTime.now();
-    if (now.difference(_lastConfirm).inMilliseconds < 400) return;
-    _lastConfirm = now;
-    AppHaptics.confirm();
   }
 }
 
@@ -87,7 +80,6 @@ class _MorphTextState extends State<MorphText> with SingleTickerProviderStateMix
   AnimationController? _c;
   String? _from; // text being dusted away (phase 1)
   _Grains? _grains;
-  int _lastTickFrame = -1;
 
   @override
   void didUpdateWidget(MorphText old) {
@@ -101,11 +93,12 @@ class _MorphTextState extends State<MorphText> with SingleTickerProviderStateMix
     _from = old.text;
     _grains = null;
     _c ??= AnimationController(vsync: this)..addListener(_onTick);
+    // First tick right away, with the first frame of dust (not after the first frame lands).
+    EditAnimation._tick();
     _c!
       ..duration = _out + _in
       ..forward(from: 0).whenComplete(() {
         if (!mounted) return;
-        EditAnimation._confirm();
         setState(() {
           _from = null;
           _grains = null;
@@ -113,14 +106,15 @@ class _MorphTextState extends State<MorphText> with SingleTickerProviderStateMix
       });
   }
 
+  // Buzz only while grains are actually moving: dust leaving (most of phase one) and dust
+  // gathering (most of phase two), so the feel stops when the new text has formed.
   void _onTick() {
     final c = _c!;
+    if (!c.isAnimating) return;
     final split = _out.inMilliseconds / (_out + _in).inMilliseconds;
-    if (c.value < split * .8) {
-      final frame = (c.value * 30).floor(); // a light tick every few frames while dust flies
-      if (frame != _lastTickFrame && frame % 2 == 0) EditAnimation._tick();
-      _lastTickFrame = frame;
-    }
+    final v = c.value;
+    final moving = v < split * .92 || (v > split && v < split + (1 - split) * .9);
+    if (moving) EditAnimation._tick();
   }
 
   void _stop() {
@@ -385,4 +379,40 @@ class _MorphPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_MorphPainter old) => old.t != t || old.out != out || old.to != to;
+}
+
+/// An icon that shows an edit the same way: the old icon turns to dust and the new one
+/// gathers in its place. Icons are font glyphs, so this is [MorphText] with one character.
+class MorphIcon extends StatelessWidget {
+  final IconData icon;
+  final double size;
+  final Color? color;
+  final Object? id;
+
+  const MorphIcon(this.icon, {super.key, this.size = 24, this.color, this.id});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Center(
+        child: MorphText(
+          String.fromCharCode(icon.codePoint),
+          id: id,
+          softWrap: false,
+          style: TextStyle(
+            inherit: false,
+            fontFamily: icon.fontFamily,
+            package: icon.fontPackage,
+            fontFamilyFallback: icon.fontFamilyFallback,
+            fontSize: size,
+            height: 1,
+            color: color ?? IconTheme.of(context).color,
+            leadingDistribution: TextLeadingDistribution.even,
+          ),
+        ),
+      ),
+    );
+  }
 }

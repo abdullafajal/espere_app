@@ -347,7 +347,8 @@ class _CategoryTile extends StatelessWidget {
               color: AppColors.categoryFill,
               shape: BoxShape.circle,
             ),
-            child: Icon(
+            child: MorphIcon(
+              id: category.id,
               IconMapper.map(category.icon),
               size: 21,
               color: AppColors.categoryInk,

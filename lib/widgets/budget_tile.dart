@@ -52,7 +52,8 @@ class _BudgetTileState extends State<BudgetTile> {
                 width: 42,
                 height: 42,
                 decoration: const BoxDecoration(color: AppColors.categoryFill, shape: BoxShape.circle),
-                child: Icon(
+                child: MorphIcon(
+                  id: widget.budget['id'],
                   IconMapper.map(category['icon']),
                   color: AppColors.categoryInk,
                   size: 21,
