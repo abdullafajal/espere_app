@@ -100,6 +100,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
   /// Edit / receipt mode: a category tap selects, Save stores.
   bool get _formMode => widget.editId != null || widget.prefill != null;
   bool get _isEdit => widget.editId != null;
+  static const bool _pickThenSave = true;
   TransactionModel? _old;
   int? _categoryId;
 
@@ -198,7 +199,8 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
   }
 
   Future<void> _save(CategoryModel? category) async {
-    if (_formMode) {
+    // New entries work like edit too: tap a category to pick it, then the Add button saves.
+    if (_formMode || _pickThenSave) {
       AppHaptics.tap();
       setState(() => _categoryId = category?.id);
       return;
@@ -273,6 +275,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
           paymentMethod: _method,
           notes: _note.trim(),
         );
+        (await SharedPreferences.getInstance()).setString(_kMethod, _method);
       }
       if (!mounted) return;
       AppToast.success(context, _old != null ? 'Saved' : 'Added');
@@ -574,7 +577,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
           Text(
             _formMode
                 ? (_isEdit ? 'Change anything, then Save' : 'Check the details, then Save')
-                : (_hasAmount ? 'Now tap a category below' : 'Type the amount'),
+                : (_hasAmount ? 'Pick a category, then Add' : 'Type the amount'),
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
@@ -611,7 +614,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
             child: Row(
               children: [
                 Expanded(
-                  child: Text(_formMode ? 'Category' : 'Pick a category to save', style: AppText.section),
+                  child: const Text('Category', style: AppText.section),
                 ),
                 Text(
                   _categories.length > 8 ? '${_categories.length} · scroll' : '${_categories.length}',
@@ -621,7 +624,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
             ),
           ),
           Expanded(child: _grid()),
-          if (_formMode) _saveBar(),
+          _saveBar(),
           _keypad(),
         ],
       ),
@@ -634,7 +637,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
     }
     final tiles = <Widget>[
       for (final c in _categories)
-        _categoryTile(c.name, IconMapper.map(c.icon), () => _save(c), selected: _formMode && c.id == _categoryId),
+        _categoryTile(c.name, IconMapper.map(c.icon), () => _save(c), selected: c.id == _categoryId),
       _categoryTile('New', Icons.add_rounded, _newCategory, dashed: true),
     ];
     if (_categories.isEmpty) {
@@ -656,7 +659,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
     return Semantics(
       button: true,
       selected: selected,
-      label: dashed ? 'New category' : (_formMode ? label : 'Save to $label'),
+      label: dashed ? 'New category' : label,
       excludeSemantics: true,
       child: SpringPress(
         haptic: dashed ? HapticKind.tap : HapticKind.none,

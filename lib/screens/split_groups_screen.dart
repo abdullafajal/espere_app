@@ -584,7 +584,8 @@ class SplitGroupsScreenState extends State<SplitGroupsScreen> {
                       color: AppColors.categoryFill,
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(
+                    child: MorphIcon(
+                      id: group['id'],
                       _getIconData(group['icon'] ?? 'groups'),
                       color: AppColors.categoryInk,
                       size: 24,

@@ -73,7 +73,7 @@ class TransactionTile extends StatelessWidget {
                 width: 42,
                 height: 42,
                 decoration: const BoxDecoration(color: AppColors.categoryFill, shape: BoxShape.circle),
-                child: Icon(IconMapper.map(t.category.icon), size: 21, color: AppColors.categoryInk),
+                child: MorphIcon(IconMapper.map(t.category.icon), id: t.id, size: 21, color: AppColors.categoryInk),
               ),
               const SizedBox(width: 12),
               Expanded(

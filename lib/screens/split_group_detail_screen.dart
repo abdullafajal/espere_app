@@ -1728,7 +1728,7 @@ class _S extends State<SplitGroupDetailScreen>
                   color: lit ? AppColors.accent : AppColors.surface,
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(icon, size: 21, color: AppColors.dark),
+                child: MorphIcon(icon, id: id, size: 21, color: AppColors.dark),
               ),
               const SizedBox(width: 12),
               Expanded(
