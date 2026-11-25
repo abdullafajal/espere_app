@@ -297,7 +297,25 @@ class SyncService {
           if (resultData != null) {
             if (entity == 'transaction') {
               if (action == 'create' || action == 'update') {
-                final txnJson = (resultData as TransactionModel).toJson();
+                var txnJson = (resultData as TransactionModel).toJson();
+                // If the entry was edited again while this request was on its way, the
+                // server's answer is already out of date: keep the newer local values
+                // (only take the server id) until that edit is sent too. Otherwise the
+                // list briefly jumped back to the old amount.
+                final later = (await CacheService.getSyncQueue()).any((o) =>
+                    o['entity'] == 'transaction' &&
+                    (o['entityId']?.toString() == entityId?.toString() ||
+                        o['entityId']?.toString() == txnJson['id'].toString()));
+                if (later) {
+                  final cached = await CacheService.getCachedTransactions();
+                  final local = ((cached?['transactions'] as List?) ?? const [])
+                      .whereType<Map>()
+                      .where((t) => t['id']?.toString() == entityId?.toString())
+                      .firstOrNull;
+                  if (local != null) {
+                    txnJson = {...Map<String, dynamic>.from(local), 'id': txnJson['id']};
+                  }
+                }
                 await CacheService.updateTransactionInCache(
                   txnJson['id'], 
                   txnJson, 

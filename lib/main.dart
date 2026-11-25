@@ -30,14 +30,6 @@ final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase (graceful failure if config is missing)
-  try {
-    await Firebase.initializeApp();
-    await NotificationService.init(rootScaffoldMessengerKey, rootNavigatorKey);
-  } catch (e) {
-    debugPrint('[Firebase] Init failed: $e');
-  }
-
   // Initialize connectivity monitoring
   await ConnectivityService.init();
 
@@ -50,9 +42,10 @@ void main() async {
   // Payment receipts shared to Espere (Share -> Espere) open the Add Transaction form
   ReceiptService.init();
 
-  // Initial sync if online
+  // Initial sync if online: after the first screen is up, so it does not compete with
+  // drawing it (the screens show the saved copy straight away).
   if (ConnectivityService.isOnline) {
-    SyncService.syncAll();
+    Future.delayed(const Duration(milliseconds: 600), SyncService.syncAll);
   }
 
   // Auto-sync when device comes back online
@@ -68,11 +61,26 @@ void main() async {
     statusBarBrightness: Brightness.light,
   ));
 
-  await AppAccent.load();
-  await EditAnimation.load();
+  await Future.wait([AppAccent.load(), EditAnimation.load()]);
   // Keep the start-up splash in the chosen app colour (Android 13+; takes effect next start).
   AppIconService.setSplash(AppAccent.current.name);
   runApp(const EspereApp());
+
+  // Push notifications start after the first screen is shown. Before, the app waited
+  // for Firebase (including fetching a token over the network) before showing
+  // anything, which made opening slow, very slow on a weak connection.
+  _initPush();
+}
+
+Future<void> _initPush() async {
+  try {
+    await Firebase.initializeApp();
+    await NotificationService.init(rootScaffoldMessengerKey, rootNavigatorKey);
+  } catch (e) {
+    debugPrint('[Firebase] Init failed: $e');
+  } finally {
+    NotificationService.markReady();
+  }
 }
 
 class EspereApp extends StatefulWidget {
