@@ -782,7 +782,7 @@ class _S extends State<SplitGroupDetailScreen>
                                 SliverPersistentHeader(
                                   pinned: true,
                                   delegate: _SliverAppBarDelegate(
-                                    height: 76,
+                                    height: 84,
                                     child: Padding(
                                       padding: const EdgeInsets.fromLTRB(
                                         16,
@@ -794,6 +794,11 @@ class _S extends State<SplitGroupDetailScreen>
                                         child: SpringTabs(
                                           controller: _tc,
                                           labels: const ['Activity', 'Balances', 'Members'],
+                                          icons: const [
+                                            Icons.receipt_long_rounded,
+                                            Icons.account_balance_wallet_rounded,
+                                            Icons.group_rounded,
+                                          ],
                                         ),
                                       ),
                                     ),

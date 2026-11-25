@@ -1,6 +1,8 @@
-/// Segmented tabs whose dark pill moves exactly like the nav bar's: a tick on tap, the
-/// pill flows to the new tab on [AppMotion.move] with a soft overshoot (one vibration per
-/// change, none on landing). Swiping the pages moves the pill with the finger.
+/// Segmented tabs that look and move exactly like the bottom nav bar: a dark track, the
+/// accent pill widens the selected tab and shows its icon and label side by side, the
+/// others show a muted icon over a small label. The pill flows on [AppMotion.move] with a
+/// soft overshoot (one vibration per change). Swiping the pages moves the pill with the
+/// finger.
 library;
 
 import 'package:flutter/material.dart';
@@ -13,7 +15,10 @@ class SpringTabs extends StatefulWidget {
   final TabController controller;
   final List<String> labels;
 
-  /// Track colour; null = white card with a soft shadow.
+  /// One icon per tab, as in the nav bar. Without icons the tabs show labels only.
+  final List<IconData>? icons;
+
+  /// Kept for older call sites; the track is always the nav bar's dark pill now.
   final Color? background;
   final double height;
 
@@ -21,8 +26,9 @@ class SpringTabs extends StatefulWidget {
     super.key,
     required this.controller,
     required this.labels,
+    this.icons,
     this.background,
-    this.height = 52,
+    this.height = 60,
   });
 
   @override
@@ -95,70 +101,107 @@ class _SpringTabsState extends State<SpringTabs> with SingleTickerProviderStateM
     final n = widget.labels.length;
     return Container(
       height: widget.height,
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       decoration: BoxDecoration(
-        color: widget.background ?? AppColors.card,
-        borderRadius: BorderRadius.circular(widget.height / 2), // fully round, like every switch
-        boxShadow: widget.background == null ? AppShadows.soft : null,
+        color: AppColors.dark,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        boxShadow: AppShadows.soft,
       ),
-      child: LayoutBuilder(
-        builder: (context, box) {
-          final w = box.maxWidth / n;
-          return AnimatedBuilder(
-            animation: _pos,
-            builder: (context, _) {
-              final p = _pos.value;
-              return Stack(
-                children: [
-                  Positioned(
-                    left: p * w,
-                    top: 0,
-                    bottom: 0,
-                    width: w,
-                    child: Container(
-                      decoration: BoxDecoration(color: AppColors.dark, borderRadius: BorderRadius.circular(widget.height / 2 - 4)),
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      for (var i = 0; i < n; i++)
-                        Expanded(
-                          child: Semantics(
-                            button: true,
-                            selected: widget.controller.index == i,
-                            label: widget.labels[i],
-                            excludeSemantics: true,
-                            child: SpringPress(
-                              haptic: HapticKind.none,
-                              onTap: () => _tap(i),
-                              child: Center(
-                                child: Text(
-                                  widget.labels[i],
-                                  maxLines: 1,
-                                  overflow: TextOverflow.fade,
-                                  softWrap: false,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color.lerp(
-                                      AppColors.muted,
-                                      AppColors.accent,
-                                      (1 - (p - i).abs()).clamp(0.0, 1.0),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-              );
-            },
-          );
-        },
+      child: MediaQuery.withClampedTextScaling(
+        maxScaleFactor: 1.1,
+        child: AnimatedBuilder(
+          animation: _pos,
+          builder: (context, _) => Row(
+            // Every slot is full height, so the pill always fills the track like the nav bar.
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [for (var i = 0; i < n; i++) _slot(i)],
+          ),
+        ),
       ),
     );
   }
+
+  /// One tab, built like a nav bar slot. `a` (0-1) is how much of the pill is on it: it
+  /// widens the slot, grows and fades in the pill, and cross-fades the two looks.
+  Widget _slot(int i) {
+    final a = (1 - (_pos.value - i).abs()).clamp(0.0, 1.0);
+    final icon = widget.icons != null && i < widget.icons!.length ? widget.icons![i] : null;
+    final label = widget.labels[i];
+    return Expanded(
+      flex: (1000 + 800 * a).round(),
+      child: Semantics(
+        button: true,
+        selected: widget.controller.index == i,
+        label: label,
+        excludeSemantics: true,
+        child: SpringPress(
+          haptic: HapticKind.none,
+          onTap: () => _tap(i),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              if (a > 0)
+                Positioned.fill(
+                  child: Opacity(
+                    opacity: a,
+                    child: Transform.scale(
+                      scale: 0.82 + 0.18 * a,
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 1),
+                        decoration: BoxDecoration(
+                          color: AppColors.accent,
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              if (a < 1)
+                Opacity(
+                  opacity: 1 - a,
+                  child: icon == null
+                      ? _label(label, AppColors.darkMuted, 13)
+                      : Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(icon, size: 21, color: AppColors.darkMuted),
+                            const SizedBox(height: 1),
+                            _label(label, AppColors.darkMuted, 10, weight: FontWeight.w600),
+                          ],
+                        ),
+                ),
+              if (a > 0)
+                Opacity(
+                  opacity: a,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (icon != null) ...[
+                            Icon(icon, size: 21, color: AppColors.dark),
+                            const SizedBox(width: 5),
+                          ],
+                          _label(label, AppColors.dark, 13),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _label(String text, Color color, double size, {FontWeight weight = FontWeight.w700}) => Text(
+        text,
+        maxLines: 1,
+        softWrap: false,
+        overflow: TextOverflow.fade,
+        style: TextStyle(fontSize: size, fontWeight: weight, letterSpacing: size < 12 ? -0.2 : 0, color: color),
+      );
 }
