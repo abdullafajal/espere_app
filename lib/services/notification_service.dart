@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import '../screens/split_group_detail_screen.dart';
@@ -12,6 +14,13 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 }
 
 class NotificationService {
+  /// Completes once Firebase is set up (it now starts after the first screen), so a
+  /// token request made earlier waits for it instead of failing.
+  static final Completer<void> _ready = Completer<void>();
+  static void markReady() {
+    if (!_ready.isCompleted) _ready.complete();
+  }
+
   static GlobalKey<NavigatorState>? _navigatorKey;
 
   /// Opens what a notification is about (from a push or the Notifications screen).
@@ -103,13 +112,6 @@ class NotificationService {
         });
       }
 
-      // Try to get token (will fail with placeholder google-services.json)
-      try {
-        final token = await fcm.getToken();
-        if (token != null) debugPrint('[FCM] Token: $token');
-      } catch (_) {
-        debugPrint('[FCM] Token unavailable — replace google-services.json with real file');
-      }
     } catch (e) {
       debugPrint('[FCM] Init skipped: $e');
     }
@@ -118,6 +120,7 @@ class NotificationService {
   /// Get current FCM token safely
   static Future<String?> getToken() async {
     try {
+      await _ready.future.timeout(const Duration(seconds: 20), onTimeout: () {});
       return await FirebaseMessaging.instance.getToken();
     } catch (e) {
       debugPrint('[FCM] getToken error: $e');
