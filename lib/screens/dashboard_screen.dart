@@ -556,9 +556,8 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
     );
   }
 
-  static const _over = Color(0xFFFFB68C);
-
-  /// The ring: the picked day's spending (today by default) against the daily average,
+  /// The ring (always in the app colour): the picked day's spending (today by default)
+  /// against the daily average,
   /// with a message beside it and the week's bars below the message. Tap a bar to see that
   /// day in the ring. For an earlier month the bars are weeks, against the weekly average.
   Widget _dayRing({
@@ -573,7 +572,8 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
     final value = bars[sel];
     final over = avg > 0 && value > avg;
     final fraction = avg <= 0 ? (value > 0 ? 1.0 : 0.0) : (value / avg).clamp(0.0, 1.0);
-    final color = over ? _over : AppColors.accent;
+    // Always the app colour, even over the average (only the message says so).
+    final color = AppColors.accent;
     final maxBar = bars.fold<double>(0, math.max);
     final String caption;
     if (_isThisMonth) {
@@ -633,7 +633,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                       _money(value.roundToDouble(), symbol),
                       maxLines: 1,
                       style: TextStyle(
-                          fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.5, color: over ? _over : Colors.white),
+                          fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.5, color: Colors.white),
                     ),
                   ),
                   if (avg > 0)
@@ -662,7 +662,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                     fontSize: 12,
                     height: 1.35,
                     fontWeight: FontWeight.w600,
-                    color: over ? _over : AppColors.darkMuted,
+                    color: AppColors.darkMuted,
                   ),
                 ),
               ),
@@ -674,7 +674,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                   children: List.generate(bars.length, (i) {
                     final on = i == sel;
                     final h = maxBar <= 0 ? 6.0 : math.max(6.0, 36 * (bars[i] / maxBar));
-                    final barColor = on ? (bars[i] > avg && avg > 0 ? _over : AppColors.accent) : AppColors.darkCardRaised;
+                    final barColor = on ? AppColors.accent : AppColors.darkCardRaised;
                     return Expanded(
                       child: Semantics(
                         button: true,
