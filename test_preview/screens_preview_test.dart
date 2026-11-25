@@ -94,6 +94,10 @@ void main() {
       AppAccent.debugIndex = 0;
     }
   });
+  testWidgets('home_ring_tap', (t) => shot(t, 'home_ring_tap', const DashboardScreen(), act: (t) async {
+        final bars = find.bySemanticsLabel(RegExp(r'^[A-Z]: '));
+        await t.tap(bars.at(3));
+      }));
   testWidgets('home_long', (t) => shot(t, 'home_long', const DashboardScreen(), size: const Size(390, 2400)));
   testWidgets('quick_add', (t) => shot(t, 'quick_add', const QuickAddScreen(), scaffold: false));
   testWidgets('activity', (t) => shot(t, 'activity', const TransactionListScreen()));

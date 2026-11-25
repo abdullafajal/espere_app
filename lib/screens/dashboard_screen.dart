@@ -51,6 +51,12 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
   List<double> _week = List.filled(7, 0);
   List<String> _weekDays = List.filled(7, '');
 
+  /// Full day names of the last 7 days ("Tuesday"), for the ring's caption.
+  List<String> _weekNames = List.filled(7, '');
+
+  /// The bar picked in the Home card (null: today / the default one).
+  int? _selBar;
+
   /// Everything saved on the phone (for the category and month charts).
   List<TransactionModel> _txns = const [];
 
@@ -184,6 +190,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
     setState(() {
       _month = DateTime(m.year, m.month);
       _past = null;
+      _selBar = null;
     });
     if (!_isThisMonth) _loadMonth(_month);
   }
@@ -246,6 +253,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
     final today = DateUtils.dateOnly(DateTime.now());
     final week = List<double>.filled(7, 0);
     final days = List.generate(7, (i) => DateFormat('E').format(today.subtract(Duration(days: 6 - i)))[0]);
+    final names = List.generate(7, (i) => DateFormat('EEEE').format(today.subtract(Duration(days: 6 - i))));
     final counts = <String, _Again>{};
     for (final t in txns) {
       if (t['type'] != 'expense') continue;
@@ -286,6 +294,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
       _txns = all;
       _week = week;
       _weekDays = days;
+      _weekNames = names;
       _again = again.take(4).toList();
       _reviewCount = review;
     });
@@ -444,7 +453,6 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
     final bars = past?.bars ?? _week;
     final labels = past?.barLabels ?? _weekDays;
     final highlight = past?.highlight ?? 6;
-    final maxBar = bars.fold<double>(0, math.max);
     final loading = !_isThisMonth && past == null;
     final title = _isThisMonth ? 'Spent this month' : 'Spent in ${DateFormat('MMMM').format(_month)}';
     final chip = _isThisMonth || _month.year == now.year
@@ -512,47 +520,12 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
             ),
           ),
           const SizedBox(height: 10),
-          SizedBox(
-            height: 50,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: List.generate(bars.length, (i) {
-                final on = i == highlight;
-                final h = maxBar <= 0 ? 5.0 : math.max(5.0, 32 * (bars[i] / maxBar));
-                return Expanded(
-                  child: Tooltip(
-                    message: _money(bars[i], d.currencySymbol),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 500),
-                            curve: Curves.easeOutCubic,
-                            height: h,
-                            decoration: BoxDecoration(
-                              color: on ? AppColors.accent : AppColors.darkCardRaised,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            i < labels.length ? labels[i] : '',
-                            maxLines: 1,
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: on ? AppColors.accent : AppColors.darkFaint,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              }),
-            ),
+          _dayRing(
+            bars: bars,
+            labels: labels,
+            highlight: highlight,
+            avg: _isThisMonth ? avgDaily : (bars.isEmpty ? 0 : bars.fold<double>(0, (a, b) => a + b) / bars.length),
+            symbol: d.currencySymbol,
           ),
           const SizedBox(height: 10),
           Row(
@@ -580,6 +553,176 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
           ),
         ],
       ),
+    );
+  }
+
+  static const _over = Color(0xFFFFB68C);
+
+  /// The ring: the picked day's spending (today by default) against the daily average,
+  /// with a message beside it and the week's bars below the message. Tap a bar to see that
+  /// day in the ring. For an earlier month the bars are weeks, against the weekly average.
+  Widget _dayRing({
+    required List<double> bars,
+    required List<String> labels,
+    required int highlight,
+    required double avg,
+    required String symbol,
+  }) {
+    if (bars.isEmpty) return const SizedBox(height: 8);
+    final sel = (_selBar ?? highlight).clamp(0, bars.length - 1);
+    final value = bars[sel];
+    final over = avg > 0 && value > avg;
+    final fraction = avg <= 0 ? (value > 0 ? 1.0 : 0.0) : (value / avg).clamp(0.0, 1.0);
+    final color = over ? _over : AppColors.accent;
+    final maxBar = bars.fold<double>(0, math.max);
+    final String caption;
+    if (_isThisMonth) {
+      caption = sel == bars.length - 1
+          ? 'TODAY'
+          : sel == bars.length - 2
+              ? 'YESTERDAY'
+              : (sel < _weekNames.length && _weekNames[sel].isNotEmpty ? _weekNames[sel] : labels[sel]).toUpperCase();
+    } else {
+      caption = '${sel < labels.length ? labels[sel] : ''} ${DateFormat('MMM').format(_month)}'.toUpperCase();
+    }
+    final unit = _isThisMonth ? 'daily' : 'weekly';
+    final diff = (avg - value).abs();
+    final String message;
+    if (value <= 0) {
+      message = _isThisMonth && sel == bars.length - 1 ? 'Nothing spent yet today.' : 'Nothing spent.';
+    } else if (avg <= 0) {
+      message = 'Spent ${_money(value.roundToDouble(), symbol)}.';
+    } else if (over) {
+      message = '${_money(diff.roundToDouble(), symbol)} more than your $unit average.';
+    } else {
+      message = '${_money(diff.roundToDouble(), symbol)} less than your $unit average. Nice!';
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: 116,
+          height: 116,
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(end: fraction),
+            duration: const Duration(milliseconds: 650),
+            curve: Curves.easeOutBack,
+            builder: (context, f, child) => CustomPaint(
+              painter: _RingPainter(fraction: f.clamp(0.0, 1.0), color: color, track: AppColors.darkCardRaised),
+              child: child,
+            ),
+            child: Padding(
+              // Keeps the text inside the ring; long amounts shrink to fit.
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(caption,
+                        maxLines: 1,
+                        style: const TextStyle(
+                            fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: AppColors.darkMuted)),
+                  ),
+                  const SizedBox(height: 2),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: MorphText(
+                      id: 'home-ring-$sel',
+                      _money(value.roundToDouble(), symbol),
+                      maxLines: 1,
+                      style: TextStyle(
+                          fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.5, color: over ? _over : Colors.white),
+                    ),
+                  ),
+                  if (avg > 0)
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('of ${_money(avg.roundToDouble(), symbol)} avg',
+                          maxLines: 1, style: const TextStyle(fontSize: 10, color: AppColors.darkFaint)),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                child: Text(
+                  message,
+                  key: ValueKey(message),
+                  maxLines: 2,
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.35,
+                    fontWeight: FontWeight.w600,
+                    color: over ? _over : AppColors.darkMuted,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 54,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: List.generate(bars.length, (i) {
+                    final on = i == sel;
+                    final h = maxBar <= 0 ? 6.0 : math.max(6.0, 36 * (bars[i] / maxBar));
+                    final barColor = on ? (bars[i] > avg && avg > 0 ? _over : AppColors.accent) : AppColors.darkCardRaised;
+                    return Expanded(
+                      child: Semantics(
+                        button: true,
+                        selected: on,
+                        label: '${i < labels.length ? labels[i] : ''}: ${_money(bars[i], symbol)}',
+                        excludeSemantics: true,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () {
+                            if (i == sel) return;
+                            AppHaptics.tap();
+                            setState(() => _selBar = i);
+                          },
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              AnimatedContainer(
+                                duration: const Duration(milliseconds: 450),
+                                curve: Curves.easeOutBack,
+                                width: on ? 10 : 8,
+                                height: h,
+                                decoration: BoxDecoration(color: barColor, borderRadius: BorderRadius.circular(5)),
+                              ),
+                              const SizedBox(height: 4),
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  i < labels.length ? labels[i] : '',
+                                  maxLines: 1,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: on ? barColor : AppColors.darkFaint,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -1052,4 +1195,31 @@ class _MonthView {
       recent: d.recentTransactions.isNotEmpty ? d.recentTransactions : local.recent,
     );
   }
+}
+
+
+/// A ring that fills clockwise from the top.
+class _RingPainter extends CustomPainter {
+  final double fraction;
+  final Color color;
+  final Color track;
+
+  const _RingPainter({required this.fraction, required this.color, required this.track});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const stroke = 10.0;
+    final rect = Rect.fromCircle(center: size.center(Offset.zero), radius: size.shortestSide / 2 - stroke / 2);
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.round;
+    canvas.drawArc(rect, 0, 2 * math.pi, false, paint..color = track);
+    if (fraction > 0) {
+      canvas.drawArc(rect, -math.pi / 2, 2 * math.pi * fraction, false, paint..color = color);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_RingPainter old) => old.fraction != fraction || old.color != color || old.track != track;
 }
