@@ -24,55 +24,46 @@ class SplitSwitcher extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Same look as the bottom nav bar (and the group tabs): dark track, the accent pill
+    // widens the selected side and shows icon + label in a row, the other side shows a
+    // muted icon over a small label.
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
       child: Container(
-        height: 48,
+        height: 60,
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
-          color: AppColors.card,
-          borderRadius: BorderRadius.circular(24),
+          color: AppColors.dark,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
           boxShadow: AppShadows.soft,
         ),
-        child: LayoutBuilder(
-          builder: (context, box) {
-            final half = box.maxWidth / 2;
-            return ValueListenableBuilder<double?>(
-              valueListenable: SplitPill.position,
-              builder: (context, moving, _) {
-                // While the pill is not moving, it sits on this screen's side.
-                final p = moving ?? _home;
-                return Stack(
-                  children: [
-                    Positioned(
-                      left: p * half,
-                      top: 0,
-                      bottom: 0,
-                      width: half,
-                      child: Container(
-                        decoration: BoxDecoration(color: AppColors.dark, borderRadius: BorderRadius.circular(20)),
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        _item('Groups', Icons.groups_rounded, 1 - p.clamp(0.0, 1.0), 0, groupsTab),
-                        _item('Friends', Icons.person_rounded, p.clamp(0.0, 1.0), 1, friendsTab),
-                      ],
-                    ),
-                  ],
-                );
-              },
-            );
-          },
+        child: MediaQuery.withClampedTextScaling(
+          maxScaleFactor: 1.1,
+          child: ValueListenableBuilder<double?>(
+            valueListenable: SplitPill.position,
+            builder: (context, moving, _) {
+              // While the pill is not moving, it sits on this screen's side.
+              final p = moving ?? _home;
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _item('Groups', Icons.groups_rounded, (1 - (p - 0).abs()).clamp(0.0, 1.0), 0, groupsTab),
+                  _item('Friends', Icons.person_rounded, (1 - (p - 1).abs()).clamp(0.0, 1.0), 1, friendsTab),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
   }
 
-  /// `on` (0-1): how much of the pill is behind this side, for the colour cross-fade.
-  Widget _item(String label, IconData icon, double on, double side, int tab) {
+  /// `a` (0-1): how much of the pill is on this side. It widens the side, grows and fades
+  /// in the pill, and cross-fades the two looks, exactly like a nav bar slot.
+  Widget _item(String label, IconData icon, double a, double side, int tab) {
     final selected = _home == side;
     return Expanded(
+      flex: (1000 + 800 * a).round(),
       child: Semantics(
         button: true,
         selected: selected,
@@ -87,22 +78,63 @@ class SplitSwitcher extends StatelessWidget {
                   SplitPill.moveTo(from: _home, to: side);
                   AppNavigation.openTab(tab);
                 },
-          child: SizedBox.expand(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon, size: 18, color: Color.lerp(AppColors.muted, AppColors.accent, on)),
-                const SizedBox(width: 6),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: on > 0.5 ? FontWeight.w800 : FontWeight.w600,
-                    color: Color.lerp(AppColors.text, Colors.white, on),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              if (a > 0)
+                Positioned.fill(
+                  child: Opacity(
+                    opacity: a,
+                    child: Transform.scale(
+                      scale: 0.82 + 0.18 * a,
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 1),
+                        decoration: BoxDecoration(
+                          color: AppColors.accent,
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-              ],
-            ),
+              if (a < 1)
+                Opacity(
+                  opacity: 1 - a,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(icon, size: 21, color: AppColors.darkMuted),
+                      const SizedBox(height: 1),
+                      Text(
+                        label,
+                        maxLines: 1,
+                        softWrap: false,
+                        style: const TextStyle(
+                            fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: -0.2, color: AppColors.darkMuted),
+                      ),
+                    ],
+                  ),
+                ),
+              if (a > 0)
+                Opacity(
+                  opacity: a,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(icon, size: 21, color: AppColors.dark),
+                          const SizedBox(width: 5),
+                          Text(label,
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.dark)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       ),
