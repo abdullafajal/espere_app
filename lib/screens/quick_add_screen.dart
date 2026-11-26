@@ -608,16 +608,21 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
             child: _loading
                 ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
                 // Shrinks on very short screens instead of overflowing.
-                : Center(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: SizedBox(
-                        width: MediaQuery.sizeOf(context).width,
-                        child: CategoryCarousel(
-                          items: _carouselItems,
-                          index: _carouselIndex,
-                          onChanged: _pickIndex,
-                          onNew: _newCategory,
+                // The carousel fits its cards to the room it gets; it only shrinks as a
+                // whole on very short screens.
+                : LayoutBuilder(
+                    builder: (context, box) => Center(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: SizedBox(
+                          width: MediaQuery.sizeOf(context).width,
+                          child: CategoryCarousel(
+                            items: _carouselItems,
+                            index: _carouselIndex,
+                            onChanged: _pickIndex,
+                            onNew: _newCategory,
+                            maxHeight: box.maxHeight,
+                          ),
                         ),
                       ),
                     ),

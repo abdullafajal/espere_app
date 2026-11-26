@@ -28,13 +28,7 @@ class CarouselCategory {
   /// The "New category" card (tap opens [CategoryCarousel.onNew]).
   final bool isNew;
 
-  const CarouselCategory({
-    required this.label,
-    required this.icon,
-    this.note,
-    this.used,
-    this.isNew = false,
-  });
+  const CarouselCategory({required this.label, required this.icon, this.note, this.used, this.isNew = false});
 }
 
 class CategoryCarousel extends StatefulWidget {
@@ -46,6 +40,11 @@ class CategoryCarousel extends StatefulWidget {
   /// Dark cards on a dark background (inside a dark sheet) instead of the light sheet.
   final bool onDark;
 
+  /// The most height it may take. When that is short the cards shrink to fit and the
+  /// large name under them (already on the card) gives way to one compact line, so
+  /// the cards stay as big as the space allows.
+  final double? maxHeight;
+
   const CategoryCarousel({
     super.key,
     required this.items,
@@ -53,6 +52,7 @@ class CategoryCarousel extends StatefulWidget {
     required this.onChanged,
     this.onNew,
     this.onDark = false,
+    this.maxHeight,
   });
 
   @override
@@ -60,12 +60,15 @@ class CategoryCarousel extends StatefulWidget {
 }
 
 class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerProviderStateMixin {
-  static const double _gap = 100; // between the middle card and the ones beside it
-  static const double _gapFar = 47; // the next ones tuck half behind those
-  static const double _stageH = 186;
+  static const double _gap = 120; // between the middle card and the ones beside it
+  static const double _gapFar = 56; // the next ones tuck half behind those
+  static const double _stageH = 214;
 
-  late final AnimationController _pos =
-      AnimationController.unbounded(vsync: this, value: widget.index.toDouble())..addListener(_onMove);
+  /// How much the cards are scaled down to fit [CategoryCarousel.maxHeight].
+  double _k = 1;
+
+  late final AnimationController _pos = AnimationController.unbounded(vsync: this, value: widget.index.toDouble())
+    ..addListener(_onMove);
   int _shown = 0; // the index last reported
 
   @override
@@ -121,14 +124,14 @@ class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerPr
   void _dragStart(DragStartDetails d) => _pos.stop();
 
   void _dragUpdate(DragUpdateDetails d) {
-    var p = _pos.value - d.delta.dx / _gap;
+    var p = _pos.value - d.delta.dx / (_gap * _k);
     // Without going round, past either end it gives like a rubber band.
-    if (!_loops && (p < 0 || p > _n - 1)) p = _pos.value - d.delta.dx / _gap * 0.3;
+    if (!_loops && (p < 0 || p > _n - 1)) p = _pos.value - d.delta.dx / (_gap * _k) * 0.3;
     _pos.value = p;
   }
 
   void _dragEnd(DragEndDetails d) {
-    final v = -(d.primaryVelocity ?? 0) / _gap; // cards per second
+    final v = -(d.primaryVelocity ?? 0) / (_gap * _k); // cards per second
     final projected = _pos.value + v * 0.18; // a flick carries on a little
     final target = _loops ? projected.round() : projected.round().clamp(0, _n - 1);
     _settle(target, v);
@@ -141,7 +144,7 @@ class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerPr
     var hit = base;
     for (final k in [0, -1, 1, -2, 2]) {
       final d = base + k - _pos.value;
-      if ((o - _offset(d)).abs() <= 60 * _scale(d.abs())) {
+      if ((o - _offset(d) * _k).abs() <= 72 * _scale(d.abs()) * _k) {
         hit = base + k;
         break;
       }
@@ -171,81 +174,113 @@ class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerPr
   @override
   Widget build(BuildContext context) {
     if (_n == 0) return const SizedBox(height: 150);
+    final ts = MediaQuery.textScalerOf(context).scale(1);
+    final fullFooter = 88 * ts;
+    final maxH = widget.maxHeight;
+    final compact = maxH != null && maxH < _stageH + fullFooter;
+    final stageH = maxH == null ? _stageH : (maxH - (compact ? 40 * ts : fullFooter)).clamp(110.0, _stageH);
+    _k = stageH / _stageH;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        LayoutBuilder(builder: (context, box) {
-          final w = box.maxWidth;
-          return GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onHorizontalDragStart: _dragStart,
-            onHorizontalDragUpdate: _dragUpdate,
-            onHorizontalDragEnd: _dragEnd,
-            onTapUp: (d) => _tapAt(d.localPosition.dx, w),
-            child: SizedBox(
-              height: _stageH,
-              child: AnimatedBuilder(
-                animation: _pos,
-                builder: (context, _) {
-                  final p = _pos.value;
-                  final c = p.round();
-                  // Positions around the middle (each shows the category it wraps to);
-                  // never so many that one category shows twice.
-                  final reach = _loops ? math.min(3, (_n - 1) ~/ 2) : 3;
-                  final order = <int>[
-                    for (var k = c - reach; k <= c + reach; k++)
-                      if (_loops || (k >= 0 && k < _n)) k
-                  ]..sort((a, b) => (b - p).abs().compareTo((a - p).abs()));
-                  return Stack(
-                    clipBehavior: Clip.none,
-                    children: [for (final i in order) _placed(i, p, w)],
-                  );
-                },
+        LayoutBuilder(
+          builder: (context, box) {
+            final w = box.maxWidth;
+            return GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onHorizontalDragStart: _dragStart,
+              onHorizontalDragUpdate: _dragUpdate,
+              onHorizontalDragEnd: _dragEnd,
+              onTapUp: (d) => _tapAt(d.localPosition.dx, w),
+              child: SizedBox(
+                height: stageH,
+                child: AnimatedBuilder(
+                  animation: _pos,
+                  builder: (context, _) {
+                    final p = _pos.value;
+                    final c = p.round();
+                    // Positions around the middle (each shows the category it wraps to);
+                    // never so many that one category shows twice.
+                    final reach = _loops ? math.min(3, (_n - 1) ~/ 2) : 3;
+                    final order = <int>[
+                      for (var k = c - reach; k <= c + reach; k++)
+                        if (_loops || (k >= 0 && k < _n)) k,
+                    ]..sort((a, b) => (b - p).abs().compareTo((a - p).abs()));
+                    return Stack(clipBehavior: Clip.none, children: [for (final i in order) _placed(i, p, w)]);
+                  },
+                ),
               ),
-            ),
-          );
-        }),
-        // The picked category, large: its name and what its budget says.
-        AnimatedBuilder(
-          animation: _pos,
-          builder: (context, _) {
-            final item = widget.items[_wrap(_pos.value.round())];
-            return Column(
-              children: [
-                Text(
-                  item.isNew ? 'New category' : item.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.4,
-                    color: widget.onDark ? Colors.white : AppColors.text,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                SizedBox(
-                  height: 17,
-                  child: Text(
-                    item.isNew ? 'Tap to add one' : (item.note ?? 'No budget'),
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: item.note != null ? FontWeight.w700 : FontWeight.w500,
-                      color: item.note != null ? const Color(0xFF1D6B45) : AppColors.muted,
-                    ),
-                  ),
-                ),
-              ],
             );
           },
         ),
-        const SizedBox(height: 8),
+        // The picked category, large: its name and what its budget says.
+        if (!compact) ...[
+          AnimatedBuilder(
+            animation: _pos,
+            builder: (context, _) {
+              final item = widget.items[_wrap(_pos.value.round())];
+              return Column(
+                children: [
+                  Text(
+                    item.isNew ? 'New category' : item.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.4,
+                      color: widget.onDark ? Colors.white : AppColors.text,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  SizedBox(
+                    height: 17,
+                    child: Text(
+                      item.isNew ? 'Tap to add one' : (item.note ?? 'No budget'),
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: item.note != null ? FontWeight.w700 : FontWeight.w500,
+                        color: item.note != null ? const Color(0xFF1D6B45) : AppColors.muted,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 8),
+        ],
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            // Compact: the budget line moves in here, the name is on the card.
+            if (compact) ...[
+              Flexible(
+                child: AnimatedBuilder(
+                  animation: _pos,
+                  builder: (context, _) {
+                    final item = widget.items[_wrap(_pos.value.round())];
+                    return Text(
+                      item.isNew ? 'Tap to add one' : (item.note ?? 'No budget'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: item.note != null ? FontWeight.w700 : FontWeight.w500,
+                        color: item.note != null ? const Color(0xFF1D6B45) : AppColors.muted,
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+            ],
             Icon(Icons.swipe_rounded, size: 15, color: widget.onDark ? AppColors.darkMuted : AppColors.muted),
             const SizedBox(width: 6),
-            Text('Swipe', style: AppText.rowSub.copyWith(fontSize: 11.5, color: widget.onDark ? AppColors.darkMuted : null)),
+            Text(
+              'Swipe',
+              style: AppText.rowSub.copyWith(fontSize: 11.5, color: widget.onDark ? AppColors.darkMuted : null),
+            ),
             const SizedBox(width: 10),
             SpringPress(
               haptic: HapticKind.none,
@@ -282,16 +317,13 @@ class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerPr
     // ones smaller still, half tucked behind them.
     final scale = _scale(a);
     final opacity = (1 - math.max(0.0, a - 2.2) * 1.6).clamp(0.0, 1.0);
-    const cw = 120.0, ch = 150.0;
+    const cw = 144.0, ch = 178.0;
     return Positioned(
-      left: width / 2 - cw / 2 + _offset(d),
-      top: (_stageH - ch) / 2,
+      left: width / 2 - cw / 2 + _offset(d) * _k,
+      top: (_stageH * _k - ch) / 2,
       child: Opacity(
         opacity: opacity,
-        child: Transform.scale(
-          scale: scale,
-          child: _card(widget.items[_wrap(i)], t, cw, ch),
-        ),
+        child: Transform.scale(scale: scale * _k, child: _card(widget.items[_wrap(i)], t, cw, ch)),
       ),
     );
   }
@@ -315,7 +347,7 @@ class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerPr
       padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
         color: Color.lerp(AppColors.dark, AppColors.surface, t),
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(32),
         // A thin edge in the sheet colour keeps stacked cards apart.
         border: mid ? null : Border.all(color: AppColors.card, width: 2.5),
         boxShadow: mid ? const [BoxShadow(color: Color(0x33000000), blurRadius: 22, offset: Offset(0, 10))] : null,
@@ -324,23 +356,33 @@ class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerPr
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            width: 60,
-            height: 60,
+            width: 72,
+            height: 72,
             decoration: BoxDecoration(
               color: item.isNew ? Colors.transparent : Color.lerp(AppColors.accent, Colors.white, t),
               shape: BoxShape.circle,
-              border: item.isNew ? Border.all(color: Color.lerp(AppColors.darkMuted, AppColors.mutedLight, t)!, width: 1.5) : null,
+              border:
+                  item.isNew
+                      ? Border.all(color: Color.lerp(AppColors.darkMuted, AppColors.mutedLight, t)!, width: 1.5)
+                      : null,
             ),
-            child: Icon(item.icon, size: 28,
-                color: item.isNew ? Color.lerp(AppColors.darkMuted, AppColors.muted, t) : AppColors.dark),
+            child: Icon(
+              item.icon,
+              size: 34,
+              color: item.isNew ? Color.lerp(AppColors.darkMuted, AppColors.muted, t) : AppColors.dark,
+            ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Text(
             item.label,
             maxLines: 1,
             textAlign: TextAlign.center,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color.lerp(Colors.white, AppColors.text, t)),
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: Color.lerp(Colors.white, AppColors.text, t),
+            ),
           ),
         ],
       ),
@@ -375,7 +417,7 @@ class _CategoryListSheetState extends State<_CategoryListSheet> {
   Widget build(BuildContext context) {
     final match = [
       for (final (i, c) in widget.items.indexed)
-        if (!c.isNew && c.label.toLowerCase().contains(_q.toLowerCase())) (i, c)
+        if (!c.isNew && c.label.toLowerCase().contains(_q.toLowerCase())) (i, c),
     ];
     final withBudget = match.where((e) => e.$2.used != null).toList();
     final others = match.where((e) => e.$2.used == null).toList();
@@ -440,10 +482,8 @@ class _CategoryListSheetState extends State<_CategoryListSheet> {
     );
   }
 
-  Widget _label(String t) => Padding(
-        padding: const EdgeInsets.fromLTRB(4, 14, 4, 4),
-        child: Text(t, style: AppText.label),
-      );
+  Widget _label(String t) =>
+      Padding(padding: const EdgeInsets.fromLTRB(4, 14, 4, 4), child: Text(t, style: AppText.label));
 
   Widget _row(int i, CarouselCategory c) {
     final current = i == widget.current;
@@ -475,11 +515,7 @@ class _CategoryListSheetState extends State<_CategoryListSheet> {
                 ],
               ),
             ),
-            if (c.used != null)
-              SizedBox(
-                width: 64,
-                child: BlockBar(value: c.used!, height: 5),
-              ),
+            if (c.used != null) SizedBox(width: 64, child: BlockBar(value: c.used!, height: 5)),
           ],
         ),
       ),
