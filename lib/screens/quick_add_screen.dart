@@ -639,17 +639,27 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
           CarouselCategory(
             label: c.name,
             icon: IconMapper.map(c.icon),
-            note: _type != 'expense' || _budgets[c.id] == null || _budgets[c.id]!.limit <= 0
-                ? null
-                : (_budgets[c.id]!.spent > _budgets[c.id]!.limit
-                    ? '${_moneyShort(_budgets[c.id]!.spent - _budgets[c.id]!.limit)} over'
-                    : '${_moneyShort(_budgets[c.id]!.left)} left'),
+            note: _budgetLine(c.id),
             used: _type != 'expense' || _budgets[c.id] == null || _budgets[c.id]!.limit <= 0
                 ? null
                 : _budgets[c.id]!.fraction,
           ),
         const CarouselCategory(label: 'New', icon: Icons.add_rounded, isNew: true),
       ];
+
+  /// What the category's budget will say after this entry ("₹2,203 left after this"),
+  /// or what is left now while no amount is typed. Null without a budget.
+  String? _budgetLine(int id) {
+    final b = _budgets[id];
+    if (_type != 'expense' || b == null || b.limit <= 0) return null;
+    if (!_hasAmount) {
+      return b.spent > b.limit ? '${_moneyShort(b.spent - b.limit)} over' : '${_moneyShort(b.left)} left';
+    }
+    final after = _after(id) ?? b;
+    return after.spent > after.limit
+        ? '${_moneyShort(after.spent - after.limit)} over after this'
+        : '${_moneyShort(after.left)} left after this';
+  }
 
   int get _carouselIndex {
     final i = _categories.indexWhere((c) => c.id == _categoryId);

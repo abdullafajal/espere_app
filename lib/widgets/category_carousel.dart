@@ -59,7 +59,27 @@ class CategoryCarousel extends StatefulWidget {
 }
 
 class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerProviderStateMixin {
-  static const double _gap = 108; // between card centres
+  static const double _gap = 92; // between card centres
+  static const double _stageH = 186;
+
+  /// Soft tints for categories without a colour of their own.
+  static const _tints = [
+    Color(0xFFFFE3C2), Color(0xFFD6E8FF), Color(0xFFFFD6E6), Color(0xFFE5DCFF), Color(0xFFD9F3E4),
+    Color(0xFFFFF1B8), Color(0xFFDCF2C9), Color(0xFFFFE0D6), Color(0xFFD4F0F0), Color(0xFFF1E3D3),
+  ];
+
+  /// A soft tint per category, picked from its name so a category keeps its colour on
+  /// every screen (many categories share one stored colour, which would make every card
+  /// look the same).
+  Color _tint(int i) {
+    final item = widget.items[i];
+    if (item.isNew) return AppColors.surface;
+    var h = 0;
+    for (final u in item.label.toLowerCase().codeUnits) {
+      h = (h * 31 + u) & 0x7fffffff;
+    }
+    return _tints[h % _tints.length];
+  }
   late final AnimationController _pos =
       AnimationController.unbounded(vsync: this, value: widget.index.toDouble())..addListener(_onMove);
   int _shown = 0; // the index last reported
@@ -169,7 +189,7 @@ class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerPr
             onHorizontalDragEnd: _dragEnd,
             onTapUp: (d) => _tapAt(d.localPosition.dx, w),
             child: SizedBox(
-              height: 142,
+              height: _stageH,
               child: AnimatedBuilder(
                 animation: _pos,
                 builder: (context, _) {
@@ -191,7 +211,41 @@ class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerPr
             ),
           );
         }),
-        const SizedBox(height: 6),
+        // The picked category, large: its name and what its budget says.
+        AnimatedBuilder(
+          animation: _pos,
+          builder: (context, _) {
+            final item = widget.items[_wrap(_pos.value.round())];
+            return Column(
+              children: [
+                Text(
+                  item.isNew ? 'New category' : item.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.4,
+                    color: widget.onDark ? Colors.white : AppColors.text,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                SizedBox(
+                  height: 17,
+                  child: Text(
+                    item.isNew ? 'Tap to add one' : (item.note ?? 'No budget'),
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: item.note != null ? FontWeight.w700 : FontWeight.w500,
+                      color: item.note != null ? const Color(0xFF1D6B45) : AppColors.muted,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 8),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -224,81 +278,64 @@ class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerPr
     );
   }
 
-  /// One card at its place for scroll position [p]: the middle one big and dark, the
-  /// others smaller and lighter, fading out further away.
+  /// One card at its place for scroll position [p], cover-flow style: the middle card
+  /// faces you, the others turn away in 3D, step back and fade further out.
   Widget _placed(int i, double p, double width) {
     final d = i - p;
     final a = d.abs();
-    final scale = 1 - math.min(a, 1.4) * 0.16;
-    final x = d * _gap - d.sign * math.max(0, a - 1) * 18;
-    final opacity = (1 - math.max(0.0, a - 1) * 0.6).clamp(0.0, 1.0);
-    final mid = a < 0.5;
-    final item = widget.items[_wrap(i)];
-    const cw = 116.0, ch = 130.0;
+    final s = d.clamp(-1.0, 1.0);
+    final x = d * _gap + s * math.min(a, 1) * 6;
+    final opacity = (1 - math.max(0.0, a - 1.6) * 0.8).clamp(0.0, 1.0);
+    const cw = 120.0, ch = 150.0;
+    final m = Matrix4.identity()
+      ..setEntry(3, 2, 0.0014) // perspective
+      ..translateByDouble(x, 0, -math.min(a, 2) * 70, 1)
+      ..rotateY(-s * 0.84); // up to 48°
     return Positioned(
       left: width / 2 - cw / 2,
-      top: (142 - ch) / 2,
+      top: (_stageH - ch) / 2,
       child: Opacity(
         opacity: opacity,
-        child: Transform.translate(
-          offset: Offset(x, 0),
-          child: Transform.scale(scale: scale, child: _card(item, mid, cw, ch)),
+        child: Transform(
+          transform: m,
+          alignment: Alignment.center,
+          child: _card(widget.items[_wrap(i)], a < 0.5, cw, ch, _tint(_wrap(i))),
         ),
       ),
     );
   }
 
-  Widget _card(CarouselCategory item, bool mid, double w, double h) {
-    final bg = mid ? AppColors.dark : (widget.onDark ? AppColors.darkCard : AppColors.surface);
-    final iconBg = mid ? AppColors.darkCardRaised : (widget.onDark ? AppColors.darkCardRaised : AppColors.card);
-    final fg = mid || widget.onDark ? Colors.white : AppColors.muted;
+  Widget _card(CarouselCategory item, bool mid, double w, double h, Color bg) {
     return Container(
       width: w,
       height: h,
       padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(26),
-        boxShadow: mid ? const [BoxShadow(color: Color(0x38000000), blurRadius: 22, offset: Offset(0, 10))] : null,
-        border: mid && widget.onDark ? Border.all(color: AppColors.accent, width: 2) : null,
+        borderRadius: BorderRadius.circular(28),
+        border: mid ? Border.all(color: AppColors.dark, width: 2) : null,
+        boxShadow: mid ? const [BoxShadow(color: Color(0x2E000000), blurRadius: 24, offset: Offset(0, 12))] : null,
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            width: 50,
-            height: 50,
+            width: 60,
+            height: 60,
             decoration: BoxDecoration(
-              color: item.isNew ? Colors.transparent : iconBg,
-              borderRadius: BorderRadius.circular(17),
+              color: item.isNew ? Colors.transparent : Colors.white.withValues(alpha: 0.6),
+              borderRadius: BorderRadius.circular(20),
               border: item.isNew ? Border.all(color: AppColors.mutedLight, width: 1.5) : null,
             ),
-            child: Icon(item.icon, size: 24, color: mid ? AppColors.accent : (widget.onDark ? Colors.white : AppColors.dark)),
+            child: Icon(item.icon, size: 28, color: AppColors.dark),
           ),
-          const SizedBox(height: 7),
+          const SizedBox(height: 8),
           Text(
             item.label,
-            maxLines: 2,
+            maxLines: 1,
             textAlign: TextAlign.center,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 12, height: 1.2, fontWeight: FontWeight.w700, color: fg),
-          ),
-          const SizedBox(height: 2),
-          SizedBox(
-            height: 14,
-            child: item.note == null
-                ? null
-                : FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      item.note!,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: mid ? AppColors.accent : AppColors.muted,
-                      ),
-                    ),
-                  ),
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.text),
           ),
         ],
       ),
