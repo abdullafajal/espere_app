@@ -44,7 +44,7 @@ class BudgetDeck extends StatefulWidget {
     this.snapKeyFor,
   });
 
-  static const double height = 230;
+  static const double height = 252;
 
   @override
   State<BudgetDeck> createState() => _BudgetDeckState();
@@ -528,12 +528,12 @@ class _BudgetDeckState extends State<BudgetDeck> with TickerProviderStateMixin {
                             // (a dot when nothing). Green while within the budget, white after it ran out;
                             // the days still to come are faint; a white line marks today.
                             child: SizedBox(
-                              height: 30,
+                              height: 50,
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
                                   for (var d = 1; d <= daysIn; d++) ...[
-                                    if (d > 1) const SizedBox(width: 2),
+                                    if (d > 1) const SizedBox(width: 2.5),
                                     Expanded(
                                       child: Column(
                                         mainAxisAlignment:
@@ -542,9 +542,9 @@ class _BudgetDeckState extends State<BudgetDeck> with TickerProviderStateMixin {
                                           Container(
                                             height:
                                                 (b.daily[d] ?? 0) <= 0
-                                                    ? 3
-                                                    : 4 +
-                                                        20 *
+                                                    ? 4
+                                                    : 8 +
+                                                        34 *
                                                             ((b.daily[d] ?? 0) /
                                                                     maxDay)
                                                                 .clamp(
@@ -780,7 +780,7 @@ class BudgetListRow extends StatelessWidget {
                                       k < filled
                                           ? blockColor
                                           : AppColors.surface,
-                                  borderRadius: BorderRadius.circular(2),
+                                  borderRadius: BorderRadius.circular(3),
                                 ),
                               ),
                             ),
