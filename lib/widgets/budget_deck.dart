@@ -50,7 +50,7 @@ class BudgetDeck extends StatefulWidget {
   State<BudgetDeck> createState() => _BudgetDeckState();
 }
 
-class _BudgetDeckState extends State<BudgetDeck> with SingleTickerProviderStateMixin {
+class _BudgetDeckState extends State<BudgetDeck> with TickerProviderStateMixin {
   /// The front card's sideways offset in pixels. Driven by the finger while dragging and
   /// by a spring after letting go. Only the card transforms listen to it, so dragging
   /// does not rebuild the cards (or the screen).
@@ -64,7 +64,26 @@ class _BudgetDeckState extends State<BudgetDeck> with SingleTickerProviderStateM
   /// the left and back, to show that it can be swiped.
   static bool _nudged = false;
 
-  static const _spring = SpringDescription(mass: 1, stiffness: 260, damping: 24);
+  /// The app's spring (the nav pill's): arrives with one soft overshoot.
+  static const _spring = AppMotion.move;
+
+  /// The front card's size: springs from a little smaller to full when a new budget comes
+  /// to the front (after a swipe, or a tap in the list), like the nav pill landing.
+  late final AnimationController _land = AnimationController.unbounded(vsync: this, value: 1);
+  bool _ownChange = false; // the index change came from this deck's swipe
+
+  void _landSpring({double from = 0.94, double velocity = 0}) {
+    _land.value = from;
+    _land.animateWith(SpringSimulation(_spring, from, 1, velocity));
+  }
+
+  @override
+  void didUpdateWidget(BudgetDeck old) {
+    super.didUpdateWidget(old);
+    // Picked from the list (not swiped): the new card springs in.
+    if (old.index != widget.index && !_ownChange) _landSpring(from: 0.9);
+    _ownChange = false;
+  }
 
   @override
   void initState() {
@@ -83,6 +102,7 @@ class _BudgetDeckState extends State<BudgetDeck> with SingleTickerProviderStateM
   @override
   void dispose() {
     _dx.dispose();
+    _land.dispose();
     super.dispose();
   }
 
@@ -127,8 +147,11 @@ class _BudgetDeckState extends State<BudgetDeck> with SingleTickerProviderStateM
     final ms = ((target - _dx.value).abs() / speed * 1000).clamp(120, 320).round();
     await _dx.animateTo(target, duration: Duration(milliseconds: ms), curve: Curves.easeOutCubic);
     if (!mounted) return;
+    _ownChange = true;
     widget.onIndex((_i + dir + _n) % _n);
     _dx.value = 0;
+    // The card that came forward settles with the app's spring (a small overshoot).
+    _landSpring(from: 0.97, velocity: 0.6);
     _flying = false;
   }
 
@@ -174,7 +197,7 @@ class _BudgetDeckState extends State<BudgetDeck> with SingleTickerProviderStateM
               onHorizontalDragUpdate: _dragUpdate,
               onHorizontalDragEnd: _dragEnd,
               child: AnimatedBuilder(
-                animation: _dx,
+                animation: Listenable.merge([_dx, _land]),
                 builder: (context, _) {
                   final x = _dx.value;
                   final t = _t;
@@ -189,7 +212,10 @@ class _BudgetDeckState extends State<BudgetDeck> with SingleTickerProviderStateM
                       _placed(
                         Transform.translate(
                           offset: Offset(x, x.abs() * 0.04),
-                          child: Transform.rotate(angle: x / (_width * 6), child: front),
+                          child: Transform.rotate(
+                            angle: x / (_width * 6),
+                            child: Transform.scale(scale: _land.value, child: front),
+                          ),
                         ),
                         depth: 0,
                       ),
@@ -439,13 +465,14 @@ class BudgetListRow extends StatelessWidget {
       selected: current,
       label: '${b.name}: $amount ${over ? 'over' : 'left'}',
       excludeSemantics: true,
-      child: Material(
-        color: current ? AppColors.accentSoft : AppColors.card,
-        child: InkWell(
-          onTap: () {
-            AppHaptics.tap();
-            onTap();
-          },
+      // Pressed, the row sinks and springs back like every button in the app.
+      child: SpringPress(
+        haptic: HapticKind.tap,
+        scale: 0.97,
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          color: current ? AppColors.accentSoft : AppColors.card,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(
