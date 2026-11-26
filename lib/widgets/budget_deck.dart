@@ -55,6 +55,25 @@ class _BudgetDeckState extends State<BudgetDeck> with SingleTickerProviderStateM
   double _dx = 0, _from = 0, _to = 0;
   double _width = 300;
 
+  /// The first time the deck is shown (once per app run), the card slides a little to
+  /// the left and back, to show that it can be swiped.
+  static bool _nudged = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!_nudged && widget.items.length > 1) {
+      _nudged = true;
+      Future.delayed(const Duration(milliseconds: 700), () async {
+        if (!mounted || _c.isAnimating) return;
+        await _animate(-46);
+        if (!mounted) return;
+        await Future.delayed(const Duration(milliseconds: 120));
+        if (mounted) await _animate(0);
+      });
+    }
+  }
+
   @override
   void dispose() {
     _c.dispose();
@@ -136,36 +155,46 @@ class _BudgetDeckState extends State<BudgetDeck> with SingleTickerProviderStateM
             ),
           );
         }),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            _arrow(Icons.chevron_left_rounded, 'Previous budget', n > 1 ? () => go(-1) : null),
-            Expanded(
-              child: Text('${i + 1} of $n',
-                  textAlign: TextAlign.center, style: AppText.rowSub.copyWith(fontWeight: FontWeight.w600)),
-            ),
-            _arrow(Icons.chevron_right_rounded, 'Next budget', n > 1 ? () => go(1) : null),
-          ],
-        ),
+        const SizedBox(height: 10),
+        _indicator(n, i),
       ],
     );
   }
 
-  Widget _arrow(IconData icon, String label, VoidCallback? onTap) => Semantics(
-        button: true,
-        label: label,
-        excludeSemantics: true,
-        child: SpringPress(
-          haptic: HapticKind.none,
-          onTap: onTap,
-          child: Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(color: AppColors.card, shape: BoxShape.circle, boxShadow: AppShadows.soft),
-            child: Icon(icon, color: onTap == null ? AppColors.mutedLight : AppColors.dark),
-          ),
-        ),
-      );
+  /// Where you are and that the cards swipe: dots (a count when there are many) with a
+  /// small swipe icon. Tapping a side of it moves one card that way.
+  Widget _indicator(int n, int i) {
+    if (n < 2) return const SizedBox(height: 4);
+    final dots = n <= 8;
+    return Semantics(
+      label: 'Budget ${i + 1} of $n. Swipe the card for the next one.',
+      excludeSemantics: true,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.swipe_rounded, size: 16, color: AppColors.muted),
+          const SizedBox(width: 6),
+          if (dots)
+            for (var k = 0; k < n; k++)
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOutCubic,
+                margin: const EdgeInsets.symmetric(horizontal: 2.5),
+                width: k == i ? 18 : 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: k == i ? AppColors.dark : AppColors.mutedLight,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              )
+          else
+            Text('${i + 1} of $n', style: AppText.rowSub.copyWith(fontWeight: FontWeight.w700)),
+          const SizedBox(width: 8),
+          Text('Swipe', style: AppText.rowSub.copyWith(fontSize: 11.5)),
+        ],
+      ),
+    );
+  }
 
   /// A card peeking behind the front one: a little higher, smaller and fainter.
   Widget _back(BudgetInfo b, int depth) => Positioned(

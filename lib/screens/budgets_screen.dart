@@ -408,7 +408,8 @@ class BudgetsScreenState extends State<BudgetsScreen> {
     ];
     if (!options.any((o) => o.$1 == _filter)) _filter = 'all';
     return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 16, 0, 4),
+      // Room under the filters so the cards peeking behind the deck do not touch them.
+      padding: const EdgeInsets.fromLTRB(0, 16, 0, 16),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         clipBehavior: Clip.none,
