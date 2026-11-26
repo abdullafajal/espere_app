@@ -63,15 +63,18 @@ jobs:
       - name: Unit tests
         run: flutter test
 
+      # The arm64 APK, the same build as the test APK from "Build test APK": the universal
+      # APK (all ABIs in one) would not install on some 64-bit-only phones (Samsung S25:
+      # "App not installed"), while this one does. Almost every phone today is arm64.
       - name: Build website APK
-        run: flutter build apk --release -P espere.autoTrack=false
+        run: flutter build apk --release --split-per-abi -P espere.autoTrack=false
 
       # Play Protect blocks browser installs of apps with a notification listener, so the
       # website APK must never contain one.
       - name: Check the APK has no notification listener
         run: |
           AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)aapt2
-          APK=build/app/outputs/flutter-apk/app-release.apk
+          APK=build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
           COUNT=$("$AAPT2" dump xmltree --file AndroidManifest.xml "$APK" | grep -c BIND_NOTIFICATION_LISTENER_SERVICE || true)
           echo "listener entries: $COUNT"
           [ "$COUNT" = "0" ]
@@ -83,7 +86,7 @@ jobs:
         run: |
           VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}')
           git clone --depth 1 "https://x-access-token:${PAGES_TOKEN}@github.com/abdullafajal/espere-pages.git" /tmp/pages
-          cp build/app/outputs/flutter-apk/app-release.apk /tmp/pages/espere.apk
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk /tmp/pages/espere.apk
           cd /tmp/pages
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
