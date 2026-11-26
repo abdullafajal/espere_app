@@ -31,7 +31,7 @@ import '../services/auto_expense_service.dart';
 import '../services/receipt_service.dart';
 import '../services/transaction_store.dart';
 import '../services/budget_service.dart';
-import '../widgets/budget_deck.dart';
+import '../widgets/budget_watch.dart';
 import 'package:image_picker/image_picker.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -67,6 +67,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
 
   /// This month's category budgets that are 80% used or more.
   List<BudgetInfo> _nearLimit = const [];
+  int _budgetCount = -1; // this month's budgets (-1 until loaded)
   int _reviewCount = 0;
   StreamSubscription<void>? _autoSub;
 
@@ -141,51 +142,56 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
     final picked = await showModalBottomSheet<DateTime>(
       context: context,
       backgroundColor: AppColors.card,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Show month', style: AppText.section),
-              const SizedBox(height: 14),
-              GridView.count(
-                crossAxisCount: 3,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 8,
-                crossAxisSpacing: 8,
-                childAspectRatio: 2.4,
+      builder:
+          (ctx) => SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  for (final m in months)
-                    Builder(builder: (_) {
-                      final on = m.year == _month.year && m.month == _month.month;
-                      return Material(
-                        color: on ? AppColors.dark : AppColors.surface,
-                        borderRadius: BorderRadius.circular(16),
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(16),
-                          onTap: () => Navigator.pop(ctx, m),
-                          child: Center(
-                            child: Text(
-                              m.year == now.year ? DateFormat('MMMM').format(m) : DateFormat('MMM yyyy').format(m),
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: on ? Colors.white : AppColors.text,
+                  const Text('Show month', style: AppText.section),
+                  const SizedBox(height: 14),
+                  GridView.count(
+                    crossAxisCount: 3,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    mainAxisSpacing: 8,
+                    crossAxisSpacing: 8,
+                    childAspectRatio: 2.4,
+                    children: [
+                      for (final m in months)
+                        Builder(
+                          builder: (_) {
+                            final on = m.year == _month.year && m.month == _month.month;
+                            return Material(
+                              color: on ? AppColors.dark : AppColors.surface,
+                              borderRadius: BorderRadius.circular(16),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(16),
+                                onTap: () => Navigator.pop(ctx, m),
+                                child: Center(
+                                  child: Text(
+                                    m.year == now.year
+                                        ? DateFormat('MMMM').format(m)
+                                        : DateFormat('MMM yyyy').format(m),
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: on ? Colors.white : AppColors.text,
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
+                            );
+                          },
                         ),
-                      );
-                    }),
+                    ],
+                  ),
                 ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
     );
     if (picked == null || !mounted) return;
     _selectMonth(picked);
@@ -205,12 +211,13 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
   Future<void> _loadMonth(DateTime month) async {
     final key = DateFormat('yyyy-MM').format(month);
     final cached = await CacheService.getCachedTransactions();
-    final txns = ((cached?['transactions'] as List?) ?? const [])
-        .whereType<Map>()
-        .map((t) => TransactionModel.fromJson(Map<String, dynamic>.from(t)))
-        .where((t) => DateFormat('yyyy-MM').format(t.date.toLocal()) == key)
-        .toList()
-      ..sort((a, b) => b.date.compareTo(a.date));
+    final txns =
+        ((cached?['transactions'] as List?) ?? const [])
+            .whereType<Map>()
+            .map((t) => TransactionModel.fromJson(Map<String, dynamic>.from(t)))
+            .where((t) => DateFormat('yyyy-MM').format(t.date.toLocal()) == key)
+            .toList()
+          ..sort((a, b) => b.date.compareTo(a.date));
     final local = _MonthView.fromTransactions(month, txns);
     if (!mounted || month != _month) return;
     setState(() => _past = local);
@@ -225,7 +232,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
   Future<void> _loadDashboard() async {
     final cached = await CacheService.getCachedDashboard();
     final cachedUser = await CacheService.getCachedUser();
-    
+
     if (cached != null && mounted) {
       if (cachedUser != null) {
         cached['user'] = cachedUser;
@@ -234,7 +241,6 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
       setState(() {
         _data = d;
         _isLoading = false;
-        
       });
 
       _loadExtras();
@@ -280,26 +286,28 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
         count: (prev?.count ?? 0) + 1,
       );
     }
-    final again = counts.values.where((a) => a.count >= 2).toList()
-      ..sort((a, b) => b.count.compareTo(a.count));
+    final again = counts.values.where((a) => a.count >= 2).toList()..sort((a, b) => b.count.compareTo(a.count));
     var review = 0;
     if (await AutoExpenseService.isAvailable()) review = await AutoExpenseService.reviewCount();
     if (!mounted) return;
-    final all = txns
-        .map((t) {
-          try {
-            return TransactionModel.fromJson(Map<String, dynamic>.from(t));
-          } catch (_) {
-            return null;
-          }
-        })
-        .whereType<TransactionModel>()
-        .toList();
-    final near = (await BudgetService.byCategory()).values.where((b) => b.limit > 0 && b.fraction >= 0.8).toList()
-      ..sort((a, b) => b.fraction.compareTo(a.fraction));
+    final all =
+        txns
+            .map((t) {
+              try {
+                return TransactionModel.fromJson(Map<String, dynamic>.from(t));
+              } catch (_) {
+                return null;
+              }
+            })
+            .whereType<TransactionModel>()
+            .toList();
+    // Over or close budgets; the one with the most entries this month first.
+    final budgets = await BudgetService.byCategory();
+    final near = budgets.values.where((b) => b.limit > 0 && b.fraction >= 0.8).toList()..sort(BudgetInfo.byUse);
     if (!mounted) return;
     setState(() {
-      _nearLimit = near.take(3).toList();
+      _nearLimit = near.take(6).toList();
+      _budgetCount = budgets.length;
       _txns = all;
       _week = week;
       _weekDays = days;
@@ -337,29 +345,26 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
 
   Future<void> _addAgain(_Again a, String symbol) async {
     AppHaptics.confirm();
-    final id = await TransactionStore.create(
-      amount: a.amount,
-      type: 'expense',
-      category: a.category,
-      notes: a.note,
-    );
+    final id = await TransactionStore.create(amount: a.amount, type: 'expense', category: a.category, notes: a.note);
     if (!mounted) return;
     await _loadDashboard();
     if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text('−${_money(a.amount, symbol)} added · ${a.label}'),
-        duration: const Duration(seconds: 4),
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 96),
-        action: SnackBarAction(
-          label: 'Undo',
-          onPressed: () async {
-            await TransactionStore.remove(id);
-            if (mounted) _loadDashboard();
-          },
+      ..showSnackBar(
+        SnackBar(
+          content: Text('−${_money(a.amount, symbol)} added · ${a.label}'),
+          duration: const Duration(seconds: 4),
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 96),
+          action: SnackBarAction(
+            label: 'Undo',
+            onPressed: () async {
+              await TransactionStore.remove(id);
+              if (mounted) _loadDashboard();
+            },
+          ),
         ),
-      ));
+      );
   }
 
   Future<void> _openReview() async {
@@ -403,7 +408,8 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Good ${d.greeting.toLowerCase()}', style: AppText.rowSub),
-                  MorphText(id: 'home-name', 
+                  MorphText(
+                    id: 'home-name',
                     d.user.displayName.trim().isEmpty ? firstName : d.user.displayName.trim(),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -422,7 +428,11 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                 child: Container(
                   width: 44,
                   height: 44,
-                  decoration: BoxDecoration(color: AppColors.accent, shape: BoxShape.circle, boxShadow: AppShadows.accent),
+                  decoration: BoxDecoration(
+                    color: AppColors.accent,
+                    shape: BoxShape.circle,
+                    boxShadow: AppShadows.accent,
+                  ),
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
@@ -464,9 +474,10 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
     final highlight = past?.highlight ?? 6;
     final loading = !_isThisMonth && past == null;
     final title = _isThisMonth ? 'Spent this month' : 'Spent in ${DateFormat('MMMM').format(_month)}';
-    final chip = _isThisMonth || _month.year == now.year
-        ? DateFormat('MMMM').format(_month)
-        : DateFormat('MMM yyyy').format(_month);
+    final chip =
+        _isThisMonth || _month.year == now.year
+            ? DateFormat('MMMM').format(_month)
+            : DateFormat('MMM yyyy').format(_month);
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
@@ -480,9 +491,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
         children: [
           Row(
             children: [
-              Expanded(
-                child: Text(title, style: const TextStyle(fontSize: 13, color: AppColors.darkMuted)),
-              ),
+              Expanded(child: Text(title, style: const TextStyle(fontSize: 13, color: AppColors.darkMuted))),
               Semantics(
                 button: true,
                 label: 'Month: $chip. Change month',
@@ -497,7 +506,10 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(chip, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
+                        Text(
+                          chip,
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white),
+                        ),
                         const Icon(Icons.expand_more_rounded, size: 18, color: Colors.white),
                       ],
                     ),
@@ -517,12 +529,18 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                 crossAxisAlignment: CrossAxisAlignment.baseline,
                 textBaseline: TextBaseline.alphabetic,
                 children: [
-                  MorphText(id: 'home-spent', _money(spent, d.currencySymbol),
-                      style: AppText.hero.copyWith(color: Colors.white, fontSize: 34, letterSpacing: -1)),
+                  MorphText(
+                    id: 'home-spent',
+                    _money(spent, d.currencySymbol),
+                    style: AppText.hero.copyWith(color: Colors.white, fontSize: 34, letterSpacing: -1),
+                  ),
                   if (limit > 0) ...[
                     const SizedBox(width: 8),
-                    MorphText(id: 'home-spent', 'of ${_money(limit, d.currencySymbol)}',
-                        style: const TextStyle(fontSize: 13, color: AppColors.darkMuted)),
+                    MorphText(
+                      id: 'home-spent',
+                      'of ${_money(limit, d.currencySymbol)}',
+                      style: const TextStyle(fontSize: 13, color: AppColors.darkMuted),
+                    ),
                   ],
                 ],
               ),
@@ -544,19 +562,20 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
               Expanded(child: _heroStat('Avg / day', _money(avgDaily.roundToDouble(), d.currencySymbol), Colors.white)),
               const SizedBox(width: 8),
               Expanded(
-                child: _isThisMonth
-                    ? _heroStat(
-                        limit > 0 ? 'Left to spend' : 'Balance',
-                        limit > 0
-                            ? _money(math.max(0, limit - spent), d.currencySymbol)
-                            : _money(_num(d.totalBalance), d.currencySymbol),
-                        Colors.white,
-                      )
-                    : _heroStat(
-                        income >= spent ? 'Saved' : 'Overspent',
-                        _money((income - spent).abs(), d.currencySymbol),
-                        Colors.white,
-                      ),
+                child:
+                    _isThisMonth
+                        ? _heroStat(
+                          limit > 0 ? 'Left to spend' : 'Balance',
+                          limit > 0
+                              ? _money(math.max(0, limit - spent), d.currencySymbol)
+                              : _money(_num(d.totalBalance), d.currencySymbol),
+                          Colors.white,
+                        )
+                        : _heroStat(
+                          income >= spent ? 'Saved' : 'Overspent',
+                          _money((income - spent).abs(), d.currencySymbol),
+                          Colors.white,
+                        ),
               ),
               const SizedBox(width: 8),
               Expanded(child: _heroStat('Money in', '+${_money(income, d.currencySymbol)}', AppColors.accent)),
@@ -598,9 +617,10 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
     final maxBar = bars.fold<double>(0, math.max);
     final String caption;
     if (_isThisMonth) {
-      caption = sel == bars.length - 1
-          ? 'TODAY'
-          : sel == bars.length - 2
+      caption =
+          sel == bars.length - 1
+              ? 'TODAY'
+              : sel == bars.length - 2
               ? 'YESTERDAY'
               : (sel < _weekNames.length && _weekNames[sel].isNotEmpty ? _weekNames[sel] : labels[sel]).toUpperCase();
     } else {
@@ -610,9 +630,10 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
     final diff = (avg - value).abs();
     final String message;
     if (useSafe) {
-      message = safe <= 0
-          ? 'The month\'s budget is used up.'
-          : over
+      message =
+          safe <= 0
+              ? 'The month\'s budget is used up.'
+              : over
               ? '${_money(diff.roundToDouble(), symbol)} over what is safe for today.'
               : 'You can still spend ${_money(diff.roundToDouble(), symbol)} today and stay on budget.';
     } else if (value <= 0) {
@@ -635,10 +656,11 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
             tween: Tween(end: fraction),
             duration: const Duration(milliseconds: 650),
             curve: Curves.easeOutBack,
-            builder: (context, f, child) => CustomPaint(
-              painter: _RingPainter(fraction: f.clamp(0.0, 1.0), color: color, track: AppColors.darkCardRaised),
-              child: child,
-            ),
+            builder:
+                (context, f, child) => CustomPaint(
+                  painter: _RingPainter(fraction: f.clamp(0.0, 1.0), color: color, track: AppColors.darkCardRaised),
+                  child: child,
+                ),
             child: Padding(
               // Keeps the text inside the ring; long amounts shrink to fit.
               padding: const EdgeInsets.all(18),
@@ -647,10 +669,16 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                 children: [
                   FittedBox(
                     fit: BoxFit.scaleDown,
-                    child: Text(caption,
-                        maxLines: 1,
-                        style: const TextStyle(
-                            fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: AppColors.darkMuted)),
+                    child: Text(
+                      caption,
+                      maxLines: 1,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.6,
+                        color: AppColors.darkMuted,
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 2),
                   FittedBox(
@@ -660,14 +688,21 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                       _money(value.roundToDouble(), symbol),
                       maxLines: 1,
                       style: TextStyle(
-                          fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.5, color: Colors.white),
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                   if (avg > 0)
                     FittedBox(
                       fit: BoxFit.scaleDown,
-                      child: Text('of ${_money(avg.roundToDouble(), symbol)} ${useSafe ? 'safe' : 'avg'}',
-                          maxLines: 1, style: const TextStyle(fontSize: 10, color: AppColors.darkFaint)),
+                      child: Text(
+                        'of ${_money(avg.roundToDouble(), symbol)} ${useSafe ? 'safe' : 'avg'}',
+                        maxLines: 1,
+                        style: const TextStyle(fontSize: 10, color: AppColors.darkFaint),
+                      ),
                     ),
                 ],
               ),
@@ -685,12 +720,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                   message,
                   key: ValueKey(message),
                   maxLines: 2,
-                  style: TextStyle(
-                    fontSize: 12,
-                    height: 1.35,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.darkMuted,
-                  ),
+                  style: TextStyle(fontSize: 12, height: 1.35, fontWeight: FontWeight.w600, color: AppColors.darkMuted),
                 ),
               ),
               const SizedBox(height: 10),
@@ -754,21 +784,26 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
   }
 
   Widget _heroStat(String label, String value, Color color) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        decoration: BoxDecoration(color: AppColors.darkCard, borderRadius: BorderRadius.circular(14)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: AppColors.darkMuted)),
-            const SizedBox(height: 2),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: color)),
-            ),
-          ],
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+    decoration: BoxDecoration(color: AppColors.darkCard, borderRadius: BorderRadius.circular(14)),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 11, color: AppColors.darkMuted),
         ),
-      );
+        const SizedBox(height: 2),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: color)),
+        ),
+      ],
+    ),
+  );
 
   Widget _actions() {
     return Row(
@@ -798,7 +833,10 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                       child: Icon(Icons.add_rounded, size: 20, color: AppColors.accent),
                     ),
                     const SizedBox(width: 10),
-                    const Text('Add expense', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.dark)),
+                    const Text(
+                      'Add expense',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.dark),
+                    ),
                   ],
                 ),
               ),
@@ -815,7 +853,11 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
             child: Container(
               width: 58,
               height: 58,
-              decoration: BoxDecoration(color: AppColors.card, borderRadius: BorderRadius.circular(AppRadius.xl), boxShadow: AppShadows.soft),
+              decoration: BoxDecoration(
+                color: AppColors.card,
+                borderRadius: BorderRadius.circular(AppRadius.xl),
+                boxShadow: AppShadows.soft,
+              ),
               child: const Icon(Icons.document_scanner_rounded, size: 24, color: AppColors.dark),
             ),
           ),
@@ -830,50 +872,79 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Add again in one tap', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.muted)),
+          const Text(
+            'Add again in one tap',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.muted),
+          ),
           const SizedBox(height: 8),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             clipBehavior: Clip.none,
             child: Row(
-              children: _again.map((a) {
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Semantics(
-                    button: true,
-                    label: 'Add ${a.label} ${_money(a.amount, d.currencySymbol)} again',
-                    excludeSemantics: true,
-                    child: SpringPress(
-                      haptic: HapticKind.none,
-                      onTap: () => _addAgain(a, d.currencySymbol),
-                      child: Container(
-                        height: 42,
-                        padding: const EdgeInsets.only(left: 6, right: 14),
-                        decoration: BoxDecoration(color: AppColors.card, borderRadius: BorderRadius.circular(21), boxShadow: AppShadows.soft),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 30,
-                              height: 30,
-                              decoration: const BoxDecoration(color: AppColors.categoryFill, shape: BoxShape.circle),
-                              child: Icon(IconMapper.map(a.category?.icon ?? 'category'), size: 17, color: AppColors.categoryInk),
+              children:
+                  _again.map((a) {
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Semantics(
+                        button: true,
+                        label: 'Add ${a.label} ${_money(a.amount, d.currencySymbol)} again',
+                        excludeSemantics: true,
+                        child: SpringPress(
+                          haptic: HapticKind.none,
+                          onTap: () => _addAgain(a, d.currencySymbol),
+                          child: Container(
+                            height: 42,
+                            padding: const EdgeInsets.only(left: 6, right: 14),
+                            decoration: BoxDecoration(
+                              color: AppColors.card,
+                              borderRadius: BorderRadius.circular(21),
+                              boxShadow: AppShadows.soft,
                             ),
-                            const SizedBox(width: 8),
-                            ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 120),
-                              child: Text(a.label, maxLines: 1, overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.text)),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 30,
+                                  height: 30,
+                                  decoration: const BoxDecoration(
+                                    color: AppColors.categoryFill,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    IconMapper.map(a.category?.icon ?? 'category'),
+                                    size: 17,
+                                    color: AppColors.categoryInk,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                ConstrainedBox(
+                                  constraints: const BoxConstraints(maxWidth: 120),
+                                  child: Text(
+                                    a.label,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.text,
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  ' ${_money(a.amount, d.currencySymbol)}',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.text,
+                                  ),
+                                ),
+                              ],
                             ),
-                            Text(' ${_money(a.amount, d.currencySymbol)}',
-                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.text)),
-                          ],
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                );
-              }).toList(),
+                    );
+                  }).toList(),
             ),
           ),
         ],
@@ -881,24 +952,31 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
     );
   }
 
-  void _edit(TransactionModel txn) => TransactionFormScreen.show(context, transactionId: txn.id, onSaved: () {
-        _loadDashboard();
-        if (!_isThisMonth) _loadMonth(_month);
-      });
+  void _edit(TransactionModel txn) => TransactionFormScreen.show(
+    context,
+    transactionId: txn.id,
+    onSaved: () {
+      _loadDashboard();
+      if (!_isThisMonth) _loadMonth(_month);
+    },
+  );
 
   Future<void> _delete(TransactionModel txn, GlobalKey<ThanosSnapWidgetState> snapKey) async {
     final sign = txn.isIncome ? '+' : '−';
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete this entry?'),
-        content: Text('${txn.notes.trim().isNotEmpty ? txn.notes.trim() : txn.category.name} '
-            '($sign${_data?.currencySymbol ?? '₹'}${txn.amount}) will be removed.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
-        ],
-      ),
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('Delete this entry?'),
+            content: Text(
+              '${txn.notes.trim().isNotEmpty ? txn.notes.trim() : txn.category.name} '
+              '($sign${_data?.currencySymbol ?? '₹'}${txn.amount}) will be removed.',
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+              TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+            ],
+          ),
     );
     if (ok != true || !mounted) return;
     AppHaptics.confirm();
@@ -911,9 +989,9 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
   }
 
   /// One white card: payments to review, then "Recent" with the latest entries.
-  /// Budgets close to (or over) their limit, as the same rows as the Budgets screen
-  /// (ten-block bars, OVER tag, what is left). Tap one to open Budgets.
-  Widget _nearLimitCard(String symbol) {
+  /// Budgets close to (or over) their limit, as a deck of money-left charts to swipe
+  /// through. Sits under "Month by month". Tap a card (or "All") to open Budgets.
+  Widget _watchCard(String symbol) {
     return Padding(
       padding: const EdgeInsets.only(top: 16),
       child: Column(
@@ -921,29 +999,38 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-            child: Text('Budgets near the limit', style: AppText.rowSub.copyWith(fontSize: 13, fontWeight: FontWeight.w600)),
-          ),
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.card,
-              borderRadius: BorderRadius.circular(AppRadius.xxl),
-              boxShadow: AppShadows.soft,
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Column(
+            child: Row(
               children: [
-                for (var i = 0; i < _nearLimit.length; i++) ...[
-                  if (i > 0) const Divider(height: 1, indent: 66, color: AppColors.border),
-                  BudgetListRow(
-                    budget: _nearLimit[i],
-                    current: false,
-                    symbol: symbol,
+                Expanded(child: Text(_budgetCount == 0 ? 'Budgets' : 'Budgets to watch', style: AppText.section)),
+                if (_budgetCount > 0)
+                  SpringPress(
+                    haptic: HapticKind.tap,
                     onTap: () => widget.onTabChange?.call(2),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 4),
+                      child: Text(
+                        'All budgets',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.text,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
                   ),
-                ],
               ],
             ),
           ),
+          if (_nearLimit.isEmpty)
+            BudgetWatchEmpty(budgets: _budgetCount, onSet: () => widget.onTabChange?.call(2))
+          else
+            BudgetWatchDeck(
+              items: _nearLimit,
+              symbol: symbol,
+              today: DateTime.now(),
+              onOpen: () => widget.onTabChange?.call(2),
+            ),
         ],
       ),
     );
@@ -1025,21 +1112,23 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
               )
             else
               for (final txn in list)
-                Builder(builder: (_) {
-                  final snapKey = _snapKeys.putIfAbsent(txn.id, () => GlobalKey<ThanosSnapWidgetState>());
-                  return ThanosSnapWidget(
-                    key: snapKey,
-                    child: TransactionTile(
-                      transaction: txn,
-                      currencySymbol: d.currencySymbol,
-                      card: false,
-                      showActions: true,
-                      onTap: () => _edit(txn),
-                      onEdit: () => _edit(txn),
-                      onDelete: () => _delete(txn, snapKey),
-                    ),
-                  );
-                }),
+                Builder(
+                  builder: (_) {
+                    final snapKey = _snapKeys.putIfAbsent(txn.id, () => GlobalKey<ThanosSnapWidgetState>());
+                    return ThanosSnapWidget(
+                      key: snapKey,
+                      child: TransactionTile(
+                        transaction: txn,
+                        currencySymbol: d.currencySymbol,
+                        card: false,
+                        showActions: true,
+                        onTap: () => _edit(txn),
+                        onEdit: () => _edit(txn),
+                        onDelete: () => _delete(txn, snapKey),
+                      ),
+                    );
+                  },
+                ),
             const SizedBox(height: 6),
           ],
         ),
@@ -1072,7 +1161,6 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
             _hero(d),
             const SizedBox(height: 16),
             _actions(),
-            if (_isThisMonth && _nearLimit.isNotEmpty) _nearLimitCard(d.currencySymbol),
             if (_again.isNotEmpty) _againRow(d),
             _recentCard(d),
             CategoryBreakdownCard(
@@ -1081,14 +1169,9 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
               transactions: _txns,
               symbol: d.currencySymbol,
             ),
-            MonthlyTrendCard(
-              selected: _month,
-              transactions: _txns,
-              symbol: d.currencySymbol,
-              onSelect: _selectMonth,
-            ),
+            MonthlyTrendCard(selected: _month, transactions: _txns, symbol: d.currencySymbol, onSelect: _selectMonth),
+            if (_isThisMonth && _budgetCount >= 0) _watchCard(d.currencySymbol),
             const NavBottomSpace(),
-
           ],
         ),
       ),
@@ -1107,11 +1190,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
             children: [
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _shimmer(96, 12),
-                  const SizedBox(height: 8),
-                  _shimmer(192, 32),
-                ],
+                children: [_shimmer(96, 12), const SizedBox(height: 8), _shimmer(192, 32)],
               ),
               _shimmer(48, 48, radius: AppRadius.xl),
             ],
@@ -1165,7 +1244,13 @@ class _Again {
   final String note;
   final CategoryModel? category;
   final int count;
-  const _Again({required this.label, required this.amount, required this.note, required this.category, required this.count});
+  const _Again({
+    required this.label,
+    required this.amount,
+    required this.note,
+    required this.category,
+    required this.count,
+  });
 }
 
 /// Hero numbers for a month other than this one.
@@ -1263,7 +1348,6 @@ class _MonthView {
   }
 }
 
-
 /// A ring that fills clockwise from the top.
 class _RingPainter extends CustomPainter {
   final double fraction;
@@ -1276,10 +1360,11 @@ class _RingPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     const stroke = 10.0;
     final rect = Rect.fromCircle(center: size.center(Offset.zero), radius: size.shortestSide / 2 - stroke / 2);
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke
-      ..strokeCap = StrokeCap.round;
+    final paint =
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = stroke
+          ..strokeCap = StrokeCap.round;
     canvas.drawArc(rect, 0, 2 * math.pi, false, paint..color = track);
     if (fraction > 0) {
       canvas.drawArc(rect, -math.pi / 2, 2 * math.pi * fraction, false, paint..color = color);
