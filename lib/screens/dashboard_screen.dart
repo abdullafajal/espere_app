@@ -31,6 +31,7 @@ import '../services/auto_expense_service.dart';
 import '../services/receipt_service.dart';
 import '../services/transaction_store.dart';
 import '../services/budget_service.dart';
+import '../widgets/budget_deck.dart';
 import 'package:image_picker/image_picker.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -910,7 +911,8 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
   }
 
   /// One white card: payments to review, then "Recent" with the latest entries.
-  /// Budgets close to (or over) their limit; tap to open Budgets.
+  /// Budgets close to (or over) their limit, as the same rows as the Budgets screen
+  /// (ten-block bars, OVER tag, what is left). Tap one to open Budgets.
   Widget _nearLimitCard(String symbol) {
     return Padding(
       padding: const EdgeInsets.only(top: 16),
@@ -921,68 +923,31 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
             padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
             child: Text('Budgets near the limit', style: AppText.rowSub.copyWith(fontSize: 13, fontWeight: FontWeight.w600)),
           ),
-          SpringPress(
-            haptic: HapticKind.tap,
-            onTap: () => widget.onTabChange?.call(2),
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-              decoration: BoxDecoration(
-                color: AppColors.card,
-                borderRadius: BorderRadius.circular(AppRadius.xxl),
-                boxShadow: AppShadows.soft,
-              ),
-              child: Column(
-                children: [
-                  for (var i = 0; i < _nearLimit.length; i++) ...[
-                    if (i > 0) const SizedBox(height: 12),
-                    _nearRow(_nearLimit[i], symbol),
-                  ],
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: BorderRadius.circular(AppRadius.xxl),
+              boxShadow: AppShadows.soft,
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
+                for (var i = 0; i < _nearLimit.length; i++) ...[
+                  if (i > 0) const Divider(height: 1, indent: 66, color: AppColors.border),
+                  BudgetListRow(
+                    budget: _nearLimit[i],
+                    current: false,
+                    symbol: symbol,
+                    onTap: () => widget.onTabChange?.call(2),
+                  ),
                 ],
-              ),
+              ],
             ),
           ),
         ],
       ),
     );
   }
-
-  Widget _nearRow(BudgetInfo b, String symbol) => Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: const BoxDecoration(color: AppColors.categoryFill, shape: BoxShape.circle),
-            child: Icon(IconMapper.map(b.icon), size: 19, color: AppColors.categoryInk),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(child: Text(b.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.rowTitle)),
-                    Text(
-                      b.spent > b.limit ? '${_money((b.spent - b.limit).roundToDouble(), symbol)} over' : '${b.percent}%',
-                      style: AppText.rowTitle.copyWith(fontSize: 13),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: b.fraction.clamp(0.0, 1.0),
-                    minHeight: 6,
-                    backgroundColor: AppColors.surface,
-                    color: AppColors.dark,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      );
 
   Widget _recentCard(DashboardData d) {
     final past = _isThisMonth ? null : _past;

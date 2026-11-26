@@ -1,3 +1,4 @@
+import '../widgets/block_bar.dart';
 import 'package:flutter/material.dart';
 import '../theme/motion.dart';
 import '../widgets/espere_header.dart';
@@ -338,14 +339,11 @@ class BudgetsScreenState extends State<BudgetsScreen> {
           const SizedBox(height: 10),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(3),
-              child: LinearProgressIndicator(
-                value: limit <= 0 ? 0 : (spent / limit).clamp(0.0, 1.0),
-                minHeight: 6,
-                backgroundColor: AppColors.border,
-                color: AppColors.dark,
-              ),
+            child: BlockBar(
+              value: limit <= 0 ? 0 : spent / limit,
+              height: 8,
+              track: AppColors.border,
+              color: AppColors.dark,
             ),
           ),
           const SizedBox(height: 6),

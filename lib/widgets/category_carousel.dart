@@ -6,6 +6,7 @@
 /// Split "new expense" screen, so picking a category feels the same everywhere.
 library;
 
+import 'block_bar.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -473,15 +474,7 @@ class _CategoryListSheetState extends State<_CategoryListSheet> {
             if (c.used != null)
               SizedBox(
                 width: 64,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(3),
-                  child: LinearProgressIndicator(
-                    value: c.used!.clamp(0.0, 1.0),
-                    minHeight: 5,
-                    backgroundColor: AppColors.surface,
-                    color: c.used! >= 0.8 ? AppColors.dark : AppColors.accent,
-                  ),
-                ),
+                child: BlockBar(value: c.used!, height: 5),
               ),
           ],
         ),

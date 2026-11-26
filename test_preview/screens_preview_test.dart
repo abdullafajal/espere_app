@@ -135,6 +135,21 @@ void main() {
       ..['cache_budgets'] = jsonEncode({'budgets': bs, 'overall': {'amount': '20000.00'}, 'currency_symbol': '₹'});
     return shot(t, 'budgets_many', const BudgetsScreen(), prefs: prefs, size: const Size(390, 1500));
   });
+  testWidgets('home_near_limit', (t) {
+    final now = DateTime.now();
+    String d(int day) => DateTime(now.year, now.month, day.clamp(1, now.day), 12).toUtc().toIso8601String();
+    // Like the reported screen: 111%, 86%, 69%, 61% and two at 0%.
+    final spend = {0: 11156.0, 2: 3015.0, 3: 5847.0, 4: 3381.0};
+    final limits = {0: '10000', 2: '3500', 3: '8500', 4: '5500', 5: '500', 6: '1500'};
+    final txns = [
+      for (final e in spend.entries) txn(900 + e.key, e.value.toStringAsFixed(0), 'expense', categories[e.key], 'x', d(e.key + 2)),
+    ];
+    final bs = [for (final e in limits.entries) budget(800 + e.key, categories[e.key], e.value, '0')];
+    final prefs = Map<String, Object>.from(baseCache())
+      ..['cache_transactions'] = jsonEncode({'transactions': txns, 'currency_symbol': '₹'})
+      ..['cache_budgets'] = jsonEncode({'budgets': bs, 'overall': {'amount': '20000.00'}, 'currency_symbol': '₹'});
+    return shot(t, 'home_near_limit', const DashboardScreen(), prefs: prefs, size: const Size(390, 1500));
+  });
   testWidgets('budgets_dragging', (t) => shot(t, 'budgets_dragging', const BudgetsScreen(), act: (t) async {
         final g = await t.startGesture(t.getTopLeft(find.byType(BudgetDeck)) + const Offset(200, 120));
         for (var k = 0; k < 10; k++) {

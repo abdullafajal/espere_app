@@ -2,6 +2,7 @@
 /// entry that went into it (tap one to edit it). Opened by tapping a budget.
 library;
 
+import '../widgets/block_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -108,7 +109,6 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
   Widget build(BuildContext context) {
     final limit = _info?.limit ?? (double.tryParse(widget.budget['amount'].toString()) ?? 0);
     final spent = _info?.spent ?? (double.tryParse(widget.budget['spent']?.toString() ?? '') ?? 0);
-    final fraction = limit <= 0 ? 0.0 : (spent / limit).clamp(0.0, 1.0);
     final repeat = widget.budget['repeat'] != false;
     final carried = double.tryParse(widget.budget['carried']?.toString() ?? '') ?? 0;
 
@@ -170,14 +170,11 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(5),
-                          child: LinearProgressIndicator(
-                            value: fraction,
-                            minHeight: 10,
-                            backgroundColor: AppColors.darkCardRaised,
-                            color: AppColors.accent,
-                          ),
+                        BlockBar(
+                          value: spent / (limit <= 0 ? 1 : limit),
+                          height: 10,
+                          track: AppColors.darkCardRaised,
+                          color: AppColors.accent,
                         ),
                         const SizedBox(height: 8),
                         Row(
