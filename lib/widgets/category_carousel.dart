@@ -60,7 +60,7 @@ class CategoryCarousel extends StatefulWidget {
 }
 
 class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerProviderStateMixin {
-  static const double _gap = 92; // between card centres
+  static const double _gap = 118; // between card centres
   static const double _stageH = 186;
 
   late final AnimationController _pos =
@@ -266,39 +266,35 @@ class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerPr
   Widget _placed(int i, double p, double width) {
     final d = i - p;
     final a = d.abs();
-    final s = d.clamp(-1.0, 1.0);
-    final x = d * _gap + s * math.min(a, 1) * 6;
-    final opacity = (1 - math.max(0.0, a - 1.6) * 0.8).clamp(0.0, 1.0);
+    final t = math.min(a, 1.0);
+    // Flat and straight: side cards just sit smaller and dimmer beside the middle one.
+    final scale = 1 - 0.22 * t;
+    final opacity = (1 - math.max(0.0, a - 1.4) * 0.9).clamp(0.0, 1.0);
     const cw = 120.0, ch = 150.0;
-    final m = Matrix4.identity()
-      ..setEntry(3, 2, 0.0014) // perspective
-      ..translateByDouble(x, 0, -math.min(a, 2) * 70, 1)
-      ..rotateY(-s * 0.84); // up to 48°
     return Positioned(
-      left: width / 2 - cw / 2,
+      left: width / 2 - cw / 2 + d * _gap,
       top: (_stageH - ch) / 2,
       child: Opacity(
         opacity: opacity,
-        child: Transform(
-          transform: m,
-          alignment: Alignment.center,
-          child: _card(widget.items[_wrap(i)], a < 0.5, cw, ch,
-              Color.lerp(AppColors.accent, AppColors.surface, a.clamp(0.0, 1.0))!),
+        child: Transform.scale(
+          scale: scale,
+          child: _card(widget.items[_wrap(i)], t, cw, ch),
         ),
       ),
     );
   }
 
-  Widget _card(CarouselCategory item, bool mid, double w, double h, Color bg) {
+  /// [t] is 0 for the middle card and 1 for a card fully to the side.
+  Widget _card(CarouselCategory item, double t, double w, double h) {
+    final mid = t < 0.5;
     return Container(
       width: w,
       height: h,
       padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
-        color: bg,
+        color: AppColors.dark,
         borderRadius: BorderRadius.circular(28),
-        border: mid ? Border.all(color: AppColors.dark, width: 2) : null,
-        boxShadow: mid ? const [BoxShadow(color: Color(0x2E000000), blurRadius: 24, offset: Offset(0, 12))] : null,
+        boxShadow: mid ? const [BoxShadow(color: Color(0x33000000), blurRadius: 22, offset: Offset(0, 10))] : null,
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -307,11 +303,12 @@ class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerPr
             width: 60,
             height: 60,
             decoration: BoxDecoration(
-              color: item.isNew ? Colors.transparent : Colors.white.withValues(alpha: 0.6),
+              color: item.isNew ? Colors.transparent : Color.lerp(AppColors.accent, AppColors.darkCardRaised, t),
               shape: BoxShape.circle,
-              border: item.isNew ? Border.all(color: AppColors.mutedLight, width: 1.5) : null,
+              border: item.isNew ? Border.all(color: AppColors.darkMuted, width: 1.5) : null,
             ),
-            child: Icon(item.icon, size: 28, color: AppColors.dark),
+            child: Icon(item.icon, size: 28,
+                color: item.isNew ? AppColors.darkMuted : Color.lerp(AppColors.dark, AppColors.accent, t)),
           ),
           const SizedBox(height: 8),
           Text(
@@ -319,7 +316,7 @@ class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerPr
             maxLines: 1,
             textAlign: TextAlign.center,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.text),
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: mid ? Colors.white : AppColors.darkMuted),
           ),
         ],
       ),
