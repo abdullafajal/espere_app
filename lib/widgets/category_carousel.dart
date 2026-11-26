@@ -60,7 +60,7 @@ class CategoryCarousel extends StatefulWidget {
 }
 
 class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerProviderStateMixin {
-  static const double _gap = 118; // between card centres
+  static const double _gap = 112; // between card centres
   static const double _stageH = 186;
 
   late final AnimationController _pos =
@@ -292,7 +292,7 @@ class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerPr
       height: h,
       padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
-        color: AppColors.dark,
+        color: Color.lerp(AppColors.dark, AppColors.surface, t),
         borderRadius: BorderRadius.circular(28),
         boxShadow: mid ? const [BoxShadow(color: Color(0x33000000), blurRadius: 22, offset: Offset(0, 10))] : null,
       ),
@@ -303,12 +303,12 @@ class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerPr
             width: 60,
             height: 60,
             decoration: BoxDecoration(
-              color: item.isNew ? Colors.transparent : Color.lerp(AppColors.accent, AppColors.darkCardRaised, t),
+              color: item.isNew ? Colors.transparent : Color.lerp(AppColors.accent, Colors.white, t),
               shape: BoxShape.circle,
-              border: item.isNew ? Border.all(color: AppColors.darkMuted, width: 1.5) : null,
+              border: item.isNew ? Border.all(color: Color.lerp(AppColors.darkMuted, AppColors.mutedLight, t)!, width: 1.5) : null,
             ),
             child: Icon(item.icon, size: 28,
-                color: item.isNew ? AppColors.darkMuted : Color.lerp(AppColors.dark, AppColors.accent, t)),
+                color: item.isNew ? Color.lerp(AppColors.darkMuted, AppColors.muted, t) : AppColors.dark),
           ),
           const SizedBox(height: 8),
           Text(
@@ -316,7 +316,7 @@ class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerPr
             maxLines: 1,
             textAlign: TextAlign.center,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: mid ? Colors.white : AppColors.darkMuted),
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color.lerp(Colors.white, AppColors.text, t)),
           ),
         ],
       ),
