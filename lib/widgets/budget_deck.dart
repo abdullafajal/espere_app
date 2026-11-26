@@ -54,11 +54,19 @@ class _BudgetDeckState extends State<BudgetDeck> with TickerProviderStateMixin {
   /// The front card's sideways offset in pixels. Driven by the finger while dragging and
   /// by a spring after letting go. Only the card transforms listen to it, so dragging
   /// does not rebuild the cards (or the screen).
-  late final AnimationController _dx = AnimationController.unbounded(vsync: this);
+  late final AnimationController _dx = AnimationController.unbounded(
+    vsync: this,
+  );
   double _width = 300;
   bool _flying = false;
-  bool _passed = false; // the drag has gone far enough to change card (one tick when it does)
-  bool _touched = false; // the user has dragged the deck (then no hint animation)
+  bool _passed =
+      false; // the drag has gone far enough to change card (one tick when it does)
+  bool _touched =
+      false; // the user has dragged the deck (then no hint animation)
+
+  /// The day under the finger while pressing and sliding along the front card's strip
+  /// (null otherwise). Only the strip and the line under it listen to it.
+  final ValueNotifier<int?> _scrub = ValueNotifier<int?>(null);
 
   /// The first time the deck is shown (once per app run), the card slides a little to
   /// the left and back, to show that it can be swiped.
@@ -69,7 +77,10 @@ class _BudgetDeckState extends State<BudgetDeck> with TickerProviderStateMixin {
 
   /// The front card's size: springs from a little smaller to full when a new budget comes
   /// to the front (after a swipe, or a tap in the list), like the nav pill landing.
-  late final AnimationController _land = AnimationController.unbounded(vsync: this, value: 1);
+  late final AnimationController _land = AnimationController.unbounded(
+    vsync: this,
+    value: 1,
+  );
   bool _ownChange = false; // the index change came from this deck's swipe
 
   void _landSpring({double from = 0.94, double velocity = 0}) {
@@ -92,7 +103,11 @@ class _BudgetDeckState extends State<BudgetDeck> with TickerProviderStateMixin {
       _nudged = true;
       Future.delayed(const Duration(milliseconds: 700), () async {
         if (!mounted || _touched || _flying || _dx.isAnimating) return;
-        await _dx.animateTo(-54, duration: const Duration(milliseconds: 260), curve: Curves.easeOutCubic);
+        await _dx.animateTo(
+          -54,
+          duration: const Duration(milliseconds: 260),
+          curve: Curves.easeOutCubic,
+        );
         if (!mounted || _touched || _flying) return;
         await _dx.animateWith(SpringSimulation(_spring, _dx.value, 0, 0));
       });
@@ -103,6 +118,7 @@ class _BudgetDeckState extends State<BudgetDeck> with TickerProviderStateMixin {
   void dispose() {
     _dx.dispose();
     _land.dispose();
+    _scrub.dispose();
     super.dispose();
   }
 
@@ -131,7 +147,8 @@ class _BudgetDeckState extends State<BudgetDeck> with TickerProviderStateMixin {
     final v = d.primaryVelocity ?? 0;
     final x = _dx.value;
     _passed = false;
-    if (_n >= 2 && (x.abs() > _width * 0.28 || (v.abs() > 700 && v.sign == x.sign))) {
+    if (_n >= 2 &&
+        (x.abs() > _width * 0.28 || (v.abs() > 700 && v.sign == x.sign))) {
       _flyOut(x < 0 ? 1 : -1, v);
     } else {
       _dx.animateWith(SpringSimulation(_spring, x, 0, v));
@@ -144,8 +161,13 @@ class _BudgetDeckState extends State<BudgetDeck> with TickerProviderStateMixin {
     _flying = true;
     final target = -dir * _width * 1.15;
     final speed = math.max(velocity.abs(), 1600.0);
-    final ms = ((target - _dx.value).abs() / speed * 1000).clamp(120, 320).round();
-    await _dx.animateTo(target, duration: Duration(milliseconds: ms), curve: Curves.easeOutCubic);
+    final ms =
+        ((target - _dx.value).abs() / speed * 1000).clamp(120, 320).round();
+    await _dx.animateTo(
+      target,
+      duration: Duration(milliseconds: ms),
+      curve: Curves.easeOutCubic,
+    );
     if (!mounted) return;
     _ownChange = true;
     widget.onIndex((_i + dir + _n) % _n);
@@ -175,57 +197,82 @@ class _BudgetDeckState extends State<BudgetDeck> with TickerProviderStateMixin {
     final frontCard = _card(items[i], front: true);
     final front = RepaintBoundary(
       // Delete plays the dust animation on the front card.
-      child: widget.snapKeyFor == null
-          ? frontCard
-          : ThanosSnapWidget(key: widget.snapKeyFor!(items[i]), child: frontCard),
+      child:
+          widget.snapKeyFor == null
+              ? frontCard
+              : ThanosSnapWidget(
+                key: widget.snapKeyFor!(items[i]),
+                child: frontCard,
+              ),
     );
-    final next = n > 1 ? RepaintBoundary(child: _card(items[(i + 1) % n], front: false)) : null;
-    final prev = n > 1 ? RepaintBoundary(child: _card(items[(i - 1 + n) % n], front: false)) : null;
-    final next2 = n > 2 ? RepaintBoundary(child: _card(items[(i + 2) % n], front: false)) : null;
-    final prev2 = n > 2 ? RepaintBoundary(child: _card(items[(i - 2 + n) % n], front: false)) : null;
+    final next =
+        n > 1
+            ? RepaintBoundary(child: _card(items[(i + 1) % n], front: false))
+            : null;
+    final prev =
+        n > 1
+            ? RepaintBoundary(
+              child: _card(items[(i - 1 + n) % n], front: false),
+            )
+            : null;
+    final next2 =
+        n > 2
+            ? RepaintBoundary(child: _card(items[(i + 2) % n], front: false))
+            : null;
+    final prev2 =
+        n > 2
+            ? RepaintBoundary(
+              child: _card(items[(i - 2 + n) % n], front: false),
+            )
+            : null;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        LayoutBuilder(builder: (context, box) {
-          _width = box.maxWidth;
-          return SizedBox(
-            height: BudgetDeck.height,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => widget.onOpen(items[i]),
-              onHorizontalDragUpdate: _dragUpdate,
-              onHorizontalDragEnd: _dragEnd,
-              child: AnimatedBuilder(
-                animation: Listenable.merge([_dx, _land]),
-                builder: (context, _) {
-                  final x = _dx.value;
-                  final t = _t;
-                  // Dragging right shows the previous budgets behind, left the next ones.
-                  final b1 = x > 0 ? prev : next;
-                  final b2 = x > 0 ? prev2 : next2;
-                  return Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      if (b2 != null) _placed(b2, depth: 2 - t),
-                      if (b1 != null) _placed(b1, depth: 1 - t),
-                      _placed(
-                        Transform.translate(
-                          offset: Offset(x, x.abs() * 0.04),
-                          child: Transform.rotate(
-                            angle: x / (_width * 6),
-                            child: Transform.scale(scale: _land.value, child: front),
+        LayoutBuilder(
+          builder: (context, box) {
+            _width = box.maxWidth;
+            return SizedBox(
+              height: BudgetDeck.height,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => widget.onOpen(items[i]),
+                onHorizontalDragUpdate: _dragUpdate,
+                onHorizontalDragEnd: _dragEnd,
+                child: AnimatedBuilder(
+                  animation: Listenable.merge([_dx, _land]),
+                  builder: (context, _) {
+                    final x = _dx.value;
+                    final t = _t;
+                    // Dragging right shows the previous budgets behind, left the next ones.
+                    final b1 = x > 0 ? prev : next;
+                    final b2 = x > 0 ? prev2 : next2;
+                    return Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        if (b2 != null) _placed(b2, depth: 2 - t),
+                        if (b1 != null) _placed(b1, depth: 1 - t),
+                        _placed(
+                          Transform.translate(
+                            offset: Offset(x, x.abs() * 0.04),
+                            child: Transform.rotate(
+                              angle: x / (_width * 6),
+                              child: Transform.scale(
+                                scale: _land.value,
+                                child: front,
+                              ),
+                            ),
                           ),
+                          depth: 0,
                         ),
-                        depth: 0,
-                      ),
-                    ],
-                  );
-                },
+                      ],
+                    );
+                  },
+                ),
               ),
-            ),
-          );
-        }),
+            );
+          },
+        ),
         const SizedBox(height: 10),
         _indicator(n, i),
       ],
@@ -275,7 +322,10 @@ class _BudgetDeckState extends State<BudgetDeck> with TickerProviderStateMixin {
                 ),
               )
           else
-            Text('${i + 1} of $n', style: AppText.rowSub.copyWith(fontWeight: FontWeight.w700)),
+            Text(
+              '${i + 1} of $n',
+              style: AppText.rowSub.copyWith(fontWeight: FontWeight.w700),
+            ),
           const SizedBox(width: 8),
           Text('Swipe', style: AppText.rowSub.copyWith(fontSize: 11.5)),
         ],
@@ -287,7 +337,8 @@ class _BudgetDeckState extends State<BudgetDeck> with TickerProviderStateMixin {
     final over = b.spent > b.limit && b.limit > 0;
     final now = DateTime.now();
     final daysIn = DateTime(widget.month.year, widget.month.month + 1, 0).day;
-    final isThisMonth = widget.month.year == now.year && widget.month.month == now.month;
+    final isThisMonth =
+        widget.month.year == now.year && widget.month.month == now.month;
     final today = isThisMonth ? now.day : daysIn + 1;
     final daysLeft = isThisMonth ? daysIn - now.day + 1 : 0;
     final pct = (b.fraction * 100).round();
@@ -298,10 +349,17 @@ class _BudgetDeckState extends State<BudgetDeck> with TickerProviderStateMixin {
     final String footLeft;
     final String footRight;
     if (over) {
-      footLeft = b.ranOutDay != null ? 'Ran out on ${b.ranOutDay} ${DateFormat('MMM').format(widget.month)}' : 'Over the limit';
-      footRight = isThisMonth ? '$daysLeft ${daysLeft == 1 ? 'day' : 'days'} to go' : '';
+      footLeft =
+          b.ranOutDay != null
+              ? 'Ran out on ${b.ranOutDay} ${DateFormat('MMM').format(widget.month)}'
+              : 'Over the limit';
+      footRight =
+          isThisMonth
+              ? '$daysLeft ${daysLeft == 1 ? 'day' : 'days'} to go'
+              : '';
     } else if (isThisMonth && daysLeft > 0) {
-      footLeft = '${_m(b.left / daysLeft)} a day for $daysLeft ${daysLeft == 1 ? 'day' : 'days'}';
+      footLeft =
+          '${_m(b.left / daysLeft)} a day for $daysLeft ${daysLeft == 1 ? 'day' : 'days'}';
       footRight = '$pct% used';
     } else {
       footLeft = '${_m(b.left)} was left';
@@ -315,7 +373,16 @@ class _BudgetDeckState extends State<BudgetDeck> with TickerProviderStateMixin {
       decoration: BoxDecoration(
         color: AppColors.dark,
         borderRadius: BorderRadius.circular(26),
-        boxShadow: front ? const [BoxShadow(color: Color(0x33000000), blurRadius: 24, offset: Offset(0, 12))] : null,
+        boxShadow:
+            front
+                ? const [
+                  BoxShadow(
+                    color: Color(0x33000000),
+                    blurRadius: 24,
+                    offset: Offset(0, 12),
+                  ),
+                ]
+                : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -325,34 +392,60 @@ class _BudgetDeckState extends State<BudgetDeck> with TickerProviderStateMixin {
               Container(
                 width: 40,
                 height: 40,
-                decoration: const BoxDecoration(color: AppColors.darkCardRaised, shape: BoxShape.circle),
-                child: Icon(IconMapper.map(b.icon), size: 20, color: AppColors.accent),
+                decoration: const BoxDecoration(
+                  color: AppColors.darkCardRaised,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  IconMapper.map(b.icon),
+                  size: 20,
+                  color: AppColors.accent,
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(b.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.white)),
-                    Text(repeatLine,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 11, color: AppColors.darkMuted)),
+                    Text(
+                      b.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
+                    ),
+                    Text(
+                      repeatLine,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.darkMuted,
+                      ),
+                    ),
                   ],
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: over ? AppColors.accent : AppColors.darkCardRaised,
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Text('$pct%',
-                    style: TextStyle(
-                        fontSize: 11, fontWeight: FontWeight.w800, color: over ? AppColors.dark : AppColors.accent)),
+                child: Text(
+                  '$pct%',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: over ? AppColors.dark : AppColors.accent,
+                  ),
+                ),
               ),
               if (front)
                 SpringMenuButton<String>(
@@ -364,7 +457,11 @@ class _BudgetDeckState extends State<BudgetDeck> with TickerProviderStateMixin {
                   child: const SizedBox(
                     width: 36,
                     height: 40,
-                    child: Icon(Icons.more_vert_rounded, size: 20, color: AppColors.darkMuted),
+                    child: Icon(
+                      Icons.more_vert_rounded,
+                      size: 20,
+                      color: AppColors.darkMuted,
+                    ),
                   ),
                 )
               else
@@ -378,7 +475,12 @@ class _BudgetDeckState extends State<BudgetDeck> with TickerProviderStateMixin {
             child: MorphText(
               id: 'deck-${b.categoryId}',
               over ? '${_m(b.spent - b.limit)} over' : '${_m(b.left)} left',
-              style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: -1.4, color: Colors.white),
+              style: const TextStyle(
+                fontSize: 34,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -1.4,
+                color: Colors.white,
+              ),
             ),
           ),
           MorphText(
@@ -387,65 +489,170 @@ class _BudgetDeckState extends State<BudgetDeck> with TickerProviderStateMixin {
             style: const TextStyle(fontSize: 12, color: AppColors.darkMuted),
           ),
           const SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.only(right: 10),
-            // This budget's spending by day: each day's bar as tall as that day's spending
-            // (a dot when nothing). Green while within the budget, white after it ran out;
-            // the days still to come are faint; a white line marks today.
-            child: SizedBox(
-              height: 30,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  for (var d = 1; d <= daysIn; d++) ...[
-                    if (d > 1) const SizedBox(width: 2),
-                    Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Container(
-                            height: (b.daily[d] ?? 0) <= 0 ? 3 : 4 + 20 * ((b.daily[d] ?? 0) / maxDay).clamp(0.0, 1.0),
-                            decoration: BoxDecoration(
-                              color: d > today
-                                  ? AppColors.darkCard
-                                  : (b.daily[d] ?? 0) <= 0
-                                      ? AppColors.darkCardRaised
-                                      : (b.ranOutDay != null && d > b.ranOutDay!)
-                                          ? Colors.white
-                                          : AppColors.accent,
-                              borderRadius: BorderRadius.circular(2),
+          // On the front card, press and hold the strip, then slide: the line under it shows
+          // that day's date and spending, and its bar lights up.
+          ValueListenableBuilder<int?>(
+            valueListenable: front ? _scrub : ValueNotifier<int?>(null),
+            builder:
+                (context, scrub, _) => Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    LayoutBuilder(
+                      builder: (context, box) {
+                        final stripW = box.maxWidth - 10;
+                        int dayAt(double x) =>
+                            (x / stripW * daysIn).floor().clamp(0, daysIn - 1) +
+                            1;
+                        void pick(double x) {
+                          final d = dayAt(x);
+                          if (d != _scrub.value) {
+                            _scrub.value = d;
+                            AppHaptics.tap();
+                          }
+                        }
+
+                        return GestureDetector(
+                          // The whole strip takes the press, not only the bars.
+                          behavior: HitTestBehavior.opaque,
+                          onLongPressStart:
+                              front ? (e) => pick(e.localPosition.dx) : null,
+                          onLongPressMoveUpdate:
+                              front ? (e) => pick(e.localPosition.dx) : null,
+                          onLongPressEnd:
+                              front ? (_) => _scrub.value = null : null,
+                          onLongPressCancel:
+                              front ? () => _scrub.value = null : null,
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 10),
+                            // This budget's spending by day: each day's bar as tall as that day's spending
+                            // (a dot when nothing). Green while within the budget, white after it ran out;
+                            // the days still to come are faint; a white line marks today.
+                            child: SizedBox(
+                              height: 30,
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  for (var d = 1; d <= daysIn; d++) ...[
+                                    if (d > 1) const SizedBox(width: 2),
+                                    Expanded(
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.end,
+                                        children: [
+                                          Container(
+                                            height:
+                                                (b.daily[d] ?? 0) <= 0
+                                                    ? 3
+                                                    : 4 +
+                                                        20 *
+                                                            ((b.daily[d] ?? 0) /
+                                                                    maxDay)
+                                                                .clamp(
+                                                                  0.0,
+                                                                  1.0,
+                                                                ),
+                                            decoration: BoxDecoration(
+                                              color:
+                                                  d == scrub
+                                                      ? Colors.white
+                                                      : d > today
+                                                      ? AppColors.darkCard
+                                                      : (b.daily[d] ?? 0) <= 0
+                                                      ? AppColors.darkCardRaised
+                                                      : (b.ranOutDay != null &&
+                                                          d > b.ranOutDay!)
+                                                      ? Colors.white
+                                                      : AppColors.accent,
+                                              borderRadius:
+                                                  BorderRadius.circular(2),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 3),
+                                          Container(
+                                            height: 2,
+                                            decoration: BoxDecoration(
+                                              color:
+                                                  d == today
+                                                      ? Colors.white
+                                                      : Colors.transparent,
+                                              borderRadius:
+                                                  BorderRadius.circular(1),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
                             ),
                           ),
-                          const SizedBox(height: 3),
-                          Container(
-                            height: 2,
-                            decoration: BoxDecoration(
-                              color: d == today ? Colors.white : Colors.transparent,
-                              borderRadius: BorderRadius.circular(1),
-                            ),
-                          ),
-                        ],
-                      ),
+                        );
+                      },
                     ),
+                    const SizedBox(height: 8),
+                    if (scrub != null)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 10),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                DateFormat('EEE, d MMM').format(
+                                  DateTime(
+                                    widget.month.year,
+                                    widget.month.month,
+                                    scrub,
+                                  ),
+                                ),
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              (b.daily[scrub] ?? 0) > 0
+                                  ? _m(b.daily[scrub]!)
+                                  : 'Nothing spent',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.accent,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      Padding(
+                        padding: const EdgeInsets.only(right: 10),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                footLeft,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.darkMuted,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              footRight,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppColors.darkMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                   ],
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.only(right: 10),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(footLeft,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 11, color: AppColors.darkMuted)),
                 ),
-                Text(footRight, style: const TextStyle(fontSize: 11, color: AppColors.darkMuted)),
-              ],
-            ),
           ),
         ],
       ),
@@ -476,11 +683,19 @@ class BudgetListRow extends StatelessWidget {
     final b = budget;
     final over = b.spent > b.limit && b.limit > 0;
     final near = !over && b.fraction >= 0.8;
-    final m = NumberFormat.decimalPatternDigits(locale: 'en_IN', decimalDigits: 0);
-    final amount = '$symbol${m.format((over ? b.spent - b.limit : b.left).round())}';
-    final under = over ? 'over $symbol${m.format(b.limit.round())}' : 'left of $symbol${m.format(b.limit.round())}';
+    final m = NumberFormat.decimalPatternDigits(
+      locale: 'en_IN',
+      decimalDigits: 0,
+    );
+    final amount =
+        '$symbol${m.format((over ? b.spent - b.limit : b.left).round())}';
+    final under =
+        over
+            ? 'over $symbol${m.format(b.limit.round())}'
+            : 'left of $symbol${m.format(b.limit.round())}';
     // Blocks filled: one per 10% (a started block counts), all ten when over.
-    final filled = over ? 10 : (b.fraction * 10).ceil().clamp(b.spent > 0 ? 1 : 0, 10);
+    final filled =
+        over ? 10 : (b.fraction * 10).ceil().clamp(b.spent > 0 ? 1 : 0, 10);
     final blockColor = over || near ? AppColors.dark : AppColors.accent;
     return Semantics(
       button: true,
@@ -506,7 +721,11 @@ class BudgetListRow extends StatelessWidget {
                     color: over ? AppColors.dark : AppColors.surface,
                     borderRadius: BorderRadius.circular(13),
                   ),
-                  child: Icon(IconMapper.map(b.icon), size: 20, color: over ? AppColors.accent : AppColors.dark),
+                  child: Icon(
+                    IconMapper.map(b.icon),
+                    size: 20,
+                    color: over ? AppColors.accent : AppColors.dark,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -516,17 +735,33 @@ class BudgetListRow extends StatelessWidget {
                       Row(
                         children: [
                           Flexible(
-                            child: Text(b.name,
-                                maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.rowTitle.copyWith(fontSize: 14)),
+                            child: Text(
+                              b.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppText.rowTitle.copyWith(fontSize: 14),
+                            ),
                           ),
                           if (over) ...[
                             const SizedBox(width: 6),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(color: AppColors.dark, borderRadius: BorderRadius.circular(6)),
-                              child: Text('OVER',
-                                  style: TextStyle(
-                                      fontSize: 9.5, fontWeight: FontWeight.w800, letterSpacing: 0.4, color: AppColors.accent)),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.dark,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'OVER',
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.4,
+                                  color: AppColors.accent,
+                                ),
+                              ),
                             ),
                           ],
                         ],
@@ -541,7 +776,10 @@ class BudgetListRow extends StatelessWidget {
                                 duration: Duration(milliseconds: 200 + 40 * k),
                                 height: 7,
                                 decoration: BoxDecoration(
-                                  color: k < filled ? blockColor : AppColors.surface,
+                                  color:
+                                      k < filled
+                                          ? blockColor
+                                          : AppColors.surface,
                                   borderRadius: BorderRadius.circular(2),
                                 ),
                               ),
@@ -556,9 +794,17 @@ class BudgetListRow extends StatelessWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    MorphText(id: 'brow-${b.categoryId}', amount, style: AppText.amount.copyWith(fontSize: 15)),
+                    MorphText(
+                      id: 'brow-${b.categoryId}',
+                      amount,
+                      style: AppText.amount.copyWith(fontSize: 15),
+                    ),
                     const SizedBox(height: 2),
-                    MorphText(id: 'brow-${b.categoryId}', under, style: AppText.rowSub.copyWith(fontSize: 10.5)),
+                    MorphText(
+                      id: 'brow-${b.categoryId}',
+                      under,
+                      style: AppText.rowSub.copyWith(fontSize: 10.5),
+                    ),
                   ],
                 ),
               ],

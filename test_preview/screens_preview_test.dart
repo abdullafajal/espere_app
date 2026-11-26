@@ -144,6 +144,16 @@ void main() {
         // Keep the finger down while the screenshot is taken.
         addTearDown(() => g.up());
       }));
+  testWidgets('budgets_scrub', (t) => shot(t, 'budgets_scrub', const BudgetsScreen(), act: (t) async {
+        final at = t.getTopLeft(find.byType(BudgetDeck)) + const Offset(60, 170);
+        final g = await t.startGesture(at);
+        await t.pump(const Duration(milliseconds: 700));
+        for (var k = 0; k < 12; k++) {
+          await g.moveBy(const Offset(12, 0));
+          await t.pump(const Duration(milliseconds: 16));
+        }
+        addTearDown(() => g.up());
+      }));
   testWidgets('budget_form', (t) => shot(t, 'budget_form', const BudgetsScreen(), act: (t) async {
         await t.tap(find.byTooltip('New budget'));
       }));
