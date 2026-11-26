@@ -63,24 +63,6 @@ class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerPr
   static const double _gap = 92; // between card centres
   static const double _stageH = 186;
 
-  /// Soft tints for categories without a colour of their own.
-  static const _tints = [
-    Color(0xFFFFE3C2), Color(0xFFD6E8FF), Color(0xFFFFD6E6), Color(0xFFE5DCFF), Color(0xFFD9F3E4),
-    Color(0xFFFFF1B8), Color(0xFFDCF2C9), Color(0xFFFFE0D6), Color(0xFFD4F0F0), Color(0xFFF1E3D3),
-  ];
-
-  /// A soft tint per category, picked from its name so a category keeps its colour on
-  /// every screen (many categories share one stored colour, which would make every card
-  /// look the same).
-  Color _tint(int i) {
-    final item = widget.items[i];
-    if (item.isNew) return AppColors.surface;
-    var h = 0;
-    for (final u in item.label.toLowerCase().codeUnits) {
-      h = (h * 31 + u) & 0x7fffffff;
-    }
-    return _tints[h % _tints.length];
-  }
   late final AnimationController _pos =
       AnimationController.unbounded(vsync: this, value: widget.index.toDouble())..addListener(_onMove);
   int _shown = 0; // the index last reported
@@ -300,7 +282,8 @@ class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerPr
         child: Transform(
           transform: m,
           alignment: Alignment.center,
-          child: _card(widget.items[_wrap(i)], a < 0.5, cw, ch, _tint(_wrap(i))),
+          child: _card(widget.items[_wrap(i)], a < 0.5, cw, ch,
+              Color.lerp(AppColors.accent, AppColors.surface, a.clamp(0.0, 1.0))!),
         ),
       ),
     );
