@@ -626,23 +626,26 @@ class BudgetsScreenState extends State<BudgetsScreen> {
                               ],
                             ),
                           ),
-                          GridView.count(
-                            crossAxisCount: 2,
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            padding: EdgeInsets.zero,
-                            mainAxisSpacing: 10,
-                            crossAxisSpacing: 10,
-                            childAspectRatio: 1.32,
-                            children: [
-                              for (final (i, b) in _shown.indexed)
-                                BudgetGridTile(
-                                  budget: b,
-                                  current: i == _deckIndex.clamp(0, _shown.length - 1),
-                                  symbol: _currencySymbol,
-                                  onTap: () => setState(() => _deckIndex = i),
-                                ),
-                            ],
+                          Container(
+                            decoration: BoxDecoration(
+                              color: AppColors.card,
+                              borderRadius: BorderRadius.circular(AppRadius.xxl),
+                              boxShadow: AppShadows.soft,
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: Column(
+                              children: [
+                                for (final (i, b) in _shown.indexed) ...[
+                                  if (i > 0) const Divider(height: 1, indent: 66, color: AppColors.border),
+                                  BudgetListRow(
+                                    budget: b,
+                                    current: i == _deckIndex.clamp(0, _shown.length - 1),
+                                    symbol: _currencySymbol,
+                                    onTap: () => setState(() => _deckIndex = i),
+                                  ),
+                                ],
+                              ],
+                            ),
                           ),
                         ],
                       ],

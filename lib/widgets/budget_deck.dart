@@ -329,17 +329,17 @@ class _BudgetDeckState extends State<BudgetDeck> with SingleTickerProviderStateM
   }
 }
 
-/// One budget in the "All budgets" grid: the icon inside a progress ring, name and how
-/// it repeats, what is left (or over) in large type with the % beside it, and a thin bar
-/// along the bottom. Dark when over. The picked one is outlined. Tap to bring it to the
+/// One budget in the "All budgets" list: icon, name (with an OVER tag when over), a bar
+/// of ten blocks (each 10% of the limit; dark from 80%), and on the right what is left
+/// or over with the limit under it. The picked one is tinted. Tap to bring it to the
 /// front of the deck.
-class BudgetGridTile extends StatelessWidget {
+class BudgetListRow extends StatelessWidget {
   final BudgetInfo budget;
   final bool current;
   final String symbol;
   final VoidCallback onTap;
 
-  const BudgetGridTile({
+  const BudgetListRow({
     super.key,
     required this.budget,
     required this.current,
@@ -354,128 +354,90 @@ class BudgetGridTile extends StatelessWidget {
     final near = !over && b.fraction >= 0.8;
     final m = NumberFormat.decimalPatternDigits(locale: 'en_IN', decimalDigits: 0);
     final amount = '$symbol${m.format((over ? b.spent - b.limit : b.left).round())}';
-    final fg = over ? Colors.white : AppColors.text;
-    final soft = over ? AppColors.darkMuted : AppColors.muted;
-    final barColor = over ? AppColors.accent : (near ? AppColors.dark : AppColors.accent);
+    final under = over ? 'over $symbol${m.format(b.limit.round())}' : 'left of $symbol${m.format(b.limit.round())}';
+    // Blocks filled: one per 10% (a started block counts), all ten when over.
+    final filled = over ? 10 : (b.fraction * 10).ceil().clamp(b.spent > 0 ? 1 : 0, 10);
+    final blockColor = over || near ? AppColors.dark : AppColors.accent;
     return Semantics(
       button: true,
       selected: current,
       label: '${b.name}: $amount ${over ? 'over' : 'left'}',
       excludeSemantics: true,
-      child: SpringPress(
-        haptic: HapticKind.tap,
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-          decoration: BoxDecoration(
-            color: over ? AppColors.dark : AppColors.card,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: current ? (over ? AppColors.accent : AppColors.dark) : Colors.transparent, width: 2),
-            boxShadow: current ? AppShadows.elevated : AppShadows.soft,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  SizedBox(
-                    width: 40,
-                    height: 40,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        SizedBox.expand(
-                          child: TweenAnimationBuilder<double>(
-                            tween: Tween(end: b.fraction.clamp(0.0, 1.0)),
-                            duration: const Duration(milliseconds: 600),
-                            curve: Curves.easeOutCubic,
-                            builder: (context, v, _) => CircularProgressIndicator(
-                              value: v,
-                              strokeWidth: 3.5,
-                              strokeCap: StrokeCap.round,
-                              backgroundColor: over ? AppColors.darkCardRaised : AppColors.surface,
-                              color: barColor,
-                            ),
-                          ),
-                        ),
-                        Icon(IconMapper.map(b.icon), size: 17, color: over ? AppColors.accent : AppColors.dark),
-                      ],
-                    ),
+      child: Material(
+        color: current ? AppColors.accentSoft : AppColors.card,
+        child: InkWell(
+          onTap: () {
+            AppHaptics.tap();
+            onTap();
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: over ? AppColors.dark : AppColors.surface,
+                    borderRadius: BorderRadius.circular(13),
                   ),
-                  const SizedBox(width: 9),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(b.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: fg)),
-                        Text(b.repeat ? 'Every month' : 'This month',
-                            maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10.5, color: soft)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const Spacer(),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Text.rich(
-                        TextSpan(children: [
-                          TextSpan(
-                            text: amount,
-                            style: TextStyle(
-                              fontSize: 19,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.5,
-                              color: over ? AppColors.accent : fg,
-                            ),
-                          ),
-                          TextSpan(
-                            text: over ? ' over' : ' left',
-                            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: soft),
-                          ),
-                        ]),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: over ? AppColors.accent : (near ? AppColors.dark : AppColors.surface),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      '${(b.fraction * 100).round()}%',
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w800,
-                        color: over ? AppColors.dark : (near ? AppColors.accent : AppColors.text),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(3),
-                child: LinearProgressIndicator(
-                  value: b.fraction.clamp(0.0, 1.0),
-                  minHeight: 5,
-                  backgroundColor: over ? AppColors.darkCardRaised : AppColors.surface,
-                  color: barColor,
+                  child: Icon(IconMapper.map(b.icon), size: 20, color: over ? AppColors.accent : AppColors.dark),
                 ),
-              ),
-            ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(b.name,
+                                maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.rowTitle.copyWith(fontSize: 14)),
+                          ),
+                          if (over) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(color: AppColors.dark, borderRadius: BorderRadius.circular(6)),
+                              child: Text('OVER',
+                                  style: TextStyle(
+                                      fontSize: 9.5, fontWeight: FontWeight.w800, letterSpacing: 0.4, color: AppColors.accent)),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 7),
+                      Row(
+                        children: [
+                          for (var k = 0; k < 10; k++) ...[
+                            if (k > 0) const SizedBox(width: 2.5),
+                            Expanded(
+                              child: AnimatedContainer(
+                                duration: Duration(milliseconds: 200 + 40 * k),
+                                height: 7,
+                                decoration: BoxDecoration(
+                                  color: k < filled ? blockColor : AppColors.surface,
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    MorphText(id: 'brow-${b.categoryId}', amount, style: AppText.amount.copyWith(fontSize: 15)),
+                    const SizedBox(height: 2),
+                    MorphText(id: 'brow-${b.categoryId}', under, style: AppText.rowSub.copyWith(fontSize: 10.5)),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
