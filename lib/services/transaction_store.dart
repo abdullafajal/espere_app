@@ -5,6 +5,7 @@ library;
 import '../models/category.dart';
 import '../models/transaction.dart';
 import 'auto_expense_service.dart';
+import 'budget_service.dart';
 import 'cache_service.dart';
 import 'connectivity_service.dart';
 import 'sync_service.dart';
@@ -65,6 +66,7 @@ class TransactionStore {
     );
     if (ConnectivityService.isOnline) SyncService.syncAll();
     WidgetService.refreshAllWidgets();
+    if (type == 'expense') BudgetService.checkAfterSave(categoryId: category?.id);
     return tempId;
   }
 
@@ -150,6 +152,7 @@ class TransactionStore {
     if (ConnectivityService.isOnline) SyncService.syncAll();
     WidgetService.refreshAllWidgets();
     AutoExpenseService.learnFromEdit(txnId: id, categoryId: category?.id);
+    if (type == 'expense') BudgetService.checkAfterSave(categoryId: category?.id);
   }
 
   /// Finds a transaction in the cached lists (Activity first, then Home's recent list).

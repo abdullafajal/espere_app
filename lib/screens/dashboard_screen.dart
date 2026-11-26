@@ -30,6 +30,7 @@ import '../models/category.dart';
 import '../services/auto_expense_service.dart';
 import '../services/receipt_service.dart';
 import '../services/transaction_store.dart';
+import '../services/budget_service.dart';
 import 'package:image_picker/image_picker.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -62,6 +63,9 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
 
   /// Frequent expenses offered as one-tap repeats.
   List<_Again> _again = const [];
+
+  /// This month's category budgets that are 80% used or more.
+  List<BudgetInfo> _nearLimit = const [];
   int _reviewCount = 0;
   StreamSubscription<void>? _autoSub;
 
@@ -290,7 +294,11 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
         })
         .whereType<TransactionModel>()
         .toList();
+    final near = (await BudgetService.byCategory()).values.where((b) => b.limit > 0 && b.fraction >= 0.8).toList()
+      ..sort((a, b) => b.fraction.compareTo(a.fraction));
+    if (!mounted) return;
     setState(() {
+      _nearLimit = near.take(3).toList();
       _txns = all;
       _week = week;
       _weekDays = days;
@@ -526,6 +534,8 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
             highlight: highlight,
             avg: _isThisMonth ? avgDaily : (bars.isEmpty ? 0 : bars.fold<double>(0, (a, b) => a + b) / bars.length),
             symbol: d.currencySymbol,
+            limit: _isThisMonth ? limit : 0,
+            monthSpent: spent,
           ),
           const SizedBox(height: 10),
           Row(
@@ -566,10 +576,20 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
     required int highlight,
     required double avg,
     required String symbol,
+    double limit = 0,
+    double monthSpent = 0,
   }) {
     if (bars.isEmpty) return const SizedBox(height: 8);
     final sel = (_selBar ?? highlight).clamp(0, bars.length - 1);
     final value = bars[sel];
+    // With a monthly budget, today is measured against what is safe to spend today:
+    // the budget left at the start of today spread over the days left (today included).
+    final isToday = _isThisMonth && sel == bars.length - 1;
+    final now = DateTime.now();
+    final daysLeft = DateTime(now.year, now.month + 1, 0).day - now.day + 1;
+    final safe = isToday && limit > 0 ? math.max(0.0, (limit - (monthSpent - value)) / daysLeft) : 0.0;
+    final useSafe = isToday && limit > 0;
+    if (useSafe) avg = safe;
     final over = avg > 0 && value > avg;
     final fraction = avg <= 0 ? (value > 0 ? 1.0 : 0.0) : (value / avg).clamp(0.0, 1.0);
     // Always the app colour, even over the average (only the message says so).
@@ -588,7 +608,13 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
     final unit = _isThisMonth ? 'daily' : 'weekly';
     final diff = (avg - value).abs();
     final String message;
-    if (value <= 0) {
+    if (useSafe) {
+      message = safe <= 0
+          ? 'The month\'s budget is used up.'
+          : over
+              ? '${_money(diff.roundToDouble(), symbol)} over what is safe for today.'
+              : 'You can still spend ${_money(diff.roundToDouble(), symbol)} today and stay on budget.';
+    } else if (value <= 0) {
       message = _isThisMonth && sel == bars.length - 1 ? 'Nothing spent yet today.' : 'Nothing spent.';
     } else if (avg <= 0) {
       message = 'Spent ${_money(value.roundToDouble(), symbol)}.';
@@ -639,7 +665,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                   if (avg > 0)
                     FittedBox(
                       fit: BoxFit.scaleDown,
-                      child: Text('of ${_money(avg.roundToDouble(), symbol)} avg',
+                      child: Text('of ${_money(avg.roundToDouble(), symbol)} ${useSafe ? 'safe' : 'avg'}',
                           maxLines: 1, style: const TextStyle(fontSize: 10, color: AppColors.darkFaint)),
                     ),
                 ],
@@ -884,6 +910,80 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
   }
 
   /// One white card: payments to review, then "Recent" with the latest entries.
+  /// Budgets close to (or over) their limit; tap to open Budgets.
+  Widget _nearLimitCard(String symbol) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+            child: Text('Budgets near the limit', style: AppText.rowSub.copyWith(fontSize: 13, fontWeight: FontWeight.w600)),
+          ),
+          SpringPress(
+            haptic: HapticKind.tap,
+            onTap: () => widget.onTabChange?.call(2),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+              decoration: BoxDecoration(
+                color: AppColors.card,
+                borderRadius: BorderRadius.circular(AppRadius.xxl),
+                boxShadow: AppShadows.soft,
+              ),
+              child: Column(
+                children: [
+                  for (var i = 0; i < _nearLimit.length; i++) ...[
+                    if (i > 0) const SizedBox(height: 12),
+                    _nearRow(_nearLimit[i], symbol),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _nearRow(BudgetInfo b, String symbol) => Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: const BoxDecoration(color: AppColors.categoryFill, shape: BoxShape.circle),
+            child: Icon(IconMapper.map(b.icon), size: 19, color: AppColors.categoryInk),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(child: Text(b.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.rowTitle)),
+                    Text(
+                      b.spent > b.limit ? '${_money((b.spent - b.limit).roundToDouble(), symbol)} over' : '${b.percent}%',
+                      style: AppText.rowTitle.copyWith(fontSize: 13),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: b.fraction.clamp(0.0, 1.0),
+                    minHeight: 6,
+                    backgroundColor: AppColors.surface,
+                    color: AppColors.dark,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+
   Widget _recentCard(DashboardData d) {
     final past = _isThisMonth ? null : _past;
     final list = (past?.recent ?? d.recentTransactions).take(4).toList();
@@ -1007,6 +1107,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
             _hero(d),
             const SizedBox(height: 16),
             _actions(),
+            if (_isThisMonth && _nearLimit.isNotEmpty) _nearLimitCard(d.currencySymbol),
             if (_again.isNotEmpty) _againRow(d),
             _recentCard(d),
             CategoryBreakdownCard(

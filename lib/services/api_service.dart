@@ -650,6 +650,19 @@ class ApiService {
     }
   }
 
+  /// The whole-month budget ("0" removes it).
+  static Future<ApiResult<Map<String, dynamic>>> setOverallBudget(String amount) async {
+    try {
+      final url = await _url('/api/budgets/overall/');
+      final response = await _Http.put(Uri.parse(url), headers: await _headers(), body: jsonEncode({'amount': amount}));
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) return ApiResult(data: Map<String, dynamic>.from(data['overall'] ?? {}));
+      return ApiResult(error: data['error'] ?? 'Failed to save the monthly budget.');
+    } catch (e) {
+      return ApiResult(error: 'Connection error.');
+    }
+  }
+
   static Future<ApiResult<void>> deleteBudget(int id) async {
     try {
       final url = await _url('/api/budgets/$id/');

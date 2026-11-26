@@ -28,6 +28,7 @@ import '../utils/pickers.dart';
 import '../theme/motion.dart';
 import '../utils/app_toast.dart';
 import '../utils/icon_mapper.dart';
+import '../services/budget_service.dart';
 
 class QuickAddScreen extends StatefulWidget {
   /// 'expense' (default) or 'income'.
@@ -90,6 +91,9 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
   String _symbol = '₹';
 
   List<CategoryModel> _categories = const [];
+
+  /// This month's category budgets, to show what is left under each category.
+  Map<int, BudgetInfo> _budgets = const {};
   bool _loading = true;
 
   _Saved? _saved;
@@ -152,6 +156,22 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
       _categories = cats;
       _loading = false;
     });
+    final budgets = await BudgetService.byCategory();
+    if (mounted) setState(() => _budgets = budgets);
+  }
+
+  /// How full [categoryId]'s budget would be with this entry (counting an edited entry once).
+  /// Null when the category has no budget or this is income.
+  BudgetInfo? _after(int? categoryId) {
+    if (_type != 'expense' || categoryId == null) return null;
+    final b = _budgets[categoryId];
+    if (b == null || b.limit <= 0) return null;
+    final old = _old;
+    var spent = b.spent;
+    if (old != null && !old.isIncome && old.category.id == categoryId && old.date.toLocal().month == DateTime.now().month) {
+      spent -= double.tryParse(old.amount) ?? 0;
+    }
+    return BudgetInfo(name: b.name, limit: b.limit, spent: spent + _value);
   }
 
   Future<void> _setType(String type) async {
@@ -201,7 +221,12 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
   Future<void> _save(CategoryModel? category) async {
     // New entries work like edit too: tap a category to pick it, then the Add button saves.
     if (_formMode || _pickThenSave) {
-      AppHaptics.tap();
+      final after = _after(category?.id);
+      if (after != null && after.fraction >= 0.8) {
+        AppHaptics.warn();
+      } else {
+        AppHaptics.tap();
+      }
       setState(() => _categoryId = category?.id);
       return;
     }
@@ -624,6 +649,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
             ),
           ),
           Expanded(child: _grid()),
+          _budgetNote(),
           _saveBar(),
           _keypad(),
         ],
@@ -637,7 +663,8 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
     }
     final tiles = <Widget>[
       for (final c in _categories)
-        _categoryTile(c.name, IconMapper.map(c.icon), () => _save(c), selected: c.id == _categoryId),
+        _categoryTile(c.name, IconMapper.map(c.icon), () => _save(c),
+            selected: c.id == _categoryId, budget: _type == 'expense' ? _budgets[c.id] : null),
       _categoryTile('New', Icons.add_rounded, _newCategory, dashed: true),
     ];
     if (_categories.isEmpty) {
@@ -649,13 +676,15 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
       child: GridView.count(
         crossAxisCount: 4,
         padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-        childAspectRatio: 0.92,
+        // Taller tiles when they also show a budget line.
+        childAspectRatio: _type == 'expense' && _budgets.isNotEmpty ? 0.78 : 0.92,
         children: tiles,
       ),
     );
   }
 
-  Widget _categoryTile(String label, IconData icon, VoidCallback onTap, {bool dashed = false, bool selected = false}) {
+  Widget _categoryTile(String label, IconData icon, VoidCallback onTap,
+      {bool dashed = false, bool selected = false, BudgetInfo? budget}) {
     return Semantics(
       button: true,
       selected: selected,
@@ -685,6 +714,63 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.text),
+            ),
+            if (budget != null && budget.limit > 0) ...[
+              const SizedBox(height: 4),
+              Container(
+                width: 40,
+                height: 3,
+                decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(2)),
+                alignment: Alignment.centerLeft,
+                child: FractionallySizedBox(
+                  widthFactor: budget.fraction.clamp(0.0, 1.0),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: selected ? AppColors.accent : AppColors.dark,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                budget.spent > budget.limit ? '${_moneyShort(budget.spent - budget.limit)} over' : '${_moneyShort(budget.left)} left',
+                maxLines: 1,
+                overflow: TextOverflow.fade,
+                softWrap: false,
+                style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: AppColors.muted),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _moneyShort(double v) =>
+      '$_symbol${NumberFormat.decimalPatternDigits(locale: 'en_IN', decimalDigits: 0).format(v.round())}';
+
+  /// Above the Add button: how full the picked category's budget gets with this entry,
+  /// once that reaches 80%.
+  Widget _budgetNote() {
+    final after = _after(_categoryId);
+    if (after == null || after.fraction < 0.8 || !_hasAmount) return const SizedBox.shrink();
+    final over = after.spent > after.limit;
+    final text = over
+        ? 'After this, ${after.name} will be ${_moneyShort(after.spent - after.limit)} over budget'
+        : 'After this, ${after.name} will be ${after.percent}% used · ${_moneyShort(after.left)} left';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        decoration: BoxDecoration(color: AppColors.dark, borderRadius: BorderRadius.circular(14)),
+        child: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, size: 18, color: AppColors.accent),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(text,
+                  maxLines: 2, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
             ),
           ],
         ),

@@ -1,3 +1,9 @@
+/// One category budget as a row: icon, name, what is left (or how much over) and how
+/// it repeats, the amount spent of the limit on the right, a progress bar underneath
+/// and a "⋮" menu. Rows sit together in one card on the Budgets screen ([grouped]).
+/// Swipe right to delete, left to edit; tap to open the budget.
+library;
+
 import 'morph_text.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -12,12 +18,24 @@ class BudgetTile extends StatefulWidget {
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
 
+  /// Opens the budget (its entries this month).
+  final VoidCallback? onTap;
+
+  /// Spent this month counted on the phone (fresher than the server's number).
+  final double? spent;
+
+  /// Drawn flat, as one row of a shared card (no own card, shadow or margin).
+  final bool grouped;
+
   const BudgetTile({
     super.key,
     required this.budget,
     required this.currencySymbol,
     this.onEdit,
     this.onDelete,
+    this.onTap,
+    this.spent,
+    this.grouped = false,
   });
 
   @override
@@ -25,37 +43,46 @@ class BudgetTile extends StatefulWidget {
 }
 
 class _BudgetTileState extends State<BudgetTile> {
-  String _m(dynamic v) {
-    final d = double.tryParse(v.toString()) ?? 0;
+  String _m(double d) {
     final f = NumberFormat.decimalPatternDigits(locale: 'en_IN', decimalDigits: d == d.roundToDouble() ? 0 : 2);
     return '${widget.currencySymbol}${f.format(d)}';
   }
 
   @override
   Widget build(BuildContext context) {
-    final isExceeded = widget.budget['is_exceeded'] == true;
-    final pct = double.tryParse(widget.budget['percentage'].toString()) ?? 0;
-    final category = widget.budget['category'];
+    final b = widget.budget;
+    final id = b['id'];
+    final category = b['category'] is Map ? b['category'] as Map : const {};
+    final limit = double.tryParse(b['amount'].toString()) ?? 0;
+    final spent = widget.spent ?? (double.tryParse(b['spent']?.toString() ?? '') ?? 0);
+    final fraction = limit <= 0 ? 0.0 : spent / limit;
+    final over = spent > limit && limit > 0;
+    final repeat = b['repeat'] != false;
+    final carried = double.tryParse(b['carried']?.toString() ?? '') ?? 0;
 
-    Widget content = Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-      ),
+    final status = over ? '${_m((spent - limit).roundToDouble())} over' : '${_m((limit - spent).roundToDouble())} left';
+    final sub = [
+      repeat ? 'Every month' : 'This month only',
+      if (carried > 0) '+${_m(carried)} carried',
+    ].join(' · ');
+
+    Widget content = Padding(
+      padding: const EdgeInsets.fromLTRB(14, 12, 4, 14),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header row
           Row(
             children: [
               Container(
                 width: 42,
                 height: 42,
-                decoration: const BoxDecoration(color: AppColors.categoryFill, shape: BoxShape.circle),
+                decoration: BoxDecoration(
+                  color: over ? AppColors.dark : AppColors.categoryFill,
+                  shape: BoxShape.circle,
+                ),
                 child: MorphIcon(
-                  id: widget.budget['id'],
-                  IconMapper.map(category['icon']),
-                  color: AppColors.categoryInk,
+                  id: id,
+                  IconMapper.map(category['icon']?.toString() ?? 'category'),
+                  color: over ? AppColors.accent : AppColors.categoryInk,
                   size: 21,
                 ),
               ),
@@ -64,18 +91,40 @@ class _BudgetTileState extends State<BudgetTile> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    MorphText(id: widget.budget['id'], 
-                      category['name'] ?? 'Category',
+                    MorphText(
+                      id: id,
+                      category['name']?.toString() ?? 'Category',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: AppText.rowTitle,
                     ),
-                    MorphText(id: widget.budget['id'], 
-                      DateFormat('MMMM yyyy').format(
-                        DateTime.parse(widget.budget['month']),
-                      ),
+                    const SizedBox(height: 2),
+                    Text.rich(
+                      TextSpan(children: [
+                        TextSpan(
+                          text: status,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: over ? AppColors.text : AppColors.muted,
+                          ),
+                        ),
+                        TextSpan(text: ' · $sub'),
+                      ]),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: AppText.rowSub,
                     ),
                   ],
                 ),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  MorphText(id: id, _m(spent.roundToDouble()), style: AppText.amount),
+                  const SizedBox(height: 2),
+                  MorphText(id: id, 'of ${_m(limit)}', style: AppText.rowSub.copyWith(fontSize: 11)),
+                ],
               ),
               SpringMenuButton<String>(
                 items: SpringMenuButton.editDelete(),
@@ -86,107 +135,61 @@ class _BudgetTileState extends State<BudgetTile> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
-
-          // Progress info
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              MorphText(id: widget.budget['id'], 
-                '${_m(widget.budget['spent'])} spent',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              MorphText(id: widget.budget['id'], 
-                '${pct.toStringAsFixed(0)}%',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                  color: AppColors.text,
-                ),
-              ),
-            ],
-          ),
           const SizedBox(height: 10),
-          LinearProgressIndicator(
-            value: (pct / 100).clamp(0.0, 1.0),
-            backgroundColor: AppColors.surface,
-            color: AppColors.dark,
-            minHeight: 8,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Spent so far',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: AppColors.muted,
-                ),
-              ),
-              MorphText(id: widget.budget['id'], 
-                'Limit: ${_m(widget.budget['amount'])}',
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: AppColors.muted,
-                ),
-              ),
-            ],
-          ),
-          
-          if (isExceeded) ...[
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 8,
-              ),
-              decoration: BoxDecoration(
-                color: AppColors.dark,
-                borderRadius: BorderRadius.circular(
-                  AppRadius.md,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.warning_amber_rounded,
-                    size: 16,
-                    color: AppColors.accent,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: MorphText(id: widget.budget['id'], 
-                      'Budget exceeded by ${_m(double.parse(widget.budget['spent'].toString()) - double.parse(widget.budget['amount'].toString()))}',
-                      style: TextStyle(
-                        color: AppColors.accent,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
+          Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween(end: fraction.clamp(0.0, 1.0)),
+                      duration: const Duration(milliseconds: 600),
+                      curve: Curves.easeOutCubic,
+                      builder: (context, v, _) => LinearProgressIndicator(
+                        value: v,
+                        minHeight: 8,
+                        backgroundColor: AppColors.surface,
+                        // Under 80% the bar is the app colour; near or over the limit it turns dark.
+                        color: fraction >= 0.8 ? AppColors.dark : AppColors.accent,
                       ),
                     ),
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 10),
+                SizedBox(
+                  width: 38,
+                  child: Text(
+                    '${(fraction * 100).round()}%',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: fraction >= 0.8 ? AppColors.text : AppColors.muted,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ],
       ),
     );
 
+    content = Material(
+      color: AppColors.card,
+      child: InkWell(onTap: widget.onTap, child: content),
+    );
+
     content = EspereSwipeAction(
-      dismissKey: ValueKey(widget.budget['id']),
+      dismissKey: ValueKey(id),
       direction: DismissDirection.horizontal,
       confirmDismiss: (direction) async {
         if (direction == DismissDirection.startToEnd) {
-          if (widget.onDelete != null) widget.onDelete!();
-          return false;
+          widget.onDelete?.call();
         } else if (direction == DismissDirection.endToStart) {
-          if (widget.onEdit != null) widget.onEdit!();
-          return false;
+          widget.onEdit?.call();
         }
         return false;
       },
@@ -196,10 +199,11 @@ class _BudgetTileState extends State<BudgetTile> {
       secBgIcon: Icons.edit_rounded,
       secBgColor: AppColors.accent,
       secBgIconColor: AppColors.dark,
-      borderRadius: BorderRadius.circular(AppRadius.xxl),
+      borderRadius: widget.grouped ? BorderRadius.zero : BorderRadius.circular(AppRadius.xxl),
       child: content,
     );
 
+    if (widget.grouped) return content;
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(

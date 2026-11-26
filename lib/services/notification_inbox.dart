@@ -123,6 +123,26 @@ class NotificationInbox {
     if (id > 0) await ApiService.deleteNotification(id);
   }
 
+  /// Adds an item made on this phone (negative id, kept across server refreshes).
+  static Future<void> addLocal({
+    required String title,
+    required String message,
+    required String kind,
+    String? action,
+  }) async {
+    final items = await cached();
+    final now = DateTime.now();
+    final item = InboxItem(
+      id: -(now.millisecondsSinceEpoch ~/ 1000),
+      title: title,
+      message: message,
+      data: {'kind': kind, if (action != null) 'action': action, 'local': 'true'},
+      isRead: false,
+      createdAt: now,
+    );
+    await _store([item, ...items].take(100).toList());
+  }
+
   /// A push arrived: fetch the new list.
   static void pushArrived() => refresh();
 

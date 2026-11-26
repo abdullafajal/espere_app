@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:espere_app/widgets/budget_deck.dart';
 import 'package:intl/intl.dart';
 import 'package:espere_app/theme/app_theme.dart';
 
@@ -100,6 +102,13 @@ void main() {
       }));
   testWidgets('home_long', (t) => shot(t, 'home_long', const DashboardScreen(), size: const Size(390, 2400)));
   testWidgets('quick_add', (t) => shot(t, 'quick_add', const QuickAddScreen(), scaffold: false));
+  testWidgets('quick_add_budget', (t) => shot(t, 'quick_add_budget', const QuickAddScreen(), scaffold: false, act: (t) async {
+        for (final k in ['4', '5', '0']) {
+          await t.tap(find.text(k).last);
+          await t.pump(const Duration(milliseconds: 50));
+        }
+        await t.tap(find.bySemanticsLabel('Food'));
+      }));
   testWidgets('activity', (t) => shot(t, 'activity', const TransactionListScreen()));
   testWidgets('form_new', (t) => shot(t, 'form_new', const QuickAddScreen(prefill: TransactionPrefill(amount: 249, notes: 'Swiggy')), scaffold: false));
   testWidgets('form_edit', (t) => shot(t, 'form_edit',
@@ -109,6 +118,29 @@ void main() {
       ),
       scaffold: false));
   testWidgets('budgets', (t) => shot(t, 'budgets', const BudgetsScreen()));
+  testWidgets('budgets_swiped', (t) => shot(t, 'budgets_swiped', const BudgetsScreen(), act: (t) async {
+        await t.drag(find.byType(BudgetDeck), const Offset(-220, 0));
+      }));
+  testWidgets('budgets_many', (t) {
+    final now = DateTime.now();
+    String d(int day) => DateTime(now.year, now.month, day.clamp(1, now.day), 12).toUtc().toIso8601String();
+    final spend = {0: 6740.0, 6: 2150.0, 3: 2100.0, 9: 1700.0, 2: 1250.0, 1: 1500.0};
+    final limits = {0: '6000', 6: '2000', 3: '2500', 9: '2000', 2: '3000', 1: '4000'};
+    final txns = [
+      for (final e in spend.entries) txn(900 + e.key, e.value.toStringAsFixed(0), 'expense', categories[e.key], 'x', d(e.key + 2)),
+    ];
+    final bs = [for (final e in limits.entries) budget(800 + e.key, categories[e.key], e.value, '0')];
+    final prefs = Map<String, Object>.from(baseCache())
+      ..['cache_transactions'] = jsonEncode({'transactions': txns, 'currency_symbol': '₹'})
+      ..['cache_budgets'] = jsonEncode({'budgets': bs, 'overall': {'amount': '20000.00'}, 'currency_symbol': '₹'});
+    return shot(t, 'budgets_many', const BudgetsScreen(), prefs: prefs, size: const Size(390, 1500));
+  });
+  testWidgets('budget_form', (t) => shot(t, 'budget_form', const BudgetsScreen(), act: (t) async {
+        await t.tap(find.byTooltip('New budget'));
+      }));
+  testWidgets('budget_detail', (t) => shot(t, 'budget_detail', const BudgetsScreen(), act: (t) async {
+        await t.tapAt(t.getTopLeft(find.byType(BudgetDeck)) + const Offset(120, 140));
+      }));
   testWidgets('reports', (t) => shot(t, 'reports', const ReportsScreen(), scaffold: false, size: const Size(390, 1800)));
   testWidgets('categories', (t) => shot(t, 'categories', const CategoriesScreen(), scaffold: false));
   testWidgets('split', (t) => shot(t, 'split', SplitGroupsScreen(onBack: () {}), scaffold: false));
