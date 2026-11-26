@@ -41,6 +41,9 @@ class BudgetsScreenState extends State<BudgetsScreen> {
   /// The whole-month budget (limit 0 = none) and the month's spending.
   BudgetInfo _overall = const BudgetInfo(name: 'Month', limit: 0, spent: 0);
 
+  /// Category budgets with what is spent counted on the phone (fresher than the server).
+  Map<int, BudgetInfo> _local = const {};
+
   StreamSubscription<void>? _syncSub;
 
   @override
@@ -72,7 +75,29 @@ class BudgetsScreenState extends State<BudgetsScreen> {
 
   Future<void> _loadOverall() async {
     final o = await BudgetService.overall(_currentMonth);
-    if (mounted) setState(() => _overall = o);
+    final local = await BudgetService.byCategory(_currentMonth);
+    if (mounted) {
+      setState(() {
+        _overall = o;
+        _local = local;
+      });
+    }
+  }
+
+  double? _spentOf(Map<String, dynamic> b) {
+    final cat = b['category'];
+    final id = int.tryParse(((cat is Map ? cat['id'] : null) ?? b['category_id'])?.toString() ?? '');
+    return id == null ? null : _local[id]?.spent;
+  }
+
+  /// Fullest first, so what needs attention is on top.
+  List<Map<String, dynamic>> get _sorted {
+    double f(Map<String, dynamic> b) {
+      final limit = double.tryParse(b['amount'].toString()) ?? 0;
+      final spent = _spentOf(b) ?? (double.tryParse(b['spent']?.toString() ?? '') ?? 0);
+      return limit <= 0 ? 0 : spent / limit;
+    }
+    return [..._budgets]..sort((a, b) => f(b).compareTo(f(a)));
   }
 
   Future<void> _loadBudgets() async {
@@ -324,18 +349,14 @@ class BudgetsScreenState extends State<BudgetsScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               Row(
                 children: [
-                  Expanded(
-                    child: Text(
-                      o.spent > o.limit ? '${_money(o.spent - o.limit)} over' : '${_money(o.left)} left',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white),
-                    ),
-                  ),
-                  if (_isThisMonth && o.left > 0)
-                    Text('≈ ${_money(o.left / daysLeft)} / day',
-                        style: const TextStyle(fontSize: 12, color: AppColors.darkMuted)),
+                  _stat(o.spent > o.limit ? 'Over by' : 'Left', _money((o.spent - o.limit).abs())),
+                  const SizedBox(width: 8),
+                  _stat('Per day', _isThisMonth && o.left > 0 ? _money(o.left / daysLeft) : '—'),
+                  const SizedBox(width: 8),
+                  _stat('In categories', _money(_local.values.fold<double>(0, (a, b) => a + b.limit))),
                 ],
               ),
             ] else
@@ -356,6 +377,61 @@ class BudgetsScreenState extends State<BudgetsScreen> {
       ),
     );
   }
+
+  /// "BY CATEGORY" with how many budgets are over / near the limit.
+  Widget _categoryHeader() {
+    var over = 0, near = 0;
+    for (final b in _budgets) {
+      final limit = double.tryParse(b['amount'].toString()) ?? 0;
+      final spent = _spentOf(b) ?? (double.tryParse(b['spent']?.toString() ?? '') ?? 0);
+      if (limit <= 0) continue;
+      if (spent > limit) {
+        over++;
+      } else if (spent >= limit * 0.8) {
+        near++;
+      }
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(6, 20, 2, 8),
+      child: Row(
+        children: [
+          Expanded(child: Text('BY CATEGORY', style: AppText.label)),
+          if (over > 0) _pill('$over over', dark: true),
+          if (near > 0) ...[const SizedBox(width: 6), _pill('$near near limit')],
+          if (over == 0 && near == 0 && _budgets.isNotEmpty) _pill('All on track'),
+        ],
+      ),
+    );
+  }
+
+  Widget _pill(String text, {bool dark = false}) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: dark ? AppColors.dark : AppColors.card,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(text,
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: dark ? AppColors.accent : AppColors.text)),
+      );
+
+  Widget _stat(String label, String value) => Expanded(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(color: AppColors.darkCard, borderRadius: BorderRadius.circular(14)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, maxLines: 1, style: const TextStyle(fontSize: 11, color: AppColors.darkMuted)),
+              const SizedBox(height: 2),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Colors.white)),
+              ),
+            ],
+          ),
+        ),
+      );
 
   Widget _emptyCategories() => Container(
         padding: const EdgeInsets.all(18),
@@ -504,31 +580,42 @@ class BudgetsScreenState extends State<BudgetsScreen> {
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
                     children: [
                       _overallCard(),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(6, 18, 6, 8),
-                        child: Text(
-                          _budgets.isEmpty ? 'BY CATEGORY' : 'BY CATEGORY · TAP TO SEE ENTRIES',
-                          style: AppText.label,
-                        ),
-                      ),
+                      _categoryHeader(),
                       if (_budgets.isEmpty)
                         _emptyCategories()
                       else
-                        for (final budget in _budgets)
-                          Builder(builder: (context) {
-                            final snapKey = _budgetSnapKeys.putIfAbsent(
-                                budget['id'], () => GlobalKey<ThanosSnapWidgetState>());
-                            return ThanosSnapWidget(
-                              key: snapKey,
-                              child: BudgetTile(
-                                budget: budget,
-                                currencySymbol: _currencySymbol,
-                                onTap: () => _openBudget(budget),
-                                onEdit: () => _showBudgetForm(budget),
-                                onDelete: () => _deleteBudget(snapKey, budget['id']),
-                              ),
-                            );
-                          }),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: AppColors.card,
+                            borderRadius: BorderRadius.circular(AppRadius.xxl),
+                            boxShadow: AppShadows.soft,
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: Column(
+                            children: [
+                              for (final (i, budget) in _sorted.indexed) ...[
+                                if (i > 0) const Divider(height: 1, indent: 68, color: AppColors.border),
+                                Builder(builder: (context) {
+                                  final snapKey = _budgetSnapKeys.putIfAbsent(
+                                      budget['id'], () => GlobalKey<ThanosSnapWidgetState>());
+                                  return ThanosSnapWidget(
+                                    key: snapKey,
+                                    child: BudgetTile(
+                                      budget: budget,
+                                      currencySymbol: _currencySymbol,
+                                      spent: _spentOf(budget),
+                                      grouped: true,
+                                      onTap: () => _openBudget(budget),
+                                      onEdit: () => _showBudgetForm(budget),
+                                      onDelete: () => _deleteBudget(snapKey, budget['id']),
+                                    ),
+                                  );
+                                }),
+                              ],
+                            ],
+                          ),
+                        ),
+                      const SizedBox(height: 8),
                       const NavBottomSpace(),
                     ],
                   ),
