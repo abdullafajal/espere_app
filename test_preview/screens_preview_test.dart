@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:espere_app/widgets/budget_deck.dart';
+import 'package:espere_app/widgets/budget_watch.dart';
 import 'package:intl/intl.dart';
 import 'package:espere_app/theme/app_theme.dart';
 
@@ -143,15 +144,60 @@ void main() {
     // Like the reported screen: 111%, 86%, 69%, 61% and two at 0%.
     final spend = {0: 11156.0, 2: 3015.0, 3: 5847.0, 4: 3381.0};
     final limits = {0: '10000', 2: '3500', 3: '8500', 4: '5500', 5: '500', 6: '1500'};
+    // Spread over the month in uneven pieces, so the money-left chart has a real shape.
+    var id = 900;
     final txns = [
-      for (final e in spend.entries) txn(900 + e.key, e.value.toStringAsFixed(0), 'expense', categories[e.key], 'x', d(e.key + 2)),
+      for (final e in spend.entries)
+        // Travel has the most entries, so it comes first among the budgets to watch.
+        for (var k = 1, n = e.key == 2 ? 12 : 8; k <= n; k++)
+          txn(id++, (e.value / n * (k.isEven ? 1.3 : 0.7)).toStringAsFixed(0), 'expense', categories[e.key], 'x',
+              d((k * 3 + e.key) % 26 + 1)),
     ];
     final bs = [for (final e in limits.entries) budget(800 + e.key, categories[e.key], e.value, '0')];
     final prefs = Map<String, Object>.from(baseCache())
       ..['cache_transactions'] = jsonEncode({'transactions': txns, 'currency_symbol': '₹'})
       ..['cache_budgets'] = jsonEncode({'budgets': bs, 'overall': {'amount': '20000.00'}, 'currency_symbol': '₹'});
-    return shot(t, 'home_near_limit', const DashboardScreen(), prefs: prefs, size: const Size(390, 1500));
+    return shot(t, 'home_near_limit', const DashboardScreen(), prefs: prefs, size: const Size(390, 2600));
   });
+  testWidgets('home_watch_over', (t) {
+    final now = DateTime.now();
+    String d(int day) => DateTime(now.year, now.month, day.clamp(1, now.day), 12).toUtc().toIso8601String();
+    // Like the reported screen: 111%, 86%, 69%, 61% and two at 0%.
+    final spend = {0: 11156.0, 2: 3015.0, 3: 5847.0, 4: 3381.0};
+    final limits = {0: '10000', 2: '3500', 3: '8500', 4: '5500', 5: '500', 6: '1500'};
+    // Spread over the month in uneven pieces, so the money-left chart has a real shape.
+    var id = 900;
+    final txns = [
+      for (final e in spend.entries)
+        // Travel has the most entries, so it comes first among the budgets to watch.
+        for (var k = 1, n = e.key == 2 ? 12 : 8; k <= n; k++)
+          txn(id++, (e.value / n * (k.isEven ? 1.3 : 0.7)).toStringAsFixed(0), 'expense', categories[e.key], 'x',
+              d((k * 3 + e.key) % 26 + 1)),
+    ];
+    final bs = [for (final e in limits.entries) budget(800 + e.key, categories[e.key], e.value, '0')];
+    final prefs = Map<String, Object>.from(baseCache())
+      ..['cache_transactions'] = jsonEncode({'transactions': txns, 'currency_symbol': '₹'})
+      ..['cache_budgets'] = jsonEncode({'budgets': bs, 'overall': {'amount': '20000.00'}, 'currency_symbol': '₹'});
+    return shot(t, 'home_watch_over', const DashboardScreen(), prefs: prefs, size: const Size(390, 2600),
+        act: (t) async {
+      await t.ensureVisible(find.byType(BudgetWatchDeck));
+      await t.pumpAndSettle();
+      await t.drag(find.byType(BudgetWatchDeck), const Offset(-320, 0));
+      for (var i = 0; i < 20; i++) {
+        await t.pump(const Duration(milliseconds: 100));
+      }
+    });
+  });
+  // "Budgets" on Home with none set, and with every budget well within its limit.
+  for (final none in [true, false]) {
+    testWidgets(none ? 'home_no_budget' : 'home_budgets_ok', (t) {
+      final bs = none ? const [] : [budget(801, categories[0], '90000', '0'), budget(802, categories[2], '50000', '0')];
+      final prefs = Map<String, Object>.from(baseCache())
+        ..['cache_budgets'] = jsonEncode({'budgets': bs, 'overall': {'amount': '0'}, 'currency_symbol': '₹'});
+      return shot(t, none ? 'home_no_budget' : 'home_budgets_ok', const DashboardScreen(),
+          prefs: prefs, size: const Size(390, 2600));
+    });
+  }
   testWidgets('budgets_dragging', (t) => shot(t, 'budgets_dragging', const BudgetsScreen(), act: (t) async {
         final g = await t.startGesture(t.getTopLeft(find.byType(BudgetDeck)) + const Offset(200, 120));
         for (var k = 0; k < 10; k++) {

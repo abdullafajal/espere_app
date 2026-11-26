@@ -89,7 +89,7 @@ class BudgetsScreenState extends State<BudgetsScreen> {
     }
   }
 
-  /// This month's budgets with phone-counted spending, fullest first (over, then near).
+  /// This month's budgets with phone-counted spending: most entries first, then fullest.
   List<BudgetInfo> get _all {
     final out = <BudgetInfo>[];
     for (final b in _budgets) {
@@ -108,7 +108,7 @@ class BudgetsScreenState extends State<BudgetsScreen> {
             carried: double.tryParse(b['carried']?.toString() ?? '') ?? 0,
           ));
     }
-    return out..sort((a, b) => b.fraction.compareTo(a.fraction));
+    return out..sort(BudgetInfo.byUse);
   }
 
   static String _kind(BudgetInfo b) => b.limit <= 0

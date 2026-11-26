@@ -34,6 +34,9 @@ class BudgetInfo {
   /// Spending in this budget's category by day of the month (day → amount).
   final Map<int, double> daily;
 
+  /// How many entries went into it this month (most first in lists).
+  final int entries;
+
   const BudgetInfo({
     this.id,
     this.categoryId,
@@ -46,7 +49,14 @@ class BudgetInfo {
     this.carried = 0,
     this.ranOutDay,
     this.daily = const {},
+    this.entries = 0,
   });
+
+  /// Most entries first, then the fullest: the order budgets are listed in.
+  static int byUse(BudgetInfo a, BudgetInfo b) {
+    final c = b.entries.compareTo(a.entries);
+    return c != 0 ? c : b.fraction.compareTo(a.fraction);
+  }
 
   double get left => math.max(0, limit - spent);
   double get fraction => limit <= 0 ? 0 : spent / limit;
@@ -82,6 +92,22 @@ class BudgetService {
     return out;
   }
 
+  /// How many expenses of [month] each category has (category id → count).
+  static Future<Map<int, int>> _entries(DateTime month) async {
+    final cached = await CacheService.getCachedTransactions();
+    final list = ((cached?['transactions'] as List?) ?? const []).whereType<Map>();
+    final out = <int, int>{};
+    for (final t in list) {
+      if (t['type'] != 'expense') continue;
+      final at = DateTime.tryParse(t['date']?.toString() ?? '')?.toLocal();
+      if (at == null || at.year != month.year || at.month != month.month) continue;
+      final cat = t['category'];
+      final id = cat is Map ? int.tryParse(cat['id']?.toString() ?? '') : null;
+      if (id != null) out[id] = (out[id] ?? 0) + 1;
+    }
+    return out;
+  }
+
   /// Expenses of [month] from the phone's copy: total and per category id.
   static Future<(double, Map<int, double>)> _spent(DateTime month) async {
     final cached = await CacheService.getCachedTransactions();
@@ -108,6 +134,7 @@ class BudgetService {
     final list = ((cached?['budgets'] as List?) ?? const []).whereType<Map>();
     final (_, spent) = await _spent(m);
     final daily = await _daily(m);
+    final entries = await _entries(m);
     int? ranOut(int catId, double limit) {
       final days = daily[catId];
       if (days == null || limit <= 0) return null;
@@ -136,6 +163,7 @@ class BudgetService {
         carried: _num(b['carried']),
         ranOutDay: ranOut(catId, _num(b['amount'])),
         daily: daily[catId] ?? const {},
+        entries: entries[catId] ?? 0,
       );
     }
     return out;
