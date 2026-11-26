@@ -289,7 +289,6 @@ class _BudgetDeckState extends State<BudgetDeck> with TickerProviderStateMixin {
     final daysIn = DateTime(widget.month.year, widget.month.month + 1, 0).day;
     final isThisMonth = widget.month.year == now.year && widget.month.month == now.month;
     final today = isThisMonth ? now.day : daysIn + 1;
-    final lasted = over ? (b.ranOutDay ?? today) : today;
     final daysLeft = isThisMonth ? daysIn - now.day + 1 : 0;
     final pct = (b.fraction * 100).round();
     final repeatLine = [
@@ -309,6 +308,7 @@ class _BudgetDeckState extends State<BudgetDeck> with TickerProviderStateMixin {
       footRight = '$pct% used';
     }
 
+    final maxDay = b.daily.values.fold<double>(0, math.max);
     return Container(
       height: BudgetDeck.height - 22,
       padding: const EdgeInsets.fromLTRB(16, 14, 6, 14),
@@ -389,25 +389,47 @@ class _BudgetDeckState extends State<BudgetDeck> with TickerProviderStateMixin {
           const SizedBox(height: 12),
           Padding(
             padding: const EdgeInsets.only(right: 10),
-            child: Row(
-              children: [
-                for (var d = 1; d <= daysIn; d++) ...[
-                  if (d > 1) const SizedBox(width: 2),
-                  Expanded(
-                    child: Container(
-                      height: 18,
-                      decoration: BoxDecoration(
-                        color: d == today
-                            ? Colors.white
-                            : d < math.min(lasted, today) || (!over && d < today)
-                                ? AppColors.accent
-                                : AppColors.darkCardRaised,
-                        borderRadius: BorderRadius.circular(3),
+            // This budget's spending by day: each day's bar as tall as that day's spending
+            // (a dot when nothing). Green while within the budget, white after it ran out;
+            // the days still to come are faint; a white line marks today.
+            child: SizedBox(
+              height: 30,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  for (var d = 1; d <= daysIn; d++) ...[
+                    if (d > 1) const SizedBox(width: 2),
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Container(
+                            height: (b.daily[d] ?? 0) <= 0 ? 3 : 4 + 20 * ((b.daily[d] ?? 0) / maxDay).clamp(0.0, 1.0),
+                            decoration: BoxDecoration(
+                              color: d > today
+                                  ? AppColors.darkCard
+                                  : (b.daily[d] ?? 0) <= 0
+                                      ? AppColors.darkCardRaised
+                                      : (b.ranOutDay != null && d > b.ranOutDay!)
+                                          ? Colors.white
+                                          : AppColors.accent,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Container(
+                            height: 2,
+                            decoration: BoxDecoration(
+                              color: d == today ? Colors.white : Colors.transparent,
+                              borderRadius: BorderRadius.circular(1),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
           const SizedBox(height: 8),
