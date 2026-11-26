@@ -12,12 +12,16 @@ class BudgetTile extends StatefulWidget {
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
 
+  /// Opens the budget (its entries this month).
+  final VoidCallback? onTap;
+
   const BudgetTile({
     super.key,
     required this.budget,
     required this.currencySymbol,
     this.onEdit,
     this.onDelete,
+    this.onTap,
   });
 
   @override
@@ -31,6 +35,16 @@ class _BudgetTileState extends State<BudgetTile> {
     return '${widget.currencySymbol}${f.format(d)}';
   }
 
+  /// "Every month · +₹500 carried" or "This month only".
+  String _repeatLine() {
+    final repeat = widget.budget['repeat'] != false;
+    final carried = double.tryParse(widget.budget['carried']?.toString() ?? '') ?? 0;
+    return [
+      repeat ? 'Every month' : 'This month only',
+      if (carried > 0) '+${_m(carried)} carried',
+    ].join(' · ');
+  }
+
   @override
   Widget build(BuildContext context) {
     final isExceeded = widget.budget['is_exceeded'] == true;
@@ -39,8 +53,9 @@ class _BudgetTileState extends State<BudgetTile> {
 
     Widget content = Container(
       padding: const EdgeInsets.all(16),
+      // Transparent when tappable, so the press ripple shows.
       decoration: BoxDecoration(
-        color: AppColors.card,
+        color: widget.onTap != null ? null : AppColors.card,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -68,10 +83,10 @@ class _BudgetTileState extends State<BudgetTile> {
                       category['name'] ?? 'Category',
                       style: AppText.rowTitle,
                     ),
-                    MorphText(id: widget.budget['id'], 
-                      DateFormat('MMMM yyyy').format(
-                        DateTime.parse(widget.budget['month']),
-                      ),
+                    MorphText(id: widget.budget['id'],
+                      _repeatLine(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: AppText.rowSub,
                     ),
                   ],
@@ -176,6 +191,13 @@ class _BudgetTileState extends State<BudgetTile> {
         ],
       ),
     );
+
+    if (widget.onTap != null) {
+      content = Material(
+        color: AppColors.card,
+        child: InkWell(onTap: widget.onTap, child: content),
+      );
+    }
 
     content = EspereSwipeAction(
       dismissKey: ValueKey(widget.budget['id']),

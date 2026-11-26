@@ -20,6 +20,7 @@ import '../services/cache_service.dart';
 import '../services/connectivity_service.dart';
 import '../services/sync_service.dart';
 import '../services/widget_service.dart';
+import '../services/budget_service.dart';
 import '../utils/icon_mapper.dart';
 import '../widgets/espere_input.dart';
 
@@ -358,6 +359,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       data: txnData,
       entityId: isEdit ? widget.transactionId : tempId,
     );
+    if (_type == 'expense') BudgetService.checkAfterSave(categoryId: _categoryId);
     
     // Trigger sync if online
     if (ConnectivityService.isOnline) {

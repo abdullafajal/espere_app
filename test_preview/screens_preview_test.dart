@@ -100,6 +100,13 @@ void main() {
       }));
   testWidgets('home_long', (t) => shot(t, 'home_long', const DashboardScreen(), size: const Size(390, 2400)));
   testWidgets('quick_add', (t) => shot(t, 'quick_add', const QuickAddScreen(), scaffold: false));
+  testWidgets('quick_add_budget', (t) => shot(t, 'quick_add_budget', const QuickAddScreen(), scaffold: false, act: (t) async {
+        for (final k in ['4', '5', '0']) {
+          await t.tap(find.text(k).last);
+          await t.pump(const Duration(milliseconds: 50));
+        }
+        await t.tap(find.bySemanticsLabel('Food'));
+      }));
   testWidgets('activity', (t) => shot(t, 'activity', const TransactionListScreen()));
   testWidgets('form_new', (t) => shot(t, 'form_new', const QuickAddScreen(prefill: TransactionPrefill(amount: 249, notes: 'Swiggy')), scaffold: false));
   testWidgets('form_edit', (t) => shot(t, 'form_edit',
@@ -109,6 +116,12 @@ void main() {
       ),
       scaffold: false));
   testWidgets('budgets', (t) => shot(t, 'budgets', const BudgetsScreen()));
+  testWidgets('budget_form', (t) => shot(t, 'budget_form', const BudgetsScreen(), act: (t) async {
+        await t.tap(find.byTooltip('New budget'));
+      }));
+  testWidgets('budget_detail', (t) => shot(t, 'budget_detail', const BudgetsScreen(), act: (t) async {
+        await t.tap(find.text('Shopping').first);
+      }));
   testWidgets('reports', (t) => shot(t, 'reports', const ReportsScreen(), scaffold: false, size: const Size(390, 1800)));
   testWidgets('categories', (t) => shot(t, 'categories', const CategoriesScreen(), scaffold: false));
   testWidgets('split', (t) => shot(t, 'split', SplitGroupsScreen(onBack: () {}), scaffold: false));

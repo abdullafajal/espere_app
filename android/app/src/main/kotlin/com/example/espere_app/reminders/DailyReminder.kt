@@ -52,6 +52,14 @@ object DailyReminder {
                     scheduleAll(app)
                     result.success(true)
                 }
+                "notify" -> {
+                    showBudget(
+                        app,
+                        call.argument<String>("title") ?: "",
+                        call.argument<String>("body") ?: ""
+                    )
+                    result.success(true)
+                }
                 "test" -> {
                     fire(app, call.argument<String>("slot") ?: NIGHT, reschedule = false)
                     result.success(true)
@@ -281,6 +289,39 @@ object DailyReminder {
             .build()
         try {
             nm.notify(if (slot == MORNING) 3301 else 3302, notification)
+        } catch (_: SecurityException) {
+            // Notifications not allowed: the entry is still in the in-app list.
+        }
+    }
+
+    /** A budget alert (80% / 100%), on its own channel so it can be turned off apart from
+     *  the reminders. Opens the app. The Flutter side already added it to the in-app list. */
+    fun showBudget(context: Context, title: String, body: String) {
+        val nm = NotificationManagerCompat.from(context)
+        if (!nm.areNotificationsEnabled()) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                "budget_alerts", "Budget alerts", NotificationManager.IMPORTANCE_DEFAULT
+            ).apply { description = "When a budget is 80% used or over" }
+            context.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+        }
+        val open = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pi = PendingIntent.getActivity(
+            context, 3401, open, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val notification = NotificationCompat.Builder(context, "budget_alerts")
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setAutoCancel(true)
+            .setContentIntent(pi)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .build()
+        try {
+            nm.notify(3400 + (title.hashCode() and 0x3f), notification)
         } catch (_: SecurityException) {
             // Notifications not allowed: the entry is still in the in-app list.
         }

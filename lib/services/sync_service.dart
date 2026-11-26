@@ -137,7 +137,7 @@ class SyncService {
   }
 
   static Future<void> _pullBudgets() async {
-    if (await hasPending('budget')) return;
+    if (await hasPending('budget') || await hasPending('budget_overall')) return;
     final res = await ApiService.getBudgets();
     if (res.isSuccess && res.data != null) {
       await CacheService.cacheBudgets(res.data!);
@@ -253,6 +253,11 @@ class SyncService {
             final res = await _syncSavingAddMoney(data, entityId);
             success = res.isSuccess;
             resultData = res.data;
+            break;
+          case 'budget_overall':
+            final res = await ApiService.setOverallBudget(data?['amount']?.toString() ?? '0');
+            success = res.isSuccess;
+            resultData = null;
             break;
           case 'profile':
             final res = await ApiService.updateProfile(data ?? {});

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import '../theme/motion.dart';
 import '../widgets/morph_text.dart';
+import '../services/budget_service.dart';
 import '../widgets/espere_header.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
@@ -48,6 +49,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _theme = 'light';
   bool _emailReminders = true;
   bool _shredderAnimation = true;
+  bool _budgetAlerts = true;
   bool _autoTrackOn = false;
   bool _autoTrackAvailable = false;
 
@@ -127,6 +129,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (mounted) {
       setState(() {
         _shredderAnimation = prefs.getBool('enable_shredder_anim') ?? true;
+        _budgetAlerts = prefs.getBool(BudgetService.alertsPrefKey) ?? true;
       });
     }
   }
@@ -1095,6 +1098,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ]),
                         _group('REMINDERS', [
+                          _row(
+                            icon: Icons.donut_large_rounded,
+                            label: 'Budget alerts',
+                            hint: 'When a budget is 80% used or over',
+                            on: _budgetAlerts,
+                            onTap: () async {
+                              AppHaptics.tap();
+                              setState(() => _budgetAlerts = !_budgetAlerts);
+                              await BudgetService.setAlerts(_budgetAlerts);
+                            },
+                          ),
                           for (final slot in ReminderSlot.values)
                             _row(
                               icon: slot == ReminderSlot.morning ? Icons.wb_sunny_rounded : Icons.nightlight_round,

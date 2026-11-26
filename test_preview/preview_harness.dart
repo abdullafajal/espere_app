@@ -203,7 +203,7 @@ Map<String, Object> baseCache() => {
       'cache_user': jsonEncode(user),
       'cache_transactions': jsonEncode({'transactions': transactions, 'currency_symbol': '₹'}),
       'cache_categories': jsonEncode({'categories': categories, 'currency_symbol': '₹'}),
-      'cache_budgets': jsonEncode({'budgets': budgets, 'currency_symbol': '₹'}),
+      'cache_budgets': jsonEncode({'budgets': budgets, 'overall': {'amount': '20000.00', 'spent': '0'}, 'currency_symbol': '₹'}),
       'cache_reports': jsonEncode(reports),
       'cache_split_groups': jsonEncode(splitGroups),
       'cache_split_group_detail_1': jsonEncode(groupDetail),

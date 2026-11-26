@@ -45,6 +45,9 @@ class NotificationService {
       case 'open_friends':
         nav.popUntil((r) => r.isFirst);
         AppNavigation.openTab(3);
+      case 'open_budgets':
+        nav.popUntil((r) => r.isFirst);
+        AppNavigation.openTab(2);
       case 'open_split_invitations':
         nav.popUntil((r) => r.isFirst);
         AppNavigation.openTab(4);
