@@ -25,6 +25,13 @@ class EditAnimation {
   /// Cached so text can decide synchronously whether to animate.
   static bool enabled = true;
 
+  /// Edits arm the animation for a few seconds; only then do changed texts animate.
+  /// Without this, data refreshed on opening the app or by a sync played the edit
+  /// animation (and its buzz) on entries nobody had just edited.
+  static DateTime _armedUntil = DateTime(0);
+  static void arm([Duration d = const Duration(seconds: 8)]) => _armedUntil = DateTime.now().add(d);
+  static bool get armed => DateTime.now().isBefore(_armedUntil);
+
   static Future<void> load() async {
     final p = await SharedPreferences.getInstance();
     enabled = p.getBool(prefKey) ?? true;
@@ -85,7 +92,10 @@ class _MorphTextState extends State<MorphText> with SingleTickerProviderStateMix
   void didUpdateWidget(MorphText old) {
     super.didUpdateWidget(old);
     if (old.text == widget.text) return;
-    if (old.id != widget.id || !EditAnimation.enabled || !TickerMode.valuesOf(context).enabled) {
+    if (old.id != widget.id ||
+        !EditAnimation.enabled ||
+        !EditAnimation.armed ||
+        !TickerMode.valuesOf(context).enabled) {
       _stop();
       return;
     }

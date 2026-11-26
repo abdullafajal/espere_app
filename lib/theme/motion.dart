@@ -6,8 +6,8 @@
 /// - [AppHaptics]: tap (selection), press (light), confirm (medium), warn (heavy), and
 ///   land (the light tick when a moving thing arrives).
 /// - [SpringPress]: wrap any tappable to get the press spring + haptic.
-/// - [EspereScrollBehavior]: every list in the app bounces at its ends on [AppMotion.move]
-///   (the nav pill's spring), with one light tick when the end is reached (see main.dart).
+/// - [EspereScrollBehavior]: every list in the app bounces softly at its ends (no
+///   overshoot), with one light tick when the end is reached (see main.dart).
 library;
 
 import 'package:flutter/foundation.dart';
@@ -136,16 +136,16 @@ class _SpringPressState extends State<SpringPress> with SingleTickerProviderStat
   }
 }
 
-/// Bounces past the end of a list and springs back on [AppMotion.move] (the same spring
-/// as the nav pill), so the ends of lists feel like the rest of the app.
+/// Bounces a little past the end of a list and settles back without overshooting.
 class EspereScrollPhysics extends BouncingScrollPhysics {
   const EspereScrollPhysics({super.parent});
 
   @override
   EspereScrollPhysics applyTo(ScrollPhysics? ancestor) => EspereScrollPhysics(parent: buildParent(ancestor));
 
-  @override
-  SpringDescription get spring => AppMotion.move;
+  // Lists keep the platform's critically damped bounce. The nav pill's spring
+  // overshoots, which made a list run past its end and back (the last items slipped
+  // under the nav bar, the first under the header).
 }
 
 /// App-wide scrolling: [EspereScrollPhysics] everywhere, no Android glow or stretch.

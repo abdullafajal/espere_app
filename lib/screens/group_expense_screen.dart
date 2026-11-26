@@ -5,6 +5,7 @@
 /// because the server's equal split always covers the whole group.
 library;
 
+import '../widgets/morph_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -245,6 +246,7 @@ class _GroupExpenseScreenState extends State<GroupExpenseScreen> with SingleTick
       _error = null;
     });
     final e = widget.editData;
+    if (e != null) EditAnimation.arm();
     final r = e != null
         ? await ApiService.updateSplitExpense(widget.groupId, e['id'] as int, body)
         : await ApiService.addSplitExpense(widget.groupId, body);

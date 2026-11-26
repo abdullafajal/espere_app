@@ -148,6 +148,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       'email_reminders': _emailReminders,
     };
 
+    EditAnimation.arm();
     ApiResult result;
     var savedLocally = false;
     ApiProbe? probe;
