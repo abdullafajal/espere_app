@@ -60,7 +60,8 @@ class CategoryCarousel extends StatefulWidget {
 }
 
 class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerProviderStateMixin {
-  static const double _gap = 112; // between card centres
+  static const double _gap = 100; // between the middle card and the ones beside it
+  static const double _gapFar = 47; // the next ones tuck half behind those
   static const double _stageH = 186;
 
   late final AnimationController _pos =
@@ -134,7 +135,17 @@ class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerPr
   }
 
   void _tapAt(double dx, double width) {
-    var hit = (_pos.value + (dx - width / 2) / _gap).round();
+    // The card under the finger: the nearest to the middle wins where cards overlap.
+    final o = dx - width / 2;
+    final base = _pos.value.round();
+    var hit = base;
+    for (final k in [0, -1, 1, -2, 2]) {
+      final d = base + k - _pos.value;
+      if ((o - _offset(d)).abs() <= 60 * _scale(d.abs())) {
+        hit = base + k;
+        break;
+      }
+    }
     if (!_loops) hit = hit.clamp(0, _n - 1);
     if (hit == _pos.value.round()) {
       final item = widget.items[_wrap(hit)];
@@ -267,12 +278,13 @@ class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerPr
     final d = i - p;
     final a = d.abs();
     final t = math.min(a, 1.0);
-    // Flat and straight: side cards just sit smaller and dimmer beside the middle one.
-    final scale = 1 - 0.22 * t;
-    final opacity = (1 - math.max(0.0, a - 1.4) * 0.9).clamp(0.0, 1.0);
+    // Flat and straight: the cards beside the middle one sit smaller, and the next
+    // ones smaller still, half tucked behind them.
+    final scale = _scale(a);
+    final opacity = (1 - math.max(0.0, a - 2.2) * 1.6).clamp(0.0, 1.0);
     const cw = 120.0, ch = 150.0;
     return Positioned(
-      left: width / 2 - cw / 2 + d * _gap,
+      left: width / 2 - cw / 2 + _offset(d),
       top: (_stageH - ch) / 2,
       child: Opacity(
         opacity: opacity,
@@ -284,6 +296,16 @@ class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerPr
     );
   }
 
+  /// How far a card [d] places from the middle sits from the centre.
+  static double _offset(double d) {
+    final a = d.abs();
+    final x = a <= 1 ? a * _gap : _gap + (a - 1) * _gapFar;
+    return d < 0 ? -x : x;
+  }
+
+  /// Card size by distance from the middle: 1, then 0.78 beside it, then 0.6.
+  static double _scale(double a) => a <= 1 ? 1 - 0.22 * a : math.max(0.6, 0.78 - 0.18 * (a - 1));
+
   /// [t] is 0 for the middle card and 1 for a card fully to the side.
   Widget _card(CarouselCategory item, double t, double w, double h) {
     final mid = t < 0.5;
@@ -294,6 +316,8 @@ class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerPr
       decoration: BoxDecoration(
         color: Color.lerp(AppColors.dark, AppColors.surface, t),
         borderRadius: BorderRadius.circular(28),
+        // A thin edge in the sheet colour keeps stacked cards apart.
+        border: mid ? null : Border.all(color: AppColors.card, width: 2.5),
         boxShadow: mid ? const [BoxShadow(color: Color(0x33000000), blurRadius: 22, offset: Offset(0, 10))] : null,
       ),
       child: Column(
