@@ -1,4 +1,4 @@
-/// Home's "Budgets to watch": the budgets that are over or close to their limit, as a
+/// Home's "Budgets": up to five budgets (over or close ones always included), as a
 /// deck of dark cards to swipe through (the same springs as the Budgets screen).
 ///
 /// Each card says how much is left, or how much was spent extra past the limit, and
@@ -484,7 +484,10 @@ class MoneyLeftPainter extends CustomPainter {
       canvas.drawCircle(end, 4.5, Paint()..color = AppColors.accent);
     }
 
-    _label(canvas, 'today', Offset(x(day) - 5, top - 2), AppColors.darkFaint, alignRight: true);
+    // "today" at the top, or at the bottom when the line is still up there.
+    final endY = y(left[day]);
+    _label(canvas, 'today', Offset(x(day) - 5, endY < top + 24 ? floorY - 14 : top - 2), AppColors.darkFaint,
+        alignRight: true);
     _label(canvas, zeroLabel, Offset(w, zeroY - 15), AppColors.darkFaint, alignRight: true);
     if (ranOutLabel != null && budget.ranOutDay != null && progress > 0.6) {
       // Early in the month: above ₹0 to the right (the line is under ₹0 there by then).

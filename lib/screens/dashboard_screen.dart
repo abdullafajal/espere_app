@@ -301,12 +301,18 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
             })
             .whereType<TransactionModel>()
             .toList();
-    // Over or close budgets; the one with the most entries this month first.
     final budgets = await BudgetService.byCategory();
-    final near = budgets.values.where((b) => b.limit > 0 && b.fraction >= 0.8).toList()..sort(BudgetInfo.byUse);
+    // Up to five budgets: over or close ones are never left out, the rest by use; then
+    // shown with the most entries first.
+    final set = budgets.values.where((b) => b.limit > 0).toList()..sort(BudgetInfo.byUse);
+    final near = [
+      ...set.where((b) => b.fraction >= 0.8),
+      ...set.where((b) => b.fraction < 0.8),
+    ].take(5).toList()
+      ..sort(BudgetInfo.byUse);
     if (!mounted) return;
     setState(() {
-      _nearLimit = near.take(6).toList();
+      _nearLimit = near;
       _budgetCount = budgets.length;
       _txns = all;
       _week = week;
@@ -989,7 +995,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
   }
 
   /// One white card: payments to review, then "Recent" with the latest entries.
-  /// Budgets close to (or over) their limit, as a deck of money-left charts to swipe
+  /// Up to five budgets (over or close ones always among them), as a deck of money-left charts to swipe
   /// through. Sits under "Month by month". Tap a card (or "All") to open Budgets.
   Widget _watchCard(String symbol) {
     return Padding(
@@ -1001,7 +1007,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
             padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
             child: Row(
               children: [
-                Expanded(child: Text(_budgetCount == 0 ? 'Budgets' : 'Budgets to watch', style: AppText.section)),
+                Expanded(child: Text('Budgets', style: AppText.section)),
                 if (_budgetCount > 0)
                   SpringPress(
                     haptic: HapticKind.tap,
