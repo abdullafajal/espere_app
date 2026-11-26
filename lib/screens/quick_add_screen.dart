@@ -591,7 +591,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(22, 16, 22, 6),
+            padding: const EdgeInsets.fromLTRB(22, 12, 22, 2),
             child: Row(
               children: [
                 Expanded(
@@ -741,7 +741,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
         physics: const NeverScrollableScrollPhysics(),
         mainAxisSpacing: 8,
         crossAxisSpacing: 8,
-        childAspectRatio: 2.3,
+        childAspectRatio: 2.55,
         children: [
           for (final k in keys)
             Semantics(
