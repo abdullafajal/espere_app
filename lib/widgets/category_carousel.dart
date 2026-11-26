@@ -62,10 +62,15 @@ class CategoryCarousel extends StatefulWidget {
 class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerProviderStateMixin {
   static const double _gap = 120; // between the middle card and the ones beside it
   static const double _gapFar = 56; // the next ones tuck half behind those
-  static const double _stageH = 214;
+  static const double _stageH = 192; // the 178 card plus a little room for its shadow
 
   /// How much the cards are scaled down to fit [CategoryCarousel.maxHeight].
   double _k = 1;
+
+  /// The cards' height before scaling: short screens first take it from the card's
+  /// height (down to [_minCardH]), so the cards keep their width and icon size.
+  double _ch = 178;
+  static const double _minCardH = 136;
 
   late final AnimationController _pos = AnimationController.unbounded(vsync: this, value: widget.index.toDouble())
     ..addListener(_onMove);
@@ -178,8 +183,10 @@ class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerPr
     final fullFooter = 88 * ts;
     final maxH = widget.maxHeight;
     final compact = maxH != null && maxH < _stageH + fullFooter;
-    final stageH = maxH == null ? _stageH : (maxH - (compact ? 40 * ts : fullFooter)).clamp(110.0, _stageH);
-    _k = stageH / _stageH;
+    final stageH = maxH == null ? _stageH : (maxH - (compact ? 32 * ts : fullFooter)).clamp(110.0, _stageH);
+    // Room for the card and its shadow: shorten the card first, then scale if still short.
+    _ch = (stageH - 14).clamp(_minCardH, 178.0);
+    _k = math.min(1.0, stageH / (_ch + 14));
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -317,10 +324,11 @@ class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerPr
     // ones smaller still, half tucked behind them.
     final scale = _scale(a);
     final opacity = (1 - math.max(0.0, a - 2.2) * 1.6).clamp(0.0, 1.0);
-    const cw = 144.0, ch = 178.0;
+    const cw = 144.0;
+    final ch = _ch;
     return Positioned(
       left: width / 2 - cw / 2 + _offset(d) * _k,
-      top: (_stageH * _k - ch) / 2,
+      top: ((_ch + 14) * _k - ch) / 2,
       child: Opacity(
         opacity: opacity,
         child: Transform.scale(scale: scale * _k, child: _card(widget.items[_wrap(i)], t, cw, ch)),

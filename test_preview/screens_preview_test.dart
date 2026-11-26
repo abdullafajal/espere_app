@@ -103,6 +103,10 @@ void main() {
       }));
   testWidgets('home_long', (t) => shot(t, 'home_long', const DashboardScreen(), size: const Size(390, 2400)));
   testWidgets('quick_add', (t) => shot(t, 'quick_add', const QuickAddScreen(), scaffold: false));
+  testWidgets('quick_add_s25', (t) => shot(t, 'quick_add_s25', const QuickAddScreen(),
+      scaffold: false, size: const Size(384, 832)));
+  testWidgets('quick_add_zoomed', (t) => shot(t, 'quick_add_zoomed', const QuickAddScreen(),
+      scaffold: false, size: const Size(360, 780), textScale: 1.1));
   testWidgets('quick_add_bigfont', (t) => shot(t, 'quick_add_bigfont', const QuickAddScreen(),
       scaffold: false, size: const Size(411, 860), textScale: 1.15));
   testWidgets('quick_add_budget', (t) => shot(t, 'quick_add_budget', const QuickAddScreen(), scaffold: false, act: (t) async {
