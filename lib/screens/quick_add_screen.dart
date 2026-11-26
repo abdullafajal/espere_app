@@ -709,10 +709,9 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
       child: SizedBox(
         width: double.infinity,
         height: 54,
-        child: FilledButton.icon(
+        child: FilledButton(
           onPressed: _commit,
-          icon: const Icon(Icons.check_rounded),
-          label: Text(
+          child: Text(
             '${_isEdit ? 'Save' : 'Add'} ${_type == 'income' ? '+' : '−'}$_symbol$_amountLabel'
             '${cat != null ? ' · ${cat.name}' : ''}',
             maxLines: 1,

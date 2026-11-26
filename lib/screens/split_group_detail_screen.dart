@@ -730,8 +730,6 @@ class _S extends State<SplitGroupDetailScreen>
                       ? const SizedBox(
                           width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.dark))
                       : Row(mainAxisSize: MainAxisSize.min, children: [
-                          const Icon(Icons.check_rounded, size: 22, color: AppColors.dark),
-                          const SizedBox(width: 8),
                           Text(
                             iPay
                                 ? 'Yes, I paid ${d['to_user']} ${_money(v)}'
