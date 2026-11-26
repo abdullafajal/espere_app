@@ -45,4 +45,47 @@ void main() {
     await t.pumpAndSettle();
     expect(index, 0);
   });
+
+  testWidgets('press and slide on the strip shows that day, and the card stays', (t) async {
+    final now = DateTime.now();
+    final items = [
+      BudgetInfo(categoryId: 1, name: 'Food', limit: 1000, spent: 300, daily: {now.day: 300}),
+      BudgetInfo(categoryId: 2, name: 'Fun', limit: 1000, spent: 0),
+    ];
+    var index = 0;
+    await t.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: Center(
+          child: SizedBox(
+            width: 360,
+            child: StatefulBuilder(
+              builder: (context, set) => BudgetDeck(
+                items: items,
+                index: index,
+                onIndex: (i) => set(() => index = i),
+                month: now,
+                symbol: '₹',
+                onOpen: (_) {},
+                onEdit: (_) {},
+                onDelete: (_) {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    ));
+    await t.pump(const Duration(seconds: 2));
+    await t.pumpAndSettle();
+    final dayLine = find.textContaining(RegExp(r'^\w{3}, \d'));
+    expect(dayLine, findsNothing);
+    final g = await t.startGesture(t.getTopLeft(find.byType(BudgetDeck)) + const Offset(40, 170));
+    await t.pump(const Duration(milliseconds: 700));
+    await g.moveBy(const Offset(30, 0));
+    await t.pump();
+    expect(dayLine, findsOneWidget);
+    await g.up();
+    await t.pumpAndSettle();
+    expect(dayLine, findsNothing);
+    expect(index, 0);
+  });
 }

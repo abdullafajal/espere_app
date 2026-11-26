@@ -31,6 +31,9 @@ class BudgetInfo {
   /// Day of the month the spending went past the limit (null if it has not).
   final int? ranOutDay;
 
+  /// Spending in this budget's category by day of the month (day → amount).
+  final Map<int, double> daily;
+
   const BudgetInfo({
     this.id,
     this.categoryId,
@@ -42,6 +45,7 @@ class BudgetInfo {
     this.carryOver = false,
     this.carried = 0,
     this.ranOutDay,
+    this.daily = const {},
   });
 
   double get left => math.max(0, limit - spent);
@@ -131,6 +135,7 @@ class BudgetService {
         carryOver: b['carry_over'] == true,
         carried: _num(b['carried']),
         ranOutDay: ranOut(catId, _num(b['amount'])),
+        daily: daily[catId] ?? const {},
       );
     }
     return out;

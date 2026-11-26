@@ -316,9 +316,11 @@ class BudgetsScreenState extends State<BudgetsScreen> {
     final now = DateTime.now();
     final daysInMonth = DateTime(_currentMonth.year, _currentMonth.month + 1, 0).day;
     final daysLeft = _isThisMonth ? daysInMonth - now.day + 1 : 0;
-    // Without a whole-month budget, the category budgets together are the limit.
+    // Without a whole-month budget, the category budgets together are the limit, and
+    // only the spending in those categories counts against it (not every expense).
     final limit = has ? o.limit : _all.fold<double>(0, (a, b) => a + b.limit);
-    final left = limit - o.spent;
+    final spent = has ? o.spent : _all.fold<double>(0, (a, b) => a + b.spent);
+    final left = limit - spent;
     return SpringPress(
       haptic: HapticKind.tap,
       onTap: _isThisMonth ? _setOverall : null,
@@ -326,7 +328,7 @@ class BudgetsScreenState extends State<BudgetsScreen> {
         children: [
           Row(
             children: [
-              _statBox('Spent', _money(o.spent)),
+              _statBox('Spent', _money(spent)),
               const SizedBox(width: 8),
               _statBox(left < 0 ? 'Over by' : 'Left', limit > 0 ? _money(left.abs()) : '—'),
               const SizedBox(width: 8),
@@ -339,7 +341,7 @@ class BudgetsScreenState extends State<BudgetsScreen> {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(3),
               child: LinearProgressIndicator(
-                value: limit <= 0 ? 0 : (o.spent / limit).clamp(0.0, 1.0),
+                value: limit <= 0 ? 0 : (spent / limit).clamp(0.0, 1.0),
                 minHeight: 6,
                 backgroundColor: AppColors.border,
                 color: AppColors.dark,
@@ -355,7 +357,7 @@ class BudgetsScreenState extends State<BudgetsScreen> {
                   child: Text(
                     has
                         ? '${DateFormat('MMMM').format(_currentMonth)} · ${_money(o.limit)} budget'
-                        : (_isThisMonth ? 'Tap to set one budget for the month' : 'No monthly budget'),
+                        : (_isThisMonth ? 'In your budgets · tap to set one for the month' : 'In your budgets'),
                     style: AppText.rowSub.copyWith(
                       fontSize: 11.5,
                       fontWeight: has ? FontWeight.w500 : FontWeight.w700,
