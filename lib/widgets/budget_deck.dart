@@ -7,6 +7,7 @@ library;
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/physics.dart';
 import 'package:intl/intl.dart';
 
 import '../services/budget_service.dart';
@@ -49,15 +50,40 @@ class BudgetDeck extends StatefulWidget {
   State<BudgetDeck> createState() => _BudgetDeckState();
 }
 
-class _BudgetDeckState extends State<BudgetDeck> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 240))
-    ..addListener(() => setState(() => _dx = _from + (_to - _from) * Curves.easeOutCubic.transform(_c.value)));
-  double _dx = 0, _from = 0, _to = 0;
+class _BudgetDeckState extends State<BudgetDeck> with TickerProviderStateMixin {
+  /// The front card's sideways offset in pixels. Driven by the finger while dragging and
+  /// by a spring after letting go. Only the card transforms listen to it, so dragging
+  /// does not rebuild the cards (or the screen).
+  late final AnimationController _dx = AnimationController.unbounded(vsync: this);
   double _width = 300;
+  bool _flying = false;
+  bool _passed = false; // the drag has gone far enough to change card (one tick when it does)
+  bool _touched = false; // the user has dragged the deck (then no hint animation)
 
   /// The first time the deck is shown (once per app run), the card slides a little to
   /// the left and back, to show that it can be swiped.
   static bool _nudged = false;
+
+  /// The app's spring (the nav pill's): arrives with one soft overshoot.
+  static const _spring = AppMotion.move;
+
+  /// The front card's size: springs from a little smaller to full when a new budget comes
+  /// to the front (after a swipe, or a tap in the list), like the nav pill landing.
+  late final AnimationController _land = AnimationController.unbounded(vsync: this, value: 1);
+  bool _ownChange = false; // the index change came from this deck's swipe
+
+  void _landSpring({double from = 0.94, double velocity = 0}) {
+    _land.value = from;
+    _land.animateWith(SpringSimulation(_spring, from, 1, velocity));
+  }
+
+  @override
+  void didUpdateWidget(BudgetDeck old) {
+    super.didUpdateWidget(old);
+    // Picked from the list (not swiped): the new card springs in.
+    if (old.index != widget.index && !_ownChange) _landSpring(from: 0.9);
+    _ownChange = false;
+  }
 
   @override
   void initState() {
@@ -65,37 +91,75 @@ class _BudgetDeckState extends State<BudgetDeck> with SingleTickerProviderStateM
     if (!_nudged && widget.items.length > 1) {
       _nudged = true;
       Future.delayed(const Duration(milliseconds: 700), () async {
-        if (!mounted || _c.isAnimating) return;
-        await _animate(-46);
-        if (!mounted) return;
-        await Future.delayed(const Duration(milliseconds: 120));
-        if (mounted) await _animate(0);
+        if (!mounted || _touched || _flying || _dx.isAnimating) return;
+        await _dx.animateTo(-54, duration: const Duration(milliseconds: 260), curve: Curves.easeOutCubic);
+        if (!mounted || _touched || _flying) return;
+        await _dx.animateWith(SpringSimulation(_spring, _dx.value, 0, 0));
       });
     }
   }
 
   @override
   void dispose() {
-    _c.dispose();
+    _dx.dispose();
+    _land.dispose();
     super.dispose();
   }
 
-  Future<void> _animate(double to) {
-    _from = _dx;
-    _to = to;
-    return _c.forward(from: 0);
+  int get _n => widget.items.length;
+  int get _i => widget.index.clamp(0, _n - 1);
+
+  /// How far the card behind has come forward (0 at rest, 1 when the front card is gone).
+  double get _t => (_dx.value.abs() / (_width * 0.9)).clamp(0.0, 1.0);
+
+  void _dragUpdate(DragUpdateDetails d) {
+    if (_flying) return;
+    _touched = true;
+    _dx.stop();
+    // A single budget only gives a little, like a rubber band.
+    final delta = _n < 2 ? d.delta.dx * 0.25 : d.delta.dx;
+    _dx.value += delta;
+    final past = _dx.value.abs() > _width * 0.28;
+    if (past != _passed) {
+      _passed = past;
+      if (past) AppHaptics.tap();
+    }
   }
 
-  /// Moves to the next (dir 1) or previous (-1) budget: the card flies out, the next one
-  /// slides in.
+  void _dragEnd(DragEndDetails d) {
+    if (_flying) return;
+    final v = d.primaryVelocity ?? 0;
+    final x = _dx.value;
+    _passed = false;
+    if (_n >= 2 && (x.abs() > _width * 0.28 || (v.abs() > 700 && v.sign == x.sign))) {
+      _flyOut(x < 0 ? 1 : -1, v);
+    } else {
+      _dx.animateWith(SpringSimulation(_spring, x, 0, v));
+    }
+  }
+
+  /// The front card flies off ([dir] 1: to the left, next budget; -1: to the right,
+  /// previous). The card behind is already in front by then, so the swap does not jump.
+  Future<void> _flyOut(int dir, [double velocity = 0]) async {
+    _flying = true;
+    final target = -dir * _width * 1.15;
+    final speed = math.max(velocity.abs(), 1600.0);
+    final ms = ((target - _dx.value).abs() / speed * 1000).clamp(120, 320).round();
+    await _dx.animateTo(target, duration: Duration(milliseconds: ms), curve: Curves.easeOutCubic);
+    if (!mounted) return;
+    _ownChange = true;
+    widget.onIndex((_i + dir + _n) % _n);
+    _dx.value = 0;
+    // The card that came forward settles with the app's spring (a small overshoot).
+    _landSpring(from: 0.97, velocity: 0.6);
+    _flying = false;
+  }
+
+  /// Moves to the next (1) or previous (-1) budget, as if swiped (used by the dots).
   Future<void> go(int dir) async {
-    final n = widget.items.length;
-    if (n < 2 || _c.isAnimating) return;
+    if (_n < 2 || _flying) return;
     AppHaptics.tap();
-    await _animate(-dir * _width * 1.2);
-    widget.onIndex((widget.index + dir + n) % n);
-    _dx = dir * 50.0;
-    await _animate(0);
+    await _flyOut(dir);
   }
 
   String _m(double v) =>
@@ -105,59 +169,82 @@ class _BudgetDeckState extends State<BudgetDeck> with SingleTickerProviderStateM
   Widget build(BuildContext context) {
     final items = widget.items;
     if (items.isEmpty) return const SizedBox.shrink();
-    final n = items.length;
-    final i = widget.index.clamp(0, n - 1);
+    final n = _n;
+    final i = _i;
+    // Built once per index change; dragging only moves them.
+    final frontCard = _card(items[i], front: true);
+    final front = RepaintBoundary(
+      // Delete plays the dust animation on the front card.
+      child: widget.snapKeyFor == null
+          ? frontCard
+          : ThanosSnapWidget(key: widget.snapKeyFor!(items[i]), child: frontCard),
+    );
+    final next = n > 1 ? RepaintBoundary(child: _card(items[(i + 1) % n], front: false)) : null;
+    final prev = n > 1 ? RepaintBoundary(child: _card(items[(i - 1 + n) % n], front: false)) : null;
+    final next2 = n > 2 ? RepaintBoundary(child: _card(items[(i + 2) % n], front: false)) : null;
+    final prev2 = n > 2 ? RepaintBoundary(child: _card(items[(i - 2 + n) % n], front: false)) : null;
+
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         LayoutBuilder(builder: (context, box) {
           _width = box.maxWidth;
           return SizedBox(
             height: BudgetDeck.height,
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                if (n > 2) _back(items[(i + 2) % n], 2),
-                if (n > 1) _back(items[(i + 1) % n], 1),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  top: 18,
-                  child: GestureDetector(
-                    onTap: () => widget.onOpen(items[i]),
-                    onHorizontalDragUpdate: n < 2
-                        ? null
-                        : (d) {
-                            _c.stop();
-                            setState(() => _dx += d.delta.dx);
-                          },
-                    onHorizontalDragEnd: n < 2
-                        ? null
-                        : (d) {
-                            final v = d.primaryVelocity ?? 0;
-                            if (_dx.abs() > 70 || v.abs() > 600) {
-                              go(_dx < 0 || v < -600 ? 1 : -1);
-                            } else {
-                              _animate(0);
-                            }
-                          },
-                    child: Transform.translate(
-                      offset: Offset(_dx, 0),
-                      child: Transform.rotate(
-                        angle: _dx / 1400,
-                        child: widget.snapKeyFor == null
-                            ? _card(items[i], front: true)
-                            : ThanosSnapWidget(key: widget.snapKeyFor!(items[i]), child: _card(items[i], front: true)),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => widget.onOpen(items[i]),
+              onHorizontalDragUpdate: _dragUpdate,
+              onHorizontalDragEnd: _dragEnd,
+              child: AnimatedBuilder(
+                animation: Listenable.merge([_dx, _land]),
+                builder: (context, _) {
+                  final x = _dx.value;
+                  final t = _t;
+                  // Dragging right shows the previous budgets behind, left the next ones.
+                  final b1 = x > 0 ? prev : next;
+                  final b2 = x > 0 ? prev2 : next2;
+                  return Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      if (b2 != null) _placed(b2, depth: 2 - t),
+                      if (b1 != null) _placed(b1, depth: 1 - t),
+                      _placed(
+                        Transform.translate(
+                          offset: Offset(x, x.abs() * 0.04),
+                          child: Transform.rotate(
+                            angle: x / (_width * 6),
+                            child: Transform.scale(scale: _land.value, child: front),
+                          ),
+                        ),
+                        depth: 0,
                       ),
-                    ),
-                  ),
-                ),
-              ],
+                    ],
+                  );
+                },
+              ),
             ),
           );
         }),
         const SizedBox(height: 10),
         _indicator(n, i),
       ],
+    );
+  }
+
+  /// Puts a card in the stack: depth 0 is the front, 1 and 2 peek behind (higher,
+  /// smaller, fainter). In between while a card is being swiped away.
+  Widget _placed(Widget card, {required double depth}) {
+    final d = depth.clamp(0.0, 2.0);
+    return Positioned(
+      left: 0,
+      right: 0,
+      top: 18 - 9.0 * d,
+      child: Transform.scale(
+        scale: 1 - 0.06 * d,
+        alignment: Alignment.topCenter,
+        child: Opacity(opacity: (1 - 0.28 * d).clamp(0.0, 1.0), child: card),
+      ),
     );
   }
 
@@ -195,20 +282,6 @@ class _BudgetDeckState extends State<BudgetDeck> with SingleTickerProviderStateM
       ),
     );
   }
-
-  /// A card peeking behind the front one: a little higher, smaller and fainter.
-  Widget _back(BudgetInfo b, int depth) => Positioned(
-        left: 0,
-        right: 0,
-        top: 18 - 9.0 * depth,
-        child: IgnorePointer(
-          child: Transform.scale(
-            scale: 1 - 0.06 * depth,
-            alignment: Alignment.topCenter,
-            child: Opacity(opacity: depth == 1 ? 0.7 : 0.45, child: _card(b, front: false)),
-          ),
-        ),
-      );
 
   Widget _card(BudgetInfo b, {required bool front}) {
     final over = b.spent > b.limit && b.limit > 0;
@@ -392,13 +465,14 @@ class BudgetListRow extends StatelessWidget {
       selected: current,
       label: '${b.name}: $amount ${over ? 'over' : 'left'}',
       excludeSemantics: true,
-      child: Material(
-        color: current ? AppColors.accentSoft : AppColors.card,
-        child: InkWell(
-          onTap: () {
-            AppHaptics.tap();
-            onTap();
-          },
+      // Pressed, the row sinks and springs back like every button in the app.
+      child: SpringPress(
+        haptic: HapticKind.tap,
+        scale: 0.97,
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          color: current ? AppColors.accentSoft : AppColors.card,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(

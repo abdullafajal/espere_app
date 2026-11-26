@@ -135,6 +135,15 @@ void main() {
       ..['cache_budgets'] = jsonEncode({'budgets': bs, 'overall': {'amount': '20000.00'}, 'currency_symbol': '₹'});
     return shot(t, 'budgets_many', const BudgetsScreen(), prefs: prefs, size: const Size(390, 1500));
   });
+  testWidgets('budgets_dragging', (t) => shot(t, 'budgets_dragging', const BudgetsScreen(), act: (t) async {
+        final g = await t.startGesture(t.getTopLeft(find.byType(BudgetDeck)) + const Offset(200, 120));
+        for (var k = 0; k < 10; k++) {
+          await g.moveBy(const Offset(-16, 0));
+          await t.pump(const Duration(milliseconds: 16));
+        }
+        // Keep the finger down while the screenshot is taken.
+        addTearDown(() => g.up());
+      }));
   testWidgets('budget_form', (t) => shot(t, 'budget_form', const BudgetsScreen(), act: (t) async {
         await t.tap(find.byTooltip('New budget'));
       }));
