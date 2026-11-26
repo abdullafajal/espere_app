@@ -627,13 +627,13 @@ class BudgetsScreenState extends State<BudgetsScreen> {
                             ),
                           ),
                           GridView.count(
-                            crossAxisCount: 3,
+                            crossAxisCount: 2,
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
                             padding: EdgeInsets.zero,
-                            mainAxisSpacing: 8,
-                            crossAxisSpacing: 8,
-                            childAspectRatio: 0.98,
+                            mainAxisSpacing: 10,
+                            crossAxisSpacing: 10,
+                            childAspectRatio: 1.32,
                             children: [
                               for (final (i, b) in _shown.indexed)
                                 BudgetGridTile(

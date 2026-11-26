@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:espere_app/widgets/budget_deck.dart';
@@ -120,6 +121,20 @@ void main() {
   testWidgets('budgets_swiped', (t) => shot(t, 'budgets_swiped', const BudgetsScreen(), act: (t) async {
         await t.drag(find.byType(BudgetDeck), const Offset(-220, 0));
       }));
+  testWidgets('budgets_many', (t) {
+    final now = DateTime.now();
+    String d(int day) => DateTime(now.year, now.month, day.clamp(1, now.day), 12).toUtc().toIso8601String();
+    final spend = {0: 6740.0, 6: 2150.0, 3: 2100.0, 9: 1700.0, 2: 1250.0, 1: 1500.0};
+    final limits = {0: '6000', 6: '2000', 3: '2500', 9: '2000', 2: '3000', 1: '4000'};
+    final txns = [
+      for (final e in spend.entries) txn(900 + e.key, e.value.toStringAsFixed(0), 'expense', categories[e.key], 'x', d(e.key + 2)),
+    ];
+    final bs = [for (final e in limits.entries) budget(800 + e.key, categories[e.key], e.value, '0')];
+    final prefs = Map<String, Object>.from(baseCache())
+      ..['cache_transactions'] = jsonEncode({'transactions': txns, 'currency_symbol': '₹'})
+      ..['cache_budgets'] = jsonEncode({'budgets': bs, 'overall': {'amount': '20000.00'}, 'currency_symbol': '₹'});
+    return shot(t, 'budgets_many', const BudgetsScreen(), prefs: prefs, size: const Size(390, 1500));
+  });
   testWidgets('budget_form', (t) => shot(t, 'budget_form', const BudgetsScreen(), act: (t) async {
         await t.tap(find.byTooltip('New budget'));
       }));

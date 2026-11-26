@@ -329,8 +329,10 @@ class _BudgetDeckState extends State<BudgetDeck> with SingleTickerProviderStateM
   }
 }
 
-/// One budget in the "All budgets" grid: a small ring around the icon, %, name and what
-/// is left (dark when over). Tap to bring it to the front of the deck.
+/// One budget in the "All budgets" grid: the icon inside a progress ring, name and how
+/// it repeats, what is left (or over) in large type with the % beside it, and a thin bar
+/// along the bottom. Dark when over. The picked one is outlined. Tap to bring it to the
+/// front of the deck.
 class BudgetGridTile extends StatelessWidget {
   final BudgetInfo budget;
   final bool current;
@@ -349,24 +351,29 @@ class BudgetGridTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final b = budget;
     final over = b.spent > b.limit && b.limit > 0;
+    final near = !over && b.fraction >= 0.8;
     final m = NumberFormat.decimalPatternDigits(locale: 'en_IN', decimalDigits: 0);
-    final line = over ? '$symbol${m.format((b.spent - b.limit).round())} over' : '$symbol${m.format(b.left.round())} left';
+    final amount = '$symbol${m.format((over ? b.spent - b.limit : b.left).round())}';
+    final fg = over ? Colors.white : AppColors.text;
+    final soft = over ? AppColors.darkMuted : AppColors.muted;
+    final barColor = over ? AppColors.accent : (near ? AppColors.dark : AppColors.accent);
     return Semantics(
       button: true,
       selected: current,
-      label: '${b.name}: $line',
+      label: '${b.name}: $amount ${over ? 'over' : 'left'}',
       excludeSemantics: true,
       child: SpringPress(
         haptic: HapticKind.tap,
         onTap: onTap,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.all(10),
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
           decoration: BoxDecoration(
             color: over ? AppColors.dark : AppColors.card,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: current ? AppColors.dark : Colors.transparent, width: 2),
-            boxShadow: AppShadows.soft,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: current ? (over ? AppColors.accent : AppColors.dark) : Colors.transparent, width: 2),
+            boxShadow: current ? AppShadows.elevated : AppShadows.soft,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -374,44 +381,99 @@ class BudgetGridTile extends StatelessWidget {
               Row(
                 children: [
                   SizedBox(
-                    width: 32,
-                    height: 32,
+                    width: 40,
+                    height: 40,
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
                         SizedBox.expand(
-                          child: CircularProgressIndicator(
-                            value: b.fraction.clamp(0.0, 1.0),
-                            strokeWidth: 3,
-                            strokeCap: StrokeCap.round,
-                            backgroundColor: over ? AppColors.darkCardRaised : AppColors.surface,
-                            color: over || b.fraction < 0.8 ? AppColors.accent : AppColors.dark,
+                          child: TweenAnimationBuilder<double>(
+                            tween: Tween(end: b.fraction.clamp(0.0, 1.0)),
+                            duration: const Duration(milliseconds: 600),
+                            curve: Curves.easeOutCubic,
+                            builder: (context, v, _) => CircularProgressIndicator(
+                              value: v,
+                              strokeWidth: 3.5,
+                              strokeCap: StrokeCap.round,
+                              backgroundColor: over ? AppColors.darkCardRaised : AppColors.surface,
+                              color: barColor,
+                            ),
                           ),
                         ),
-                        Icon(IconMapper.map(b.icon), size: 15, color: over ? Colors.white : AppColors.dark),
+                        Icon(IconMapper.map(b.icon), size: 17, color: over ? AppColors.accent : AppColors.dark),
                       ],
                     ),
                   ),
-                  const Spacer(),
-                  Text('${(b.fraction * 100).round()}%',
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(b.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: fg)),
+                        Text(b.repeat ? 'Every month' : 'This month',
+                            maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10.5, color: soft)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text.rich(
+                        TextSpan(children: [
+                          TextSpan(
+                            text: amount,
+                            style: TextStyle(
+                              fontSize: 19,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.5,
+                              color: over ? AppColors.accent : fg,
+                            ),
+                          ),
+                          TextSpan(
+                            text: over ? ' over' : ' left',
+                            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: soft),
+                          ),
+                        ]),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: over ? AppColors.accent : (near ? AppColors.dark : AppColors.surface),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '${(b.fraction * 100).round()}%',
                       style: TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w800,
-                          color: over ? AppColors.accent : AppColors.muted)),
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        color: over ? AppColors.dark : (near ? AppColors.accent : AppColors.text),
+                      ),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 8),
-              Text(b.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: over ? Colors.white : AppColors.text)),
-              const SizedBox(height: 1),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(line,
-                    style: TextStyle(
-                        fontSize: 12.5, fontWeight: FontWeight.w800, color: over ? AppColors.accent : AppColors.text)),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(3),
+                child: LinearProgressIndicator(
+                  value: b.fraction.clamp(0.0, 1.0),
+                  minHeight: 5,
+                  backgroundColor: over ? AppColors.darkCardRaised : AppColors.surface,
+                  color: barColor,
+                ),
               ),
             ],
           ),
