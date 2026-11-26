@@ -107,7 +107,6 @@ void main() {
           await t.tap(find.text(k).last);
           await t.pump(const Duration(milliseconds: 50));
         }
-        await t.tap(find.bySemanticsLabel('Food'));
       }));
   testWidgets('activity', (t) => shot(t, 'activity', const TransactionListScreen()));
   testWidgets('form_new', (t) => shot(t, 'form_new', const QuickAddScreen(prefill: TransactionPrefill(amount: 249, notes: 'Swiggy')), scaffold: false));
@@ -205,6 +204,14 @@ void main() {
       }));
   testWidgets('sheet_group_expense', (t) => shot(t, 'sheet_group_expense', const SplitGroupDetailScreen(groupId: 1, groupName: 'Goa Trip'),
       scaffold: false, act: (t) => t.tap(find.text('Add expense'))));
+  testWidgets('split_category', (t) => shot(t, 'split_category', const SplitGroupDetailScreen(groupId: 1, groupName: 'Goa Trip'),
+      scaffold: false, act: (t) async {
+        await t.tap(find.text('Add expense'));
+        for (var i = 0; i < 8; i++) {
+          await t.pump(const Duration(milliseconds: 120));
+        }
+        await t.tap(find.byIcon(Icons.expand_more_rounded).first);
+      }));
   testWidgets('sheet_new_group', (t) => shot(t, 'sheet_new_group', SplitGroupsScreen(onBack: () {}),
       scaffold: false, act: (t) async {
         await t.tap(find.byTooltip('New group'));

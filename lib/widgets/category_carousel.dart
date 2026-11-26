@@ -1,0 +1,437 @@
+/// Picking a category by swiping: the picked one is a big dark card in the middle, the
+/// next and previous ones peek at the sides. Drag (or flick) to move; it settles on the
+/// app's spring. Tap a side card to bring it to the middle, tap the middle card (or
+/// "All") to see every category in a searchable list. Used on Add expense, Edit and the
+/// Split "new expense" screen, so picking a category feels the same everywhere.
+library;
+
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
+import 'package:flutter/physics.dart';
+
+import '../theme/app_theme.dart';
+import '../theme/motion.dart';
+
+class CarouselCategory {
+  final String label;
+  final IconData icon;
+
+  /// A line under the name, e.g. "₹2,653 left" (null: none).
+  final String? note;
+
+  /// How much of its budget is used (0-1+), for the list's bar (null: no budget).
+  final double? used;
+
+  /// The "New category" card (tap opens [CategoryCarousel.onNew]).
+  final bool isNew;
+
+  const CarouselCategory({
+    required this.label,
+    required this.icon,
+    this.note,
+    this.used,
+    this.isNew = false,
+  });
+}
+
+class CategoryCarousel extends StatefulWidget {
+  final List<CarouselCategory> items;
+  final int index;
+  final ValueChanged<int> onChanged;
+  final VoidCallback? onNew;
+
+  /// Dark cards on a dark background (inside a dark sheet) instead of the light sheet.
+  final bool onDark;
+
+  const CategoryCarousel({
+    super.key,
+    required this.items,
+    required this.index,
+    required this.onChanged,
+    this.onNew,
+    this.onDark = false,
+  });
+
+  @override
+  State<CategoryCarousel> createState() => _CategoryCarouselState();
+}
+
+class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerProviderStateMixin {
+  static const double _gap = 108; // between card centres
+  late final AnimationController _pos =
+      AnimationController.unbounded(vsync: this, value: widget.index.toDouble())..addListener(_onMove);
+  int _shown = 0; // the index last reported
+
+  @override
+  void initState() {
+    super.initState();
+    _shown = widget.index;
+  }
+
+  @override
+  void didUpdateWidget(CategoryCarousel old) {
+    super.didUpdateWidget(old);
+    // Picked elsewhere (the list, or the screen chose a default): glide there.
+    if (widget.index != _shown && !_pos.isAnimating) {
+      _shown = widget.index;
+      _settle(widget.index, 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _pos.dispose();
+    super.dispose();
+  }
+
+  int get _n => widget.items.length;
+
+  void _onMove() {
+    final i = _pos.value.round().clamp(0, _n - 1);
+    if (i != _shown) {
+      _shown = i;
+      AppHaptics.tap();
+      widget.onChanged(i);
+    }
+  }
+
+  void _settle(int target, double velocity) {
+    _pos.animateWith(SpringSimulation(AppMotion.move, _pos.value, target.toDouble(), velocity));
+  }
+
+  void _dragStart(DragStartDetails d) => _pos.stop();
+
+  void _dragUpdate(DragUpdateDetails d) {
+    var p = _pos.value - d.delta.dx / _gap;
+    // Past either end it gives like a rubber band.
+    if (p < 0) p = _pos.value - d.delta.dx / _gap * 0.3;
+    if (p > _n - 1) p = _pos.value - d.delta.dx / _gap * 0.3;
+    _pos.value = p;
+  }
+
+  void _dragEnd(DragEndDetails d) {
+    final v = -(d.primaryVelocity ?? 0) / _gap; // cards per second
+    final projected = _pos.value + v * 0.18; // a flick carries on a little
+    final target = projected.round().clamp(0, _n - 1);
+    _settle(target, v);
+  }
+
+  void _tapAt(double dx, double width) {
+    final hit = (_pos.value + (dx - width / 2) / _gap).round().clamp(0, _n - 1);
+    if (hit == _pos.value.round()) {
+      final item = widget.items[hit];
+      if (item.isNew) {
+        widget.onNew?.call();
+      } else {
+        _openAll();
+      }
+    } else {
+      AppHaptics.tap();
+      _settle(hit, 0);
+    }
+  }
+
+  Future<void> _openAll() async {
+    AppHaptics.tap();
+    final picked = await showCategoryList(context, widget.items, _pos.value.round());
+    if (picked != null && mounted) {
+      _settle(picked, 0);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_n == 0) return const SizedBox(height: 150);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        LayoutBuilder(builder: (context, box) {
+          final w = box.maxWidth;
+          return GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onHorizontalDragStart: _dragStart,
+            onHorizontalDragUpdate: _dragUpdate,
+            onHorizontalDragEnd: _dragEnd,
+            onTapUp: (d) => _tapAt(d.localPosition.dx, w),
+            child: SizedBox(
+              height: 142,
+              child: AnimatedBuilder(
+                animation: _pos,
+                builder: (context, _) {
+                  final p = _pos.value;
+                  final c = p.round();
+                  final order = <int>[
+                    for (var k = c - 3; k <= c + 3; k++)
+                      if (k >= 0 && k < _n) k
+                  ]..sort((a, b) => (b - p).abs().compareTo((a - p).abs()));
+                  return Stack(
+                    clipBehavior: Clip.none,
+                    children: [for (final i in order) _placed(i, p, w)],
+                  );
+                },
+              ),
+            ),
+          );
+        }),
+        const SizedBox(height: 6),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.swipe_rounded, size: 15, color: widget.onDark ? AppColors.darkMuted : AppColors.muted),
+            const SizedBox(width: 6),
+            Text('Swipe', style: AppText.rowSub.copyWith(fontSize: 11.5, color: widget.onDark ? AppColors.darkMuted : null)),
+            const SizedBox(width: 10),
+            SpringPress(
+              haptic: HapticKind.none,
+              onTap: _openAll,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: widget.onDark ? AppColors.darkCard : AppColors.surface,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Text(
+                  'All ${widget.items.where((e) => !e.isNew).length}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: widget.onDark ? Colors.white : AppColors.text,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// One card at its place for scroll position [p]: the middle one big and dark, the
+  /// others smaller and lighter, fading out further away.
+  Widget _placed(int i, double p, double width) {
+    final d = i - p;
+    final a = d.abs();
+    final scale = 1 - math.min(a, 1.4) * 0.16;
+    final x = d * _gap - d.sign * math.max(0, a - 1) * 18;
+    final opacity = (1 - math.max(0.0, a - 1) * 0.6).clamp(0.0, 1.0);
+    final mid = a < 0.5;
+    final item = widget.items[i];
+    const cw = 116.0, ch = 130.0;
+    return Positioned(
+      left: width / 2 - cw / 2,
+      top: (142 - ch) / 2,
+      child: Opacity(
+        opacity: opacity,
+        child: Transform.translate(
+          offset: Offset(x, 0),
+          child: Transform.scale(scale: scale, child: _card(item, mid, cw, ch)),
+        ),
+      ),
+    );
+  }
+
+  Widget _card(CarouselCategory item, bool mid, double w, double h) {
+    final bg = mid ? AppColors.dark : (widget.onDark ? AppColors.darkCard : AppColors.surface);
+    final iconBg = mid ? AppColors.darkCardRaised : (widget.onDark ? AppColors.darkCardRaised : AppColors.card);
+    final fg = mid || widget.onDark ? Colors.white : AppColors.muted;
+    return Container(
+      width: w,
+      height: h,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(26),
+        boxShadow: mid ? const [BoxShadow(color: Color(0x38000000), blurRadius: 22, offset: Offset(0, 10))] : null,
+        border: mid && widget.onDark ? Border.all(color: AppColors.accent, width: 2) : null,
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              color: item.isNew ? Colors.transparent : iconBg,
+              borderRadius: BorderRadius.circular(17),
+              border: item.isNew ? Border.all(color: AppColors.mutedLight, width: 1.5) : null,
+            ),
+            child: Icon(item.icon, size: 24, color: mid ? AppColors.accent : (widget.onDark ? Colors.white : AppColors.dark)),
+          ),
+          const SizedBox(height: 7),
+          Text(
+            item.label,
+            maxLines: 2,
+            textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 12, height: 1.2, fontWeight: FontWeight.w700, color: fg),
+          ),
+          const SizedBox(height: 2),
+          SizedBox(
+            height: 14,
+            child: item.note == null
+                ? null
+                : FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      item.note!,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: mid ? AppColors.accent : AppColors.muted,
+                      ),
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Every category in a sheet: a search box, those with a budget first (with what is
+/// left and a bar), then the rest. Resolves to the picked index, or null.
+Future<int?> showCategoryList(BuildContext context, List<CarouselCategory> items, int current) {
+  return showModalBottomSheet<int>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => _CategoryListSheet(items: items, current: current),
+  );
+}
+
+class _CategoryListSheet extends StatefulWidget {
+  final List<CarouselCategory> items;
+  final int current;
+  const _CategoryListSheet({required this.items, required this.current});
+
+  @override
+  State<_CategoryListSheet> createState() => _CategoryListSheetState();
+}
+
+class _CategoryListSheetState extends State<_CategoryListSheet> {
+  String _q = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final match = [
+      for (final (i, c) in widget.items.indexed)
+        if (!c.isNew && c.label.toLowerCase().contains(_q.toLowerCase())) (i, c)
+    ];
+    final withBudget = match.where((e) => e.$2.used != null).toList();
+    final others = match.where((e) => e.$2.used == null).toList();
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.78,
+      decoration: const BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: EdgeInsets.fromLTRB(16, 10, 16, MediaQuery.of(context).viewInsets.bottom),
+      child: Column(
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            height: 46,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(16)),
+            child: Row(
+              children: [
+                const Icon(Icons.search_rounded, size: 20, color: AppColors.muted),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    autofocus: false,
+                    onChanged: (v) => setState(() => _q = v.trim()),
+                    decoration: const InputDecoration(
+                      hintText: 'Search categories',
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      filled: false,
+                      isDense: true,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.only(top: 4, bottom: 24),
+              children: [
+                if (withBudget.isNotEmpty) _label('WITH A BUDGET'),
+                for (final (i, c) in withBudget) _row(i, c),
+                if (others.isNotEmpty) _label(withBudget.isEmpty ? 'CATEGORIES' : 'OTHERS'),
+                for (final (i, c) in others) _row(i, c),
+                if (match.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text('No category called "$_q"', textAlign: TextAlign.center, style: AppText.rowSub),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _label(String t) => Padding(
+        padding: const EdgeInsets.fromLTRB(4, 14, 4, 4),
+        child: Text(t, style: AppText.label),
+      );
+
+  Widget _row(int i, CarouselCategory c) {
+    final current = i == widget.current;
+    return SpringPress(
+      haptic: HapticKind.tap,
+      scale: 0.97,
+      onTap: () => Navigator.pop(context, i),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+        decoration: BoxDecoration(
+          color: current ? AppColors.accentSoft : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(14)),
+              child: Icon(c.icon, size: 21, color: AppColors.dark),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(c.label, style: AppText.rowTitle),
+                  if (c.note != null) Text(c.note!, style: AppText.rowSub),
+                ],
+              ),
+            ),
+            if (c.used != null)
+              SizedBox(
+                width: 64,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: LinearProgressIndicator(
+                    value: c.used!.clamp(0.0, 1.0),
+                    minHeight: 5,
+                    backgroundColor: AppColors.surface,
+                    color: c.used! >= 0.8 ? AppColors.dark : AppColors.accent,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}

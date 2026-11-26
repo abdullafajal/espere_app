@@ -15,6 +15,8 @@ import '../theme/app_theme.dart';
 import '../theme/motion.dart';
 import '../utils/pickers.dart';
 import '../widgets/spring_tabs.dart';
+import '../widgets/category_carousel.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class GroupExpenseScreen extends StatefulWidget {
   final int groupId;
@@ -66,8 +68,46 @@ class _GroupExpenseScreenState extends State<GroupExpenseScreen> with SingleTick
       ? null
       : widget.editData!['category'].toString();
 
+  /// Split categories, most used first (counted on this phone).
+  List<GroupCategory> _catOrder = groupCategories;
+  bool _hasUses = false;
+  static const _usesKey = 'group_category_uses';
+
+  Future<void> _loadCatOrder() async {
+    final prefs = await SharedPreferences.getInstance();
+    final uses = <String, int>{};
+    for (final e in prefs.getStringList(_usesKey) ?? const <String>[]) {
+      final parts = e.split('=');
+      if (parts.length == 2) uses[parts[0]] = int.tryParse(parts[1]) ?? 0;
+    }
+    if (uses.isEmpty || !mounted) return;
+    final order = {for (final (i, c) in groupCategories.indexed) c.key: i};
+    setState(() {
+      _hasUses = true;
+      _catOrder = [...groupCategories]
+        ..sort((a, b) {
+          final byUse = (uses[b.key] ?? 0).compareTo(uses[a.key] ?? 0);
+          return byUse != 0 ? byUse : order[a.key]!.compareTo(order[b.key]!);
+        });
+    });
+  }
+
+  Future<void> _countUse(String key) async {
+    final prefs = await SharedPreferences.getInstance();
+    final uses = <String, int>{};
+    for (final e in prefs.getStringList(_usesKey) ?? const <String>[]) {
+      final parts = e.split('=');
+      if (parts.length == 2) uses[parts[0]] = int.tryParse(parts[1]) ?? 0;
+    }
+    uses[key] = (uses[key] ?? 0) + 1;
+    await prefs.setStringList(_usesKey, [for (final e in uses.entries) '${e.key}=${e.value}']);
+  }
+
+  /// Picked by hand, else what the words suggest, else the most used one.
   GroupCategory get _cat =>
-      groupCategoryByKey(_category) ?? guessGroupCategory(_desc.text) ?? groupCategories.last;
+      groupCategoryByKey(_category) ??
+      guessGroupCategory(_desc.text) ??
+      (_hasUses ? _catOrder.first : groupCategories.last);
 
   List<Map<String, dynamic>> get _people => widget.members;
 
@@ -87,6 +127,7 @@ class _GroupExpenseScreenState extends State<GroupExpenseScreen> with SingleTick
   @override
   void initState() {
     super.initState();
+    _loadCatOrder();
     for (final m in _people) {
       _values[m['id'] as int] = TextEditingController();
     }
@@ -254,6 +295,7 @@ class _GroupExpenseScreenState extends State<GroupExpenseScreen> with SingleTick
     setState(() => _saving = false);
     if (r.isSuccess) {
       AppHaptics.confirm();
+      _countUse(_cat.key);
       Navigator.of(context).pop(true);
     } else {
       _fail(r.error ?? 'Could not save. Try again.');
@@ -411,54 +453,50 @@ class _GroupExpenseScreenState extends State<GroupExpenseScreen> with SingleTick
         ),
       );
 
-  /// All categories in a grid; tap one to pick it.
+  /// The category carousel (the same as on Add expense), most used first. Swiping
+  /// changes the category at once; Done (or tapping outside) closes it.
   void _pickCategory() {
+    final items = [for (final c in _catOrder) CarouselCategory(label: c.label, icon: c.icon)];
+    var index = _catOrder.indexWhere((c) => c.key == _cat.key).clamp(0, _catOrder.length - 1);
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.card,
-      builder: (ctx) => SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
-            ),
-            const SizedBox(height: 14),
-            const Text('Category', style: AppText.section),
-            const SizedBox(height: 14),
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 4,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: 0.95,
-              children: [
-                for (final c in groupCategories)
-                  SpringPress(
-                    onTap: () {
-                      setState(() => _category = c.key);
-                      Navigator.pop(ctx);
-                    },
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: c.key == _cat.key ? AppColors.accent : AppColors.surface,
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                        Icon(c.icon, size: 24, color: AppColors.dark),
-                        const SizedBox(height: 6),
-                        Text(c.label,
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.dark)),
-                      ]),
-                    ),
-                  ),
-              ],
-            ),
-          ]),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
+              ),
+              const SizedBox(height: 14),
+              Row(children: [
+                const Expanded(child: Text('Category', style: AppText.section)),
+                Text('${index + 1} of ${items.length}', style: AppText.rowSub),
+              ]),
+              const SizedBox(height: 10),
+              CategoryCarousel(
+                items: items,
+                index: index,
+                onChanged: (i) {
+                  setSheet(() => index = i);
+                  setState(() => _category = _catOrder[i].key);
+                },
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: FilledButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text('Use ${_catOrder[index].label}'),
+                ),
+              ),
+            ]),
+          ),
         ),
       ),
     );
