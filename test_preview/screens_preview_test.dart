@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:espere_app/widgets/budget_deck.dart';
 import 'package:intl/intl.dart';
 import 'package:espere_app/theme/app_theme.dart';
 
@@ -116,11 +117,14 @@ void main() {
       ),
       scaffold: false));
   testWidgets('budgets', (t) => shot(t, 'budgets', const BudgetsScreen()));
+  testWidgets('budgets_swiped', (t) => shot(t, 'budgets_swiped', const BudgetsScreen(), act: (t) async {
+        await t.drag(find.byType(BudgetDeck), const Offset(-220, 0));
+      }));
   testWidgets('budget_form', (t) => shot(t, 'budget_form', const BudgetsScreen(), act: (t) async {
         await t.tap(find.byTooltip('New budget'));
       }));
   testWidgets('budget_detail', (t) => shot(t, 'budget_detail', const BudgetsScreen(), act: (t) async {
-        await t.tap(find.text('Shopping').first);
+        await t.tapAt(t.getTopLeft(find.byType(BudgetDeck)) + const Offset(120, 140));
       }));
   testWidgets('reports', (t) => shot(t, 'reports', const ReportsScreen(), scaffold: false, size: const Size(390, 1800)));
   testWidgets('categories', (t) => shot(t, 'categories', const CategoriesScreen(), scaffold: false));

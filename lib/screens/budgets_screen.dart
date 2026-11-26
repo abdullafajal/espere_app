@@ -15,10 +15,10 @@ import '../utils/app_toast.dart';
 import '../utils/icon_mapper.dart';
 import '../models/category.dart';
 import '../widgets/espere_back_button.dart';
-import '../widgets/budget_tile.dart';
 import '../widgets/morph_text.dart';
 import '../services/budget_service.dart';
 import 'budget_detail_screen.dart';
+import '../widgets/budget_deck.dart';
 import 'dart:async';
 
 class BudgetsScreen extends StatefulWidget {
@@ -43,6 +43,10 @@ class BudgetsScreenState extends State<BudgetsScreen> {
 
   /// Category budgets with what is spent counted on the phone (fresher than the server).
   Map<int, BudgetInfo> _local = const {};
+
+  /// Which budgets the deck and grid show: all, over, near (80%+) or ok.
+  String _filter = 'all';
+  int _deckIndex = 0;
 
   StreamSubscription<void>? _syncSub;
 
@@ -84,20 +88,43 @@ class BudgetsScreenState extends State<BudgetsScreen> {
     }
   }
 
-  double? _spentOf(Map<String, dynamic> b) {
-    final cat = b['category'];
-    final id = int.tryParse(((cat is Map ? cat['id'] : null) ?? b['category_id'])?.toString() ?? '');
-    return id == null ? null : _local[id]?.spent;
+  /// This month's budgets with phone-counted spending, fullest first (over, then near).
+  List<BudgetInfo> get _all {
+    final out = <BudgetInfo>[];
+    for (final b in _budgets) {
+      final cat = b['category'];
+      final id = int.tryParse(((cat is Map ? cat['id'] : null) ?? b['category_id'])?.toString() ?? '');
+      final local = id == null ? null : _local[id];
+      out.add(local ??
+          BudgetInfo(
+            id: int.tryParse(b['id']?.toString() ?? ''),
+            categoryId: id,
+            name: (cat is Map ? cat['name'] : null)?.toString() ?? 'Category',
+            icon: (cat is Map ? cat['icon'] : null)?.toString() ?? 'category',
+            limit: double.tryParse(b['amount'].toString()) ?? 0,
+            spent: double.tryParse(b['spent']?.toString() ?? '') ?? 0,
+            repeat: b['repeat'] != false,
+            carried: double.tryParse(b['carried']?.toString() ?? '') ?? 0,
+          ));
+    }
+    return out..sort((a, b) => b.fraction.compareTo(a.fraction));
   }
 
-  /// Fullest first, so what needs attention is on top.
-  List<Map<String, dynamic>> get _sorted {
-    double f(Map<String, dynamic> b) {
-      final limit = double.tryParse(b['amount'].toString()) ?? 0;
-      final spent = _spentOf(b) ?? (double.tryParse(b['spent']?.toString() ?? '') ?? 0);
-      return limit <= 0 ? 0 : spent / limit;
-    }
-    return [..._budgets]..sort((a, b) => f(b).compareTo(f(a)));
+  static String _kind(BudgetInfo b) => b.limit <= 0
+      ? 'ok'
+      : b.spent > b.limit
+          ? 'over'
+          : (b.fraction >= 0.8 ? 'near' : 'ok');
+
+  List<BudgetInfo> get _shown => _filter == 'all' ? _all : _all.where((b) => _kind(b) == _filter).toList();
+
+  /// Runs [action] with the budget map behind a deck card.
+  void _withBudget(BudgetInfo b, void Function(Map<String, dynamic>) action) {
+    final m = _budgets.where((x) {
+      final cat = x['category'];
+      return ((cat is Map ? cat['id'] : null) ?? x['category_id'])?.toString() == b.categoryId?.toString();
+    }).firstOrNull;
+    if (m != null) action(m);
   }
 
   Future<void> _loadBudgets() async {
@@ -281,157 +308,142 @@ class BudgetsScreenState extends State<BudgetsScreen> {
     ).then((_) => _loadBudgets());
   }
 
-  /// The whole month at a glance: spent of the limit, days left and what that allows
-  /// per day. Without a limit it offers to set one.
-  Widget _overallCard() {
+  /// The month at a glance: Spent / Left / Per day, a thin bar and the budget line.
+  /// Tap to set or change the whole-month budget.
+  Widget _summary() {
     final o = _overall;
     final has = o.limit > 0;
     final now = DateTime.now();
     final daysInMonth = DateTime(_currentMonth.year, _currentMonth.month + 1, 0).day;
     final daysLeft = _isThisMonth ? daysInMonth - now.day + 1 : 0;
-    final title = '${DateFormat('MMMM').format(_currentMonth)} budget';
+    // Without a whole-month budget, the category budgets together are the limit.
+    final limit = has ? o.limit : _all.fold<double>(0, (a, b) => a + b.limit);
+    final left = limit - o.spent;
     return SpringPress(
       haptic: HapticKind.tap,
       onTap: _isThisMonth ? _setOverall : null,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
-        decoration: BoxDecoration(
-          color: AppColors.dark,
-          borderRadius: BorderRadius.circular(AppRadius.xxl),
-          boxShadow: AppShadows.elevated,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      child: Column(
+        children: [
+          Row(
+            children: [
+              _statBox('Spent', _money(o.spent)),
+              const SizedBox(width: 8),
+              _statBox(left < 0 ? 'Over by' : 'Left', limit > 0 ? _money(left.abs()) : '—'),
+              const SizedBox(width: 8),
+              _statBox('Per day', limit > 0 && left > 0 && daysLeft > 0 ? _money(left / daysLeft) : '—'),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(3),
+              child: LinearProgressIndicator(
+                value: limit <= 0 ? 0 : (o.spent / limit).clamp(0.0, 1.0),
+                minHeight: 6,
+                backgroundColor: AppColors.border,
+                color: AppColors.dark,
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Row(
               children: [
-                Expanded(child: Text(title, style: const TextStyle(fontSize: 13, color: AppColors.darkMuted))),
-                if (has && _isThisMonth)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(color: AppColors.darkCardRaised, borderRadius: BorderRadius.circular(12)),
-                    child: Text('$daysLeft ${daysLeft == 1 ? 'day' : 'days'} left',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.accent)),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  MorphText(id: 'budget-overall', _money(o.spent),
-                      style: AppText.hero.copyWith(color: Colors.white, fontSize: 30, letterSpacing: -1)),
-                  if (has) ...[
-                    const SizedBox(width: 8),
-                    MorphText(id: 'budget-overall', 'of ${_money(o.limit)}',
-                        style: const TextStyle(fontSize: 13, color: AppColors.darkMuted)),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            if (has) ...[
-              ClipRRect(
-                borderRadius: BorderRadius.circular(5),
-                child: TweenAnimationBuilder<double>(
-                  tween: Tween(end: o.fraction.clamp(0.0, 1.0)),
-                  duration: const Duration(milliseconds: 600),
-                  curve: Curves.easeOutCubic,
-                  builder: (context, v, _) => LinearProgressIndicator(
-                    value: v,
-                    minHeight: 10,
-                    backgroundColor: AppColors.darkCardRaised,
-                    color: AppColors.accent,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  _stat(o.spent > o.limit ? 'Over by' : 'Left', _money((o.spent - o.limit).abs())),
-                  const SizedBox(width: 8),
-                  _stat('Per day', _isThisMonth && o.left > 0 ? _money(o.left / daysLeft) : '—'),
-                  const SizedBox(width: 8),
-                  _stat('In categories', _money(_local.values.fold<double>(0, (a, b) => a + b.limit))),
-                ],
-              ),
-            ] else
-              Row(
-                children: [
-                  Icon(Icons.add_circle_rounded, size: 18, color: AppColors.accent),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      _isThisMonth ? 'Set one limit for the whole month' : 'No monthly budget was set',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.accent),
+                Expanded(
+                  child: Text(
+                    has
+                        ? '${DateFormat('MMMM').format(_currentMonth)} · ${_money(o.limit)} budget'
+                        : (_isThisMonth ? 'Tap to set one budget for the month' : 'No monthly budget'),
+                    style: AppText.rowSub.copyWith(
+                      fontSize: 11.5,
+                      fontWeight: has ? FontWeight.w500 : FontWeight.w700,
+                      color: has ? AppColors.muted : AppColors.text,
                     ),
                   ),
-                ],
+                ),
+                if (_isThisMonth)
+                  Text('$daysLeft ${daysLeft == 1 ? 'day' : 'days'} left', style: AppText.rowSub.copyWith(fontSize: 11.5)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statBox(String label, String value) => Expanded(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: AppShadows.soft,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, maxLines: 1, style: AppText.rowSub.copyWith(fontSize: 11)),
+              const SizedBox(height: 2),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: MorphText(id: 'bsum-$label', value, style: AppText.amount.copyWith(fontSize: 15)),
+              ),
+            ],
+          ),
+        ),
+      );
+
+  /// All / Over / Near limit / On track, with counts.
+  Widget _filters() {
+    final all = _all;
+    int count(String k) => all.where((b) => _kind(b) == k).length;
+    final options = [
+      ('all', 'All ${all.length}'),
+      if (count('over') > 0) ('over', 'Over ${count('over')}'),
+      if (count('near') > 0) ('near', 'Near limit ${count('near')}'),
+      if (count('ok') > 0) ('ok', 'On track ${count('ok')}'),
+    ];
+    if (!options.any((o) => o.$1 == _filter)) _filter = 'all';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 16, 0, 4),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        clipBehavior: Clip.none,
+        child: Row(
+          children: [
+            for (final (key, label) in options)
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: SpringPress(
+                  haptic: HapticKind.tap,
+                  onTap: () => setState(() {
+                    _filter = key;
+                    _deckIndex = 0;
+                  }),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: _filter == key ? AppColors.dark : AppColors.card,
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Text(label,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: _filter == key ? AppColors.accent : AppColors.text,
+                        )),
+                  ),
+                ),
               ),
           ],
         ),
       ),
     );
   }
-
-  /// "BY CATEGORY" with how many budgets are over / near the limit.
-  Widget _categoryHeader() {
-    var over = 0, near = 0;
-    for (final b in _budgets) {
-      final limit = double.tryParse(b['amount'].toString()) ?? 0;
-      final spent = _spentOf(b) ?? (double.tryParse(b['spent']?.toString() ?? '') ?? 0);
-      if (limit <= 0) continue;
-      if (spent > limit) {
-        over++;
-      } else if (spent >= limit * 0.8) {
-        near++;
-      }
-    }
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(6, 20, 2, 8),
-      child: Row(
-        children: [
-          Expanded(child: Text('BY CATEGORY', style: AppText.label)),
-          if (over > 0) _pill('$over over', dark: true),
-          if (near > 0) ...[const SizedBox(width: 6), _pill('$near near limit')],
-          if (over == 0 && near == 0 && _budgets.isNotEmpty) _pill('All on track'),
-        ],
-      ),
-    );
-  }
-
-  Widget _pill(String text, {bool dark = false}) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: dark ? AppColors.dark : AppColors.card,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text(text,
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: dark ? AppColors.accent : AppColors.text)),
-      );
-
-  Widget _stat(String label, String value) => Expanded(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-          decoration: BoxDecoration(color: AppColors.darkCard, borderRadius: BorderRadius.circular(14)),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, maxLines: 1, style: const TextStyle(fontSize: 11, color: AppColors.darkMuted)),
-              const SizedBox(height: 2),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Colors.white)),
-              ),
-            ],
-          ),
-        ),
-      );
 
   Widget _emptyCategories() => Container(
         padding: const EdgeInsets.all(18),
@@ -579,42 +591,61 @@ class BudgetsScreenState extends State<BudgetsScreen> {
                   child: ListView(
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
                     children: [
-                      _overallCard(),
-                      _categoryHeader(),
-                      if (_budgets.isEmpty)
-                        _emptyCategories()
-                      else
-                        Container(
-                          decoration: BoxDecoration(
-                            color: AppColors.card,
-                            borderRadius: BorderRadius.circular(AppRadius.xxl),
-                            boxShadow: AppShadows.soft,
+                      _summary(),
+                      if (_budgets.isEmpty) ...[
+                        const SizedBox(height: 18),
+                        _emptyCategories(),
+                      ] else ...[
+                        _filters(),
+                        if (_shown.isEmpty)
+                          Container(
+                            padding: const EdgeInsets.all(22),
+                            decoration: BoxDecoration(color: AppColors.card, borderRadius: BorderRadius.circular(AppRadius.xxl)),
+                            child: const Text('No budgets in this group.', textAlign: TextAlign.center, style: AppText.rowSub),
+                          )
+                        else ...[
+                          BudgetDeck(
+                            items: _shown,
+                            index: _deckIndex.clamp(0, _shown.length - 1),
+                            onIndex: (i) => setState(() => _deckIndex = i),
+                            month: _currentMonth,
+                            symbol: _currencySymbol,
+                            onOpen: (b) => _withBudget(b, _openBudget),
+                            onEdit: (b) => _withBudget(b, _showBudgetForm),
+                            snapKeyFor: (b) => _budgetSnapKeys.putIfAbsent(b.id ?? -1, () => GlobalKey<ThanosSnapWidgetState>()),
+                            onDelete: (b) => _withBudget(b, (m) => _deleteBudget(
+                                _budgetSnapKeys.putIfAbsent(m['id'], () => GlobalKey<ThanosSnapWidgetState>()), m['id'])),
                           ),
-                          clipBehavior: Clip.antiAlias,
-                          child: Column(
-                            children: [
-                              for (final (i, budget) in _sorted.indexed) ...[
-                                if (i > 0) const Divider(height: 1, indent: 68, color: AppColors.border),
-                                Builder(builder: (context) {
-                                  final snapKey = _budgetSnapKeys.putIfAbsent(
-                                      budget['id'], () => GlobalKey<ThanosSnapWidgetState>());
-                                  return ThanosSnapWidget(
-                                    key: snapKey,
-                                    child: BudgetTile(
-                                      budget: budget,
-                                      currencySymbol: _currencySymbol,
-                                      spent: _spentOf(budget),
-                                      grouped: true,
-                                      onTap: () => _openBudget(budget),
-                                      onEdit: () => _showBudgetForm(budget),
-                                      onDelete: () => _deleteBudget(snapKey, budget['id']),
-                                    ),
-                                  );
-                                }),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(6, 20, 6, 8),
+                            child: Row(
+                              children: [
+                                Expanded(child: Text('ALL BUDGETS', style: AppText.label)),
+                                Text('${_shown.length} ${_shown.length == 1 ? 'budget' : 'budgets'}',
+                                    style: AppText.label.copyWith(letterSpacing: 0.4)),
                               ],
+                            ),
+                          ),
+                          GridView.count(
+                            crossAxisCount: 3,
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            padding: EdgeInsets.zero,
+                            mainAxisSpacing: 8,
+                            crossAxisSpacing: 8,
+                            childAspectRatio: 0.98,
+                            children: [
+                              for (final (i, b) in _shown.indexed)
+                                BudgetGridTile(
+                                  budget: b,
+                                  current: i == _deckIndex.clamp(0, _shown.length - 1),
+                                  symbol: _currencySymbol,
+                                  onTap: () => setState(() => _deckIndex = i),
+                                ),
                             ],
                           ),
-                        ),
+                        ],
+                      ],
                       const SizedBox(height: 8),
                       const NavBottomSpace(),
                     ],

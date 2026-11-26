@@ -28,6 +28,9 @@ class BudgetInfo {
   final bool carryOver;
   final double carried;
 
+  /// Day of the month the spending went past the limit (null if it has not).
+  final int? ranOutDay;
+
   const BudgetInfo({
     this.id,
     this.categoryId,
@@ -38,6 +41,7 @@ class BudgetInfo {
     this.repeat = true,
     this.carryOver = false,
     this.carried = 0,
+    this.ranOutDay,
   });
 
   double get left => math.max(0, limit - spent);
@@ -55,6 +59,24 @@ class BudgetService {
   static String monthKey(DateTime m) => '${m.year}-${m.month.toString().padLeft(2, '0')}';
 
   static double _num(Object? v) => double.tryParse(v?.toString() ?? '') ?? 0;
+
+  /// Expenses of [month] per category and day of the month (category id → day → amount).
+  static Future<Map<int, Map<int, double>>> _daily(DateTime month) async {
+    final cached = await CacheService.getCachedTransactions();
+    final list = ((cached?['transactions'] as List?) ?? const []).whereType<Map>();
+    final out = <int, Map<int, double>>{};
+    for (final t in list) {
+      if (t['type'] != 'expense') continue;
+      final at = DateTime.tryParse(t['date']?.toString() ?? '')?.toLocal();
+      if (at == null || at.year != month.year || at.month != month.month) continue;
+      final cat = t['category'];
+      final id = cat is Map ? int.tryParse(cat['id']?.toString() ?? '') : null;
+      if (id == null) continue;
+      final days = out.putIfAbsent(id, () => {});
+      days[at.day] = (days[at.day] ?? 0) + _num(t['amount']);
+    }
+    return out;
+  }
 
   /// Expenses of [month] from the phone's copy: total and per category id.
   static Future<(double, Map<int, double>)> _spent(DateTime month) async {
@@ -81,6 +103,17 @@ class BudgetService {
     final cached = await CacheService.getCachedBudgets();
     final list = ((cached?['budgets'] as List?) ?? const []).whereType<Map>();
     final (_, spent) = await _spent(m);
+    final daily = await _daily(m);
+    int? ranOut(int catId, double limit) {
+      final days = daily[catId];
+      if (days == null || limit <= 0) return null;
+      var sum = 0.0;
+      for (var d = 1; d <= 31; d++) {
+        sum += days[d] ?? 0;
+        if (sum > limit) return d;
+      }
+      return null;
+    }
     final out = <int, BudgetInfo>{};
     for (final b in list) {
       if (!(b['month']?.toString() ?? monthKey(m)).startsWith(monthKey(m))) continue;
@@ -97,6 +130,7 @@ class BudgetService {
         repeat: b['repeat'] != false,
         carryOver: b['carry_over'] == true,
         carried: _num(b['carried']),
+        ranOutDay: ranOut(catId, _num(b['amount'])),
       );
     }
     return out;
