@@ -719,13 +719,13 @@ class BudgetListRow extends StatelessWidget {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: over ? AppColors.dark : AppColors.surface,
-                    borderRadius: BorderRadius.circular(13),
+                    color: AppColors.categoryFill,
+                    shape: BoxShape.circle,
                   ),
                   child: Icon(
                     IconMapper.map(b.icon),
                     size: 20,
-                    color: over ? AppColors.accent : AppColors.dark,
+                    color: AppColors.categoryInk,
                   ),
                 ),
                 const SizedBox(width: 12),

@@ -350,8 +350,8 @@ class _S extends State<SplitGroupDetailScreen>
                     Container(
                       width: 52,
                       height: 52,
-                      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(18)),
-                      child: Icon(groupExpenseIcon(e), size: 26, color: AppColors.dark),
+                      decoration: const BoxDecoration(color: AppColors.categoryFill, shape: BoxShape.circle),
+                      child: Icon(groupExpenseIcon(e), size: 26, color: AppColors.categoryInk),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -1728,10 +1728,10 @@ class _S extends State<SplitGroupDetailScreen>
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: lit ? AppColors.accent : AppColors.surface,
-                  borderRadius: BorderRadius.circular(14),
+                  color: lit ? AppColors.accent : AppColors.categoryFill,
+                  shape: BoxShape.circle,
                 ),
-                child: MorphIcon(icon, id: id, size: 21, color: AppColors.dark),
+                child: MorphIcon(icon, id: id, size: 21, color: AppColors.categoryInk),
               ),
               const SizedBox(width: 12),
               Expanded(

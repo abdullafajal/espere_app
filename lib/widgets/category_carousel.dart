@@ -325,7 +325,7 @@ class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerPr
             height: 60,
             decoration: BoxDecoration(
               color: item.isNew ? Colors.transparent : Colors.white.withValues(alpha: 0.6),
-              borderRadius: BorderRadius.circular(20),
+              shape: BoxShape.circle,
               border: item.isNew ? Border.all(color: AppColors.mutedLight, width: 1.5) : null,
             ),
             child: Icon(item.icon, size: 28, color: AppColors.dark),
@@ -458,8 +458,8 @@ class _CategoryListSheetState extends State<_CategoryListSheet> {
             Container(
               width: 42,
               height: 42,
-              decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(14)),
-              child: Icon(c.icon, size: 21, color: AppColors.dark),
+              decoration: const BoxDecoration(color: AppColors.categoryFill, shape: BoxShape.circle),
+              child: Icon(c.icon, size: 21, color: AppColors.categoryInk),
             ),
             const SizedBox(width: 12),
             Expanded(

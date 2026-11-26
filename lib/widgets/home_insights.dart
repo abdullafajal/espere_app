@@ -178,7 +178,7 @@ class _CategoryBreakdownCardState extends State<CategoryBreakdownCard> {
                   Container(
                     width: 40,
                     height: 40,
-                    decoration: BoxDecoration(color: AppColors.categoryFill, borderRadius: BorderRadius.circular(14)),
+                    decoration: const BoxDecoration(color: AppColors.categoryFill, shape: BoxShape.circle),
                     child: Icon(IconMapper.map(s.icon), size: 20, color: AppColors.categoryInk),
                   ),
                   Positioned(
