@@ -2,6 +2,7 @@
 /// kind of group, who to add (new groups) and who may invite. Same look as Add expense.
 library;
 
+import '../widgets/morph_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -109,6 +110,7 @@ class _GroupFormScreenState extends State<GroupFormScreen> {
       'color': widget.group?['color'] ?? '#C8E64A',
       'members_can_invite': _canInvite,
     };
+    if (_editing) EditAnimation.arm();
     final r = _editing
         ? await ApiService.updateSplitGroup(widget.group!['id'] as int, body)
         : await ApiService.createSplitGroup({...body, 'members': _picked.toList()});

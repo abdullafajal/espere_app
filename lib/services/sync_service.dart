@@ -1,5 +1,6 @@
 /// Sync service — processes offline queue and syncs with server.
 import 'package:flutter/foundation.dart';
+import '../widgets/morph_text.dart';
 import 'api_service.dart';
 import 'cache_service.dart';
 import 'connectivity_service.dart';
@@ -670,6 +671,8 @@ class SyncService {
     Map<String, dynamic>? data,
     int? entityId,
   }) async {
+    // Something the user changed: let the edit animation show it.
+    if (action == 'update') EditAnimation.arm();
     if (entity == 'transaction' && action == 'delete' && entityId != null) {
       try {
         await onTransactionDeleted?.call(entityId);

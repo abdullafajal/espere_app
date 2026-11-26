@@ -44,7 +44,7 @@ class BudgetDeck extends StatefulWidget {
     this.snapKeyFor,
   });
 
-  static const double height = 230;
+  static const double height = 252;
 
   @override
   State<BudgetDeck> createState() => _BudgetDeckState();
@@ -528,12 +528,12 @@ class _BudgetDeckState extends State<BudgetDeck> with TickerProviderStateMixin {
                             // (a dot when nothing). Green while within the budget, white after it ran out;
                             // the days still to come are faint; a white line marks today.
                             child: SizedBox(
-                              height: 30,
+                              height: 50,
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
                                   for (var d = 1; d <= daysIn; d++) ...[
-                                    if (d > 1) const SizedBox(width: 2),
+                                    if (d > 1) const SizedBox(width: 2.5),
                                     Expanded(
                                       child: Column(
                                         mainAxisAlignment:
@@ -542,9 +542,9 @@ class _BudgetDeckState extends State<BudgetDeck> with TickerProviderStateMixin {
                                           Container(
                                             height:
                                                 (b.daily[d] ?? 0) <= 0
-                                                    ? 3
-                                                    : 4 +
-                                                        20 *
+                                                    ? 4
+                                                    : 8 +
+                                                        34 *
                                                             ((b.daily[d] ?? 0) /
                                                                     maxDay)
                                                                 .clamp(
@@ -693,9 +693,9 @@ class BudgetListRow extends StatelessWidget {
         over
             ? 'over $symbol${m.format(b.limit.round())}'
             : 'left of $symbol${m.format(b.limit.round())}';
-    // Blocks filled: one per 10% (a started block counts), all ten when over.
-    final filled =
-        over ? 10 : (b.fraction * 10).ceil().clamp(b.spent > 0 ? 1 : 0, 10);
+    // Ten blocks of 10% each, filled to the exact share used: 61% is six full blocks
+    // and a tenth of the seventh. All ten when over.
+    final tenths = over ? 10.0 : (b.fraction * 10).clamp(0.0, 10.0);
     final blockColor = over || near ? AppColors.dark : AppColors.accent;
     return Semantics(
       button: true,
@@ -772,15 +772,21 @@ class BudgetListRow extends StatelessWidget {
                           for (var k = 0; k < 10; k++) ...[
                             if (k > 0) const SizedBox(width: 2.5),
                             Expanded(
-                              child: AnimatedContainer(
-                                duration: Duration(milliseconds: 200 + 40 * k),
+                              child: Container(
                                 height: 7,
                                 decoration: BoxDecoration(
-                                  color:
-                                      k < filled
-                                          ? blockColor
-                                          : AppColors.surface,
-                                  borderRadius: BorderRadius.circular(2),
+                                  color: AppColors.surface,
+                                  borderRadius: BorderRadius.circular(3),
+                                ),
+                                alignment: Alignment.centerLeft,
+                                child: FractionallySizedBox(
+                                  widthFactor: (tenths - k).clamp(0.0, 1.0),
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: blockColor,
+                                      borderRadius: BorderRadius.circular(3),
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -791,21 +797,26 @@ class BudgetListRow extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    MorphText(
-                      id: 'brow-${b.categoryId}',
-                      amount,
-                      style: AppText.amount.copyWith(fontSize: 15),
-                    ),
-                    const SizedBox(height: 2),
-                    MorphText(
-                      id: 'brow-${b.categoryId}',
-                      under,
-                      style: AppText.rowSub.copyWith(fontSize: 10.5),
-                    ),
-                  ],
+                // A fixed width, so every row's bar is the same length.
+                SizedBox(
+                  width: 104,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      MorphText(
+                        id: 'brow-${b.categoryId}',
+                        amount,
+                        style: AppText.amount.copyWith(fontSize: 15),
+                      ),
+                      const SizedBox(height: 2),
+                      MorphText(
+                        id: 'brow-${b.categoryId}',
+                        under,
+                        maxLines: 1,
+                        style: AppText.rowSub.copyWith(fontSize: 10.5),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),

@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:espere_app/models/transaction.dart';
 import 'package:espere_app/theme/app_theme.dart';
 import 'package:espere_app/widgets/transaction_tile.dart';
+import 'package:espere_app/widgets/morph_text.dart';
 import 'preview_harness.dart';
 
 void main() {
@@ -32,6 +33,7 @@ void main() {
         ),
       ),
     ));
+    EditAnimation.arm();
     n.value = b;
     var prev = 0;
     for (final ms in [0, 250, 450, 700, 950, 1150, 1600]) {

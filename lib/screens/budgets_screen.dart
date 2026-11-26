@@ -780,6 +780,7 @@ class _BudgetFormSheetState extends State<_BudgetFormSheet> {
     }
 
     final isUpdate = widget.budget != null;
+    if (isUpdate) EditAnimation.arm();
     
     // Prevent duplicate budgets for the same category in the current month
     if (!isUpdate) {

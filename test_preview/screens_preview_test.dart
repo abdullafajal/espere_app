@@ -107,7 +107,6 @@ void main() {
           await t.tap(find.text(k).last);
           await t.pump(const Duration(milliseconds: 50));
         }
-        await t.tap(find.bySemanticsLabel('Food'));
       }));
   testWidgets('activity', (t) => shot(t, 'activity', const TransactionListScreen()));
   testWidgets('form_new', (t) => shot(t, 'form_new', const QuickAddScreen(prefill: TransactionPrefill(amount: 249, notes: 'Swiggy')), scaffold: false));
@@ -124,8 +123,9 @@ void main() {
   testWidgets('budgets_many', (t) {
     final now = DateTime.now();
     String d(int day) => DateTime(now.year, now.month, day.clamp(1, now.day), 12).toUtc().toIso8601String();
-    final spend = {0: 6740.0, 6: 2150.0, 3: 2100.0, 9: 1700.0, 2: 1250.0, 1: 1500.0};
-    final limits = {0: '6000', 6: '2000', 3: '2500', 9: '2000', 2: '3000', 1: '4000'};
+    // Like the reported screen: 111%, 86%, 69%, 61% and two at 0%.
+    final spend = {0: 11156.0, 2: 3015.0, 3: 5847.0, 4: 3381.0};
+    final limits = {0: '10000', 2: '3500', 3: '8500', 4: '5500', 5: '500', 6: '1500'};
     final txns = [
       for (final e in spend.entries) txn(900 + e.key, e.value.toStringAsFixed(0), 'expense', categories[e.key], 'x', d(e.key + 2)),
     ];
@@ -204,6 +204,14 @@ void main() {
       }));
   testWidgets('sheet_group_expense', (t) => shot(t, 'sheet_group_expense', const SplitGroupDetailScreen(groupId: 1, groupName: 'Goa Trip'),
       scaffold: false, act: (t) => t.tap(find.text('Add expense'))));
+  testWidgets('split_category', (t) => shot(t, 'split_category', const SplitGroupDetailScreen(groupId: 1, groupName: 'Goa Trip'),
+      scaffold: false, act: (t) async {
+        await t.tap(find.text('Add expense'));
+        for (var i = 0; i < 8; i++) {
+          await t.pump(const Duration(milliseconds: 120));
+        }
+        await t.tap(find.byIcon(Icons.expand_more_rounded).first);
+      }));
   testWidgets('sheet_new_group', (t) => shot(t, 'sheet_new_group', SplitGroupsScreen(onBack: () {}),
       scaffold: false, act: (t) async {
         await t.tap(find.byTooltip('New group'));

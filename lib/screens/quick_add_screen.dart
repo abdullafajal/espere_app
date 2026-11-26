@@ -29,6 +29,7 @@ import '../theme/motion.dart';
 import '../utils/app_toast.dart';
 import '../utils/icon_mapper.dart';
 import '../services/budget_service.dart';
+import '../widgets/category_carousel.dart';
 
 class QuickAddScreen extends StatefulWidget {
   /// 'expense' (default) or 'income'.
@@ -104,7 +105,6 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
   /// Edit / receipt mode: a category tap selects, Save stores.
   bool get _formMode => widget.editId != null || widget.prefill != null;
   bool get _isEdit => widget.editId != null;
-  static const bool _pickThenSave = true;
   TransactionModel? _old;
   int? _categoryId;
 
@@ -154,6 +154,8 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
       }
       _symbol = cached?['currency_symbol'] as String? ?? '₹';
       _categories = cats;
+      // A new entry starts on the most used category (the list is sorted by use).
+      if (_categoryId == null && cats.isNotEmpty) _categoryId = cats.first.id;
       _loading = false;
     });
     final budgets = await BudgetService.byCategory();
@@ -182,7 +184,12 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
       _categoryId = null;
     });
     final cats = await TransactionStore.categoriesByUse(type);
-    if (mounted) setState(() => _categories = cats);
+    if (mounted) {
+      setState(() {
+        _categories = cats;
+        _categoryId = cats.isEmpty ? null : cats.first.id;
+      });
+    }
   }
 
   static String _trim(double v) =>
@@ -216,57 +223,6 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
     final parts = _amount.split('.');
     final whole = NumberFormat.decimalPattern('en_IN').format(int.tryParse(parts[0]) ?? 0);
     return parts.length > 1 ? '$whole.${parts[1]}' : whole;
-  }
-
-  Future<void> _save(CategoryModel? category) async {
-    // New entries work like edit too: tap a category to pick it, then the Add button saves.
-    if (_formMode || _pickThenSave) {
-      final after = _after(category?.id);
-      if (after != null && after.fraction >= 0.8) {
-        AppHaptics.warn();
-      } else {
-        AppHaptics.tap();
-      }
-      setState(() => _categoryId = category?.id);
-      return;
-    }
-    if (_busy) return;
-    if (!_hasAmount) {
-      AppHaptics.warn();
-      AppToast.info(context, 'Type the amount first');
-      return;
-    }
-    _busy = true;
-    AppHaptics.confirm();
-    final amount = _value;
-    try {
-      final id = await TransactionStore.create(
-        amount: amount,
-        type: _type,
-        category: category,
-        date: _date,
-        paymentMethod: _method,
-        notes: _note.trim(),
-      );
-      (await SharedPreferences.getInstance()).setString(_kMethod, _method);
-      _addedAny = true;
-      if (!mounted) return;
-      final sign = _type == 'income' ? '+' : '−';
-      setState(() {
-        _saved = _Saved(
-          id: id,
-          amount: _amount,
-          text: '$sign$_symbol$_amountLabel added to ${category?.name ?? 'Other'}',
-        );
-        _amount = '';
-        _note = '';
-        _date = null;
-      });
-      _savedTimer?.cancel();
-      _savedTimer = Timer(const Duration(seconds: 5), _dismissSaved);
-    } finally {
-      _busy = false;
-    }
   }
 
   /// Edit / receipt mode: store the values.
@@ -602,7 +558,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
           Text(
             _formMode
                 ? (_isEdit ? 'Change anything, then Save' : 'Check the details, then Save')
-                : (_hasAmount ? 'Pick a category, then Add' : 'Type the amount'),
+                : (_hasAmount ? 'Swipe to change the category, then Add' : 'Type the amount'),
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
@@ -642,13 +598,31 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
                   child: const Text('Category', style: AppText.section),
                 ),
                 Text(
-                  _categories.length > 8 ? '${_categories.length} · scroll' : '${_categories.length}',
+                  _categories.isEmpty ? '' : '${_carouselIndex + 1} of ${_categories.length}',
                   style: AppText.rowSub,
                 ),
               ],
             ),
           ),
-          Expanded(child: _grid()),
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+                // Shrinks on very short screens instead of overflowing.
+                : Center(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: SizedBox(
+                        width: MediaQuery.sizeOf(context).width,
+                        child: CategoryCarousel(
+                          items: _carouselItems,
+                          index: _carouselIndex,
+                          onChanged: _pickIndex,
+                          onNew: _newCategory,
+                        ),
+                      ),
+                    ),
+                  ),
+          ),
           _budgetNote(),
           _saveBar(),
           _keypad(),
@@ -657,94 +631,34 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
     );
   }
 
-  Widget _grid() {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
-    }
-    final tiles = <Widget>[
-      for (final c in _categories)
-        _categoryTile(c.name, IconMapper.map(c.icon), () => _save(c),
-            selected: c.id == _categoryId, budget: _type == 'expense' ? _budgets[c.id] : null),
-      _categoryTile('New', Icons.add_rounded, _newCategory, dashed: true),
-    ];
-    if (_categories.isEmpty) {
-      tiles.insert(0, _categoryTile('Other', Icons.more_horiz_rounded, () => _save(null)));
-    }
-    return AnimatedOpacity(
-      duration: const Duration(milliseconds: 150),
-      opacity: _hasAmount || _formMode ? 1 : 0.5,
-      child: GridView.count(
-        crossAxisCount: 4,
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-        // Taller tiles when they also show a budget line.
-        childAspectRatio: _type == 'expense' && _budgets.isNotEmpty ? 0.78 : 0.92,
-        children: tiles,
-      ),
-    );
+  /// The carousel's cards: the categories (most used first) with their budget left,
+  /// then "New". With no categories yet, "Other".
+  List<CarouselCategory> get _carouselItems => [
+        if (_categories.isEmpty) const CarouselCategory(label: 'Other', icon: Icons.more_horiz_rounded),
+        for (final c in _categories)
+          CarouselCategory(
+            label: c.name,
+            icon: IconMapper.map(c.icon),
+            note: _type != 'expense' || _budgets[c.id] == null || _budgets[c.id]!.limit <= 0
+                ? null
+                : (_budgets[c.id]!.spent > _budgets[c.id]!.limit
+                    ? '${_moneyShort(_budgets[c.id]!.spent - _budgets[c.id]!.limit)} over'
+                    : '${_moneyShort(_budgets[c.id]!.left)} left'),
+            used: _type != 'expense' || _budgets[c.id] == null || _budgets[c.id]!.limit <= 0
+                ? null
+                : _budgets[c.id]!.fraction,
+          ),
+        const CarouselCategory(label: 'New', icon: Icons.add_rounded, isNew: true),
+      ];
+
+  int get _carouselIndex {
+    final i = _categories.indexWhere((c) => c.id == _categoryId);
+    return i < 0 ? 0 : i;
   }
 
-  Widget _categoryTile(String label, IconData icon, VoidCallback onTap,
-      {bool dashed = false, bool selected = false, BudgetInfo? budget}) {
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: dashed ? 'New category' : label,
-      excludeSemantics: true,
-      child: SpringPress(
-        haptic: dashed ? HapticKind.tap : HapticKind.none,
-        scale: 0.9,
-        onTap: onTap,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 160),
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: dashed ? Colors.transparent : (selected ? AppColors.dark : AppColors.categoryFill),
-                borderRadius: BorderRadius.circular(18),
-                border: dashed ? Border.all(color: AppColors.mutedLight, width: 1.5) : null,
-              ),
-              child: Icon(icon, size: 24, color: selected ? AppColors.accent : AppColors.categoryInk),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.text),
-            ),
-            if (budget != null && budget.limit > 0) ...[
-              const SizedBox(height: 4),
-              Container(
-                width: 40,
-                height: 3,
-                decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(2)),
-                alignment: Alignment.centerLeft,
-                child: FractionallySizedBox(
-                  widthFactor: budget.fraction.clamp(0.0, 1.0),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: selected ? AppColors.accent : AppColors.dark,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                budget.spent > budget.limit ? '${_moneyShort(budget.spent - budget.limit)} over' : '${_moneyShort(budget.left)} left',
-                maxLines: 1,
-                overflow: TextOverflow.fade,
-                softWrap: false,
-                style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: AppColors.muted),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
+  void _pickIndex(int i) {
+    if (i >= _categories.length) return; // "New" (or "Other") card
+    setState(() => _categoryId = _categories[i].id);
   }
 
   String _moneyShort(double v) =>
