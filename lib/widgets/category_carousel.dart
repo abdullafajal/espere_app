@@ -1,5 +1,6 @@
 /// Picking a category by swiping: the picked one is a big dark card in the middle, the
-/// next and previous ones peek at the sides. Drag (or flick) to move; it settles on the
+/// next and previous ones peek at the sides. It goes round: left of the first category
+/// is the last one, so the first (most used) never sits next to an empty space. Drag (or flick) to move; it settles on the
 /// app's spring. Tap a side card to bring it to the middle, tap the middle card (or
 /// "All") to see every category in a searchable list. Used on Add expense, Edit and the
 /// Split "new expense" screen, so picking a category feels the same everywhere.
@@ -75,8 +76,17 @@ class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerPr
     // Picked elsewhere (the list, or the screen chose a default): glide there.
     if (widget.index != _shown && !_pos.isAnimating) {
       _shown = widget.index;
-      _settle(widget.index, 0);
+      _settle(_nearest(widget.index), 0);
     }
+  }
+
+  /// The scroll position for [index] closest to where the carousel is now (it goes round).
+  int _nearest(int index) {
+    if (!_loops) return index;
+    final base = _pos.value.round();
+    var diff = (index - _wrap(base)) % _n;
+    if (diff > _n / 2) diff -= _n;
+    return base + diff;
   }
 
   @override
@@ -87,8 +97,12 @@ class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerPr
 
   int get _n => widget.items.length;
 
+  /// Goes round when there are enough categories to fill both sides.
+  bool get _loops => _n >= 4;
+  int _wrap(int k) => _loops ? ((k % _n) + _n) % _n : k.clamp(0, _n - 1);
+
   void _onMove() {
-    final i = _pos.value.round().clamp(0, _n - 1);
+    final i = _wrap(_pos.value.round());
     if (i != _shown) {
       _shown = i;
       AppHaptics.tap();
@@ -104,23 +118,23 @@ class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerPr
 
   void _dragUpdate(DragUpdateDetails d) {
     var p = _pos.value - d.delta.dx / _gap;
-    // Past either end it gives like a rubber band.
-    if (p < 0) p = _pos.value - d.delta.dx / _gap * 0.3;
-    if (p > _n - 1) p = _pos.value - d.delta.dx / _gap * 0.3;
+    // Without going round, past either end it gives like a rubber band.
+    if (!_loops && (p < 0 || p > _n - 1)) p = _pos.value - d.delta.dx / _gap * 0.3;
     _pos.value = p;
   }
 
   void _dragEnd(DragEndDetails d) {
     final v = -(d.primaryVelocity ?? 0) / _gap; // cards per second
     final projected = _pos.value + v * 0.18; // a flick carries on a little
-    final target = projected.round().clamp(0, _n - 1);
+    final target = _loops ? projected.round() : projected.round().clamp(0, _n - 1);
     _settle(target, v);
   }
 
   void _tapAt(double dx, double width) {
-    final hit = (_pos.value + (dx - width / 2) / _gap).round().clamp(0, _n - 1);
+    var hit = (_pos.value + (dx - width / 2) / _gap).round();
+    if (!_loops) hit = hit.clamp(0, _n - 1);
     if (hit == _pos.value.round()) {
-      final item = widget.items[hit];
+      final item = widget.items[_wrap(hit)];
       if (item.isNew) {
         widget.onNew?.call();
       } else {
@@ -134,9 +148,9 @@ class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerPr
 
   Future<void> _openAll() async {
     AppHaptics.tap();
-    final picked = await showCategoryList(context, widget.items, _pos.value.round());
+    final picked = await showCategoryList(context, widget.items, _wrap(_pos.value.round()));
     if (picked != null && mounted) {
-      _settle(picked, 0);
+      _settle(_nearest(picked), 0);
     }
   }
 
@@ -161,9 +175,12 @@ class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerPr
                 builder: (context, _) {
                   final p = _pos.value;
                   final c = p.round();
+                  // Positions around the middle (each shows the category it wraps to);
+                  // never so many that one category shows twice.
+                  final reach = _loops ? math.min(3, (_n - 1) ~/ 2) : 3;
                   final order = <int>[
-                    for (var k = c - 3; k <= c + 3; k++)
-                      if (k >= 0 && k < _n) k
+                    for (var k = c - reach; k <= c + reach; k++)
+                      if (_loops || (k >= 0 && k < _n)) k
                   ]..sort((a, b) => (b - p).abs().compareTo((a - p).abs()));
                   return Stack(
                     clipBehavior: Clip.none,
@@ -216,7 +233,7 @@ class _CategoryCarouselState extends State<CategoryCarousel> with SingleTickerPr
     final x = d * _gap - d.sign * math.max(0, a - 1) * 18;
     final opacity = (1 - math.max(0.0, a - 1) * 0.6).clamp(0.0, 1.0);
     final mid = a < 0.5;
-    final item = widget.items[i];
+    final item = widget.items[_wrap(i)];
     const cw = 116.0, ch = 130.0;
     return Positioned(
       left: width / 2 - cw / 2,

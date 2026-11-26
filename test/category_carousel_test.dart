@@ -23,6 +23,14 @@ void main() {
     ));
     final centre = t.getCenter(find.byType(CategoryCarousel)) - const Offset(0, 14);
 
+    // It goes round: the last category is to the left of the first.
+    await t.dragFrom(centre, const Offset(130, 0));
+    await t.pumpAndSettle();
+    expect(index, 4);
+    await t.dragFrom(centre, const Offset(-130, 0));
+    await t.pumpAndSettle();
+    expect(index, 0);
+
     await t.dragFrom(centre, const Offset(-130, 0));
     await t.pumpAndSettle();
     expect(index, 1);
