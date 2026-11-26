@@ -267,6 +267,7 @@ void silencePlugins() {
 /// Renders [screen] at phone size and writes goldens/[name].png.
 Future<void> shot(WidgetTester tester, String name, Widget screen,
     {Map<String, Object>? prefs, Size size = const Size(390, 844), bool scaffold = true,
+    double textScale = 1,
     Future<void> Function(WidgetTester t)? act}) async {
   debugDisableShadows = false;
   // flutter test --dart-define=ACCENT=4 renders every screen in that app colour into
@@ -281,6 +282,12 @@ Future<void> shot(WidgetTester tester, String name, Widget screen,
   await tester.pumpWidget(MaterialApp(
     debugShowCheckedModeBanner: false,
     theme: AppTheme.lightTheme,
+    builder: textScale == 1
+        ? null
+        : (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(textScale)),
+              child: child!,
+            ),
     routes: {'/categories': (_) => const SizedBox(), '/profile': (_) => const SizedBox()},
     home: scaffold ? Scaffold(body: SafeArea(child: screen)) : screen,
   ));
