@@ -16,6 +16,7 @@ import '../theme/motion.dart';
 import '../utils/icon_mapper.dart';
 import 'morph_text.dart';
 import 'spring_menu.dart';
+import 'block_bar.dart';
 import 'thanos_snap_widget.dart';
 
 class BudgetDeck extends StatefulWidget {
@@ -718,13 +719,13 @@ class BudgetListRow extends StatelessWidget {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: over ? AppColors.dark : AppColors.surface,
-                    borderRadius: BorderRadius.circular(13),
+                    color: AppColors.categoryFill,
+                    shape: BoxShape.circle,
                   ),
                   child: Icon(
                     IconMapper.map(b.icon),
                     size: 20,
-                    color: over ? AppColors.accent : AppColors.dark,
+                    color: AppColors.categoryInk,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -767,32 +768,7 @@ class BudgetListRow extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 7),
-                      Row(
-                        children: [
-                          for (var k = 0; k < 10; k++) ...[
-                            if (k > 0) const SizedBox(width: 2.5),
-                            Expanded(
-                              child: Container(
-                                height: 7,
-                                decoration: BoxDecoration(
-                                  color: AppColors.surface,
-                                  borderRadius: BorderRadius.circular(3),
-                                ),
-                                alignment: Alignment.centerLeft,
-                                child: FractionallySizedBox(
-                                  widthFactor: (tenths - k).clamp(0.0, 1.0),
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: blockColor,
-                                      borderRadius: BorderRadius.circular(3),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
+                      BlockBar(value: over ? 2 : tenths / 10, color: blockColor),
                     ],
                   ),
                 ),

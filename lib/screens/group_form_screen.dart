@@ -261,8 +261,10 @@ class _GroupFormScreenState extends State<GroupFormScreen> {
                   ? const SizedBox(
                       width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.dark))
                   : Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(_editing ? Icons.check_rounded : Icons.group_add_rounded, size: 22, color: AppColors.dark),
-                      const SizedBox(width: 8),
+                      if (!_editing) ...[
+                        const Icon(Icons.group_add_rounded, size: 22, color: AppColors.dark),
+                        const SizedBox(width: 8),
+                      ],
                       Text(
                         _editing ? 'Save changes' : (count == 1 ? 'Create group' : 'Create group · $count people'),
                         style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.dark),

@@ -36,7 +36,7 @@ void main() {
     expect(index, 1);
 
     // Tap the card to the right of the middle one.
-    await t.tapAt(centre + const Offset(108, 0));
+    await t.tapAt(centre + const Offset(92, 0));
     await t.pumpAndSettle();
     expect(index, 2);
 

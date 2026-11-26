@@ -580,8 +580,6 @@ class _GroupExpenseScreenState extends State<GroupExpenseScreen> with SingleTick
                       ? const SizedBox(
                           width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.dark))
                       : Row(mainAxisSize: MainAxisSize.min, children: [
-                          const Icon(Icons.check_rounded, size: 22, color: AppColors.dark),
-                          const SizedBox(width: 8),
                           Text(
                             '${widget.editData == null ? 'Save' : 'Update'} · $_payerName paid, '
                             '${_included.length} ${_included.length == 1 ? 'person' : 'people'}',
