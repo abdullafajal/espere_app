@@ -238,7 +238,7 @@ object DailyReminder {
             timeZone = TimeZone.getTimeZone("UTC")
         }.format(now)
         val item = JSONObject().apply {
-            put("id", -(now / 1000))
+            put("id", -now) // milliseconds: two made in the same second stay apart
             put("title", title)
             put("message", body)
             put("data", JSONObject().apply {

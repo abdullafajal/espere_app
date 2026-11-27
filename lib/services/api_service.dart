@@ -1073,6 +1073,23 @@ class ApiService {
   }
 
   /// Marks [ids] as read, or all of them when [ids] is null.
+  /// Saves notifications made on the phone (each with a `client_ref`; one already saved
+  /// is not saved again).
+  static Future<ApiResult<void>> saveNotifications(List<Map<String, dynamic>> items) async {
+    try {
+      final url = await _url('/api/notifications/');
+      final response = await _Http.post(
+        Uri.parse(url),
+        headers: await _headers(),
+        body: jsonEncode({'notifications': items}),
+      );
+      if (response.statusCode == 200) return ApiResult(data: null);
+      return ApiResult(error: 'Failed to save notifications (${response.statusCode}).');
+    } catch (e) {
+      return ApiResult(error: 'Connection error.');
+    }
+  }
+
   static Future<ApiResult<void>> markNotificationsRead([List<int>? ids]) async {
     try {
       final url = await _url('/api/notifications/read/');
