@@ -255,6 +255,11 @@ class _BudgetWatchDeckState extends State<BudgetWatchDeck> with TickerProviderSt
             child: Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.muted),
           ),
         ),
+        // Says the cards swipe, like the category carousel.
+        const SizedBox(width: 6),
+        const Icon(Icons.swipe_rounded, size: 16, color: AppColors.muted),
+        const SizedBox(width: 5),
+        Text('Swipe', style: AppText.rowSub.copyWith(fontSize: 11.5)),
       ],
     );
   }
